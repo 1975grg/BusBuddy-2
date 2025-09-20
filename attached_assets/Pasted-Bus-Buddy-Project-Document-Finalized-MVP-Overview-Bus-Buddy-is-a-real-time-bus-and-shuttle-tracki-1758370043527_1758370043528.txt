@@ -1,0 +1,171 @@
+Bus Buddy Project Document (Finalized MVP)
+Overview
+
+Bus Buddy is a real-time bus and shuttle tracking platform built for schools, hospitals, airports, hotels, and other institutions.
+
+It gives administrators a simple way to set up routes and vehicles, lets drivers easily start and run their trips, and enables riders (students, families, employees, or guests) to track buses live with proactive notifications.
+
+The MVP is designed to be feature-complete enough for deployment across multiple industries right away, while still keeping the experience clean, intuitive, and reliable.
+
+Core Users
+
+Organization Admins – set up and manage routes, vehicles, branding, and access.
+
+Drivers – activate and operate routes with minimal interaction.
+
+Riders/Viewers – students, families, employees, or guests who follow buses live.
+
+Super Admin – platform owner, overseeing all organizations.
+
+Key Features
+For Admins
+
+Multi-organization support (each school, hospital, or hotel is siloed).
+
+Route editor: create and reorder stops (2 for shuttles, 20+ for school buses).
+
+Default “Only Active” filter on all lists (routes, stops, vehicles).
+
+Optional vehicle assignment (bus/shuttle numbers).
+
+Access tools: generate QR codes, magic links, or passwords; print QR sheets.
+
+Branding: upload organization logo and set brand colors.
+
+Token management: revoke remembered devices or reset access (e.g., each semester).
+
+For Drivers
+
+Login once (no repeated password prompts).
+
+Default route is preselected (changeable if needed).
+
+Giant buttons: Start Trip, Pause/Resume, End Trip.
+
+Live map showing bus position and next stop ETA.
+
+GPS streaming every few seconds (offline caching and backfill).
+
+Automatic stop advancement using geofencing—driver doesn’t need to manually mark stops.
+
+Optional issue reporting (free-text).
+
+For Riders
+
+Access via QR code, link, or password (if required).
+
+“Remember me”: route remembered on device, no repeated prompts.
+
+Ability to save multiple default routes (families with more than one student, employees with multiple shuttles).
+
+Auto-loads the live bus map—no need to click “Find My Bus.”
+
+ETA clearly displayed for each stop.
+
+Notifications:
+
+Email (core)
+
+SMS (core MVP)
+
+Push notifications (core MVP)
+
+Riders choose when to be alerted (X minutes before, or when the bus is Y meters away).
+
+Option to set a default stop per route for faster tracking.
+
+Notification System (Core MVP)
+
+Proactive alerts by email, SMS, and push notifications.
+
+Riders choose notification thresholds.
+
+System calculates ETA in real time, triggers alerts automatically, and prevents duplicates.
+
+Admins can view and manage notification activity.
+
+Route Types
+
+Shuttles: simple 2-stop back-and-forth loop.
+
+School buses: many sequential stops in one direction.
+
+Both handled in the same editor.
+
+Branding
+
+Each organization can upload a logo and set brand colors.
+
+Branding applies to the rider-facing map and to QR printouts, so the experience feels like the school/hospital/hotel’s own.
+
+Privacy & Safety
+
+Data siloed by organization.
+
+Bus location visible only while a trip is active.
+
+Tokens and device-based remembered access can be revoked anytime.
+
+Rider access requires a valid QR/link/password once, then is remembered.
+
+User Experience Principles
+
+Zero extra clicks: Riders immediately see live buses.
+
+Defaults everywhere: Default routes and stops for drivers and riders.
+
+Clean simplicity: Drivers only see trip controls. Riders see a map with ETA. Admins see simple lists.
+
+Consistency: Active filters applied by default to keep screens uncluttered.
+
+Brandable: Each organization’s riders feel like it’s “their app,” not a generic tool.
+
+Technology
+
+Frontend: React + TypeScript + Tailwind.
+
+Realtime backend: Firebase (Auth, Firestore, Realtime DB).
+
+Maps: MapLibre GL + OpenStreetMap.
+
+Notifications: SendGrid (email), Twilio (SMS), Firebase Cloud Messaging (push).
+
+Hosting: Firebase Hosting.
+
+MVP Deliverables
+
+Multi-organization setup.
+
+Route editor with sequential stops, active filters, and vehicle assignment.
+
+Driver app with login, default route, auto stop advancement, and simple trip controls.
+
+Rider app with QR/link/password access, remembered defaults, immediate live map, and ETA display.
+
+Notification system with email, SMS, and push alerts.
+
+Admin branding upload (logo + colors) that applies across rider-facing screens.
+
+Admin dashboard for QR/links, token management, vehicles, and notifications.
+
+Stretch Features (Future)
+
+Analytics dashboard (ridership, trip delays, notification usage).
+
+Per-stop dwell time insights.
+
+Emergency broadcast from admin to riders.
+
+Background GPS tracking for drivers.
+
+Export tools for compliance or reporting.
+
+Why Bus Buddy Matters
+
+Schools: Families save time, kids wait safely, fewer calls to administrators.
+
+Hospitals & Airports: Staff know when shuttles arrive, reducing downtime.
+
+Hotels: Guests track shuttles for a premium experience.
+
+Institutions: Operations run smoother with fewer surprises.
