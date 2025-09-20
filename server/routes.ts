@@ -538,8 +538,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Service Alerts (Admin → Riders)
   app.post("/api/service-alerts", async (req, res) => {
     try {
-      const validatedData = insertServiceAlertSchema.parse(req.body);
-      const alert = await storage.createServiceAlert(validatedData);
+      // Validate client data (without server-controlled fields)
+      const clientSchema = insertServiceAlertSchema.omit({ 
+        createdByUserId: true, 
+        organizationId: true 
+      });
+      const clientData = clientSchema.parse(req.body);
+      
+      // Verify route exists and get organization
+      const route = await storage.getRoute(clientData.routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // TODO: In a real app, get user ID from authenticated session
+      // For now, find an admin user for this organization
+      const adminUsers = await storage.getUsersByOrganization(route.organizationId);
+      const adminUser = adminUsers.find(u => u.role === "org_admin");
+      
+      if (!adminUser) {
+        return res.status(500).json({ error: "No admin user found for organization" });
+      }
+      
+      // Build complete alert data with server-controlled fields
+      const alertData = {
+        ...clientData,
+        organizationId: route.organizationId,
+        createdByUserId: adminUser.id
+      };
+      
+      const alert = await storage.createServiceAlert(alertData);
       res.status(201).json(alert);
     } catch (error) {
       console.error("Error creating service alert:", error);

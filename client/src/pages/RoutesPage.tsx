@@ -6,6 +6,7 @@ import { Plus, Search } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
 import { EditRouteDialog } from "@/components/EditRouteDialog";
+import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -22,6 +23,8 @@ export default function RoutesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [alertRoute, setAlertRoute] = useState<Route | null>(null);
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -70,6 +73,11 @@ export default function RoutesPage() {
       });
     },
   });
+
+  const handleSendAlert = (route: Route) => {
+    setAlertRoute(route);
+    setAlertDialogOpen(true);
+  };
 
   const handleToggleStatus = (routeId: string, currentStatus: "active" | "inactive") => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
@@ -161,6 +169,7 @@ export default function RoutesPage() {
                   ridersCount={0} // TODO: Add riders count to API
                   onEdit={() => handleEditRoute(route.id)}
                   onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
+                  onSendAlert={() => handleSendAlert(route)}
                 />
               );
             })}
@@ -196,6 +205,20 @@ export default function RoutesPage() {
           onSuccess={() => {
             setEditingRoute(null);
             setEditDialogOpen(false);
+          }}
+        />
+      )}
+
+      {/* Send Alert Dialog */}
+      {alertRoute && (
+        <SendAlertDialog
+          route={alertRoute}
+          open={alertDialogOpen}
+          onOpenChange={(open) => {
+            setAlertDialogOpen(open);
+            if (!open) {
+              setAlertRoute(null);
+            }
           }}
         />
       )}

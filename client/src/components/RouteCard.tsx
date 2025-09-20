@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Users, Settings } from "lucide-react";
+import { MapPin, Clock, Users, Settings, MessageSquare } from "lucide-react";
 
 interface Stop {
   id: string;
@@ -19,6 +19,7 @@ interface RouteCardProps {
   ridersCount?: number;
   onEdit?: () => void;
   onToggleStatus?: () => void;
+  onSendAlert?: () => void;
 }
 
 export function RouteCard({ 
@@ -29,7 +30,8 @@ export function RouteCard({
   stops, 
   ridersCount,
   onEdit,
-  onToggleStatus 
+  onToggleStatus,
+  onSendAlert 
 }: RouteCardProps) {
   return (
     <Card className="hover-elevate">
@@ -109,6 +111,18 @@ export function RouteCard({
           >
             {status === "active" ? "Deactivate" : "Activate"}
           </Button>
+          {status === "active" && onSendAlert && (
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="flex-1"
+              onClick={onSendAlert}
+              data-testid={`button-send-alert-${name.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Send Alert
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
