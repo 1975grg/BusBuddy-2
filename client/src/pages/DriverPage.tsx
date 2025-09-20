@@ -104,13 +104,12 @@ export default function DriverPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Heart className="w-5 h-5 text-primary fill-primary" />
-              Your Default Route
+              {favoriteRoute.name}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">{favoriteRoute.name}</p>
                 <p className="text-sm text-muted-foreground">
                   {favoriteRoute.vehicleNumber} • {favoriteRoute.type}
                 </p>
