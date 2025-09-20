@@ -159,24 +159,24 @@ export function AddressAutocomplete({
 
       {/* Suggestions dropdown */}
       {isOpen && (suggestions.length > 0 || (debouncedQuery.length >= 3 && !isLoading)) && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-md">
+        <div className="absolute top-full left-0 z-50 mt-1 w-96 max-w-[90vw] bg-popover border rounded-md shadow-md">
           <Command>
-            <CommandList>
+            <CommandList className="max-h-60 overflow-y-auto">
               {suggestions.length > 0 && (
                 <CommandGroup>
                   {suggestions.map((suggestion) => (
                     <CommandItem
                       key={suggestion.id}
                       onSelect={() => handleSelectAddress(suggestion)}
-                      className="flex items-start gap-2 p-3 cursor-pointer"
+                      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-accent"
                       data-testid={`address-suggestion-${suggestion.id}`}
                     >
-                      <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                      <MapPin className="w-5 h-5 mt-0.5 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
+                        <div className="font-medium text-sm leading-tight">
                           {suggestion.text}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
+                        <div className="text-xs text-muted-foreground mt-1 leading-tight">
                           {suggestion.place_name}
                         </div>
                       </div>
