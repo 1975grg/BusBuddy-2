@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { RiderTracker } from "@/components/RiderTracker";
+import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Star, Route, Clock } from "lucide-react";
+import { Star, Route, Clock, MessageSquare } from "lucide-react";
 
 export default function RiderPage() {
   const [selectedRoute, setSelectedRoute] = useState("main-campus-loop");
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   
   // TODO: remove mock functionality - replace with real rider data and preferences
   const mockSavedRoutes = [
@@ -117,6 +119,47 @@ export default function RiderPage() {
           stops={currentRoute.stops}
           defaultStop="1"
           isNotificationsEnabled={true}
+        />
+      )}
+
+      {/* Contact Support Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Need Help?
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-4">
+            Have a question about your route or transportation services? Contact our support team.
+          </p>
+          <Button 
+            onClick={() => setMessageDialogOpen(true)}
+            className="w-full"
+            data-testid="button-contact-support"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Contact Support
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Contact Support Dialog */}
+      {currentRoute && (
+        <SendRiderMessageDialog
+          route={{
+            id: currentRoute.id,
+            name: currentRoute.name,
+            organizationId: "org-1", // TODO: Get from context  
+            vehicleNumber: currentRoute.busName,
+            type: "shuttle",
+            status: "active",
+            isActive: true,
+            createdAt: new Date()
+          }}
+          open={messageDialogOpen}
+          onOpenChange={setMessageDialogOpen}
         />
       )}
     </div>

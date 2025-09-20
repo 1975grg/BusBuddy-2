@@ -613,8 +613,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rider Messages (Riders → Admin)
   app.post("/api/rider-messages", async (req, res) => {
     try {
-      const validatedData = insertRiderMessageSchema.parse(req.body);
-      const message = await storage.createRiderMessage(validatedData);
+      // Validate client data (without server-controlled fields)
+      const clientSchema = insertRiderMessageSchema.omit({ 
+        userId: true, 
+        organizationId: true 
+      });
+      const clientData = clientSchema.parse(req.body);
+      
+      // Verify route exists and get organization
+      const route = await storage.getRoute(clientData.routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Build complete message data with server-controlled fields
+      // TODO: In a real app, get user ID from authenticated session (if logged in)
+      // For anonymous riders, userId can be null
+      const messageData = {
+        ...clientData,
+        organizationId: route.organizationId,
+        userId: null // Anonymous rider message
+      };
+      
+      const message = await storage.createRiderMessage(messageData);
       res.status(201).json(message);
     } catch (error) {
       console.error("Error creating rider message:", error);
