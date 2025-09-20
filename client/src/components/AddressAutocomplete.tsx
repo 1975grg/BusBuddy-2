@@ -111,9 +111,15 @@ export function AddressAutocomplete({
 
   const handleInputChange = (newValue: string) => {
     setInputValue(newValue);
-    if (newValue.length < 3) {
+    
+    // Clear address data if input is empty or has been manually edited
+    if (newValue === "") {
+      onChange?.(null);
+    } else if (newValue !== value && newValue.length >= 3) {
+      // User is typing something different from the selected address
       onChange?.(null);
     }
+    
     if (newValue.length >= 3 && !isOpen) {
       setIsOpen(true);
     }

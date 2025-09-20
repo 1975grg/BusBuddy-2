@@ -70,10 +70,10 @@ function SortableRouteStopItem({ stop, index, control, onRemove, setValue, watch
       setValue(`stops.${index}.latitude`, addressData.latitude);
       setValue(`stops.${index}.longitude`, addressData.longitude);
     } else {
-      setValue(`stops.${index}.address`, "");
-      setValue(`stops.${index}.placeId`, "");
-      setValue(`stops.${index}.latitude`, null);
-      setValue(`stops.${index}.longitude`, null);
+      setValue(`stops.${index}.address`, undefined);
+      setValue(`stops.${index}.placeId`, undefined);
+      setValue(`stops.${index}.latitude`, undefined);
+      setValue(`stops.${index}.longitude`, undefined);
     }
   };
 

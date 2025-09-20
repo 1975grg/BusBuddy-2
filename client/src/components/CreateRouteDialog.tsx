@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -51,10 +52,17 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
       type: "shuttle",
       status: "active",
       vehicleNumber: "",
-      organizationId,
+      organizationId: organizationId || "",
       stops: [{ id: crypto.randomUUID(), name: "", estimatedArrival: "" }],
     },
   });
+
+  // Update organizationId when it becomes available
+  React.useEffect(() => {
+    if (organizationId) {
+      form.setValue("organizationId", organizationId);
+    }
+  }, [organizationId, form]);
 
   const createRouteMutation = useMutation({
     mutationFn: async (data: CreateRouteData) => {
@@ -113,6 +121,17 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
     createRouteMutation.mutate(data);
   };
 
+  const handleInvalidSubmit = (errors: any) => {
+    // Show user-friendly error for missing organization
+    if (errors.organizationId) {
+      toast({
+        title: "Error",
+        description: "Organization information is still loading. Please wait a moment and try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const stops = form.watch("stops");
 
   const addStop = () => {
@@ -151,7 +170,7 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit, handleInvalidSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
