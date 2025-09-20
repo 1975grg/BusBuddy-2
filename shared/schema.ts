@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, boolean, integer, decimal } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -58,6 +59,39 @@ export const routeStops = pgTable("route_stops", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Relations
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  users: many(users),
+  routes: many(routes),
+}));
+
+export const usersRelations = relations(users, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [users.organizationId],
+    references: [organizations.id],
+  }),
+  favoriteRoute: one(routes, {
+    fields: [users.favoriteRouteId],
+    references: [routes.id],
+  }),
+}));
+
+export const routesRelations = relations(routes, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [routes.organizationId],
+    references: [organizations.id],
+  }),
+  stops: many(routeStops),
+  favoredByUsers: many(users),
+}));
+
+export const routeStopsRelations = relations(routeStops, ({ one }) => ({
+  route: one(routes, {
+    fields: [routeStops.routeId],
+    references: [routes.id],
+  }),
+}));
 
 export const insertOrganizationSchema = createInsertSchema(organizations).pick({
   name: true,

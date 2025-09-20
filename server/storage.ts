@@ -9,8 +9,15 @@ import {
   type Route,
   type InsertRoute,
   type RouteStop,
-  type InsertRouteStop
+  type InsertRouteStop,
+  users,
+  organizations,
+  organizationSettings,
+  routes,
+  routeStops
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -51,6 +58,148 @@ export interface IStorage {
   createRouteStop(stop: InsertRouteStop): Promise<RouteStop>;
   updateRouteStop(id: string, stop: Partial<InsertRouteStop>): Promise<RouteStop | undefined>;
   deleteRouteStop(id: string): Promise<boolean>;
+}
+
+// Database-backed storage implementation (from javascript_database blueprint)
+export class DatabaseStorage implements IStorage {
+  // User management
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async getUsersByRole(role: UserRole): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
+  }
+
+  async getUsersByOrganization(organizationId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.organizationId, organizationId));
+  }
+
+  async setUserFavoriteRoute(userId: string, routeId: string | null): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ favoriteRouteId: routeId })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  // Organization management
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org || undefined;
+  }
+
+  async getAllOrganizations(): Promise<Organization[]> {
+    return await db.select().from(organizations);
+  }
+
+  async createOrganization(insertOrg: InsertOrganization): Promise<Organization> {
+    const [org] = await db.insert(organizations).values(insertOrg).returning();
+    return org;
+  }
+
+  async updateOrganization(id: string, updateOrg: Partial<InsertOrganization>): Promise<Organization | undefined> {
+    const [org] = await db.update(organizations)
+      .set(updateOrg)
+      .where(eq(organizations.id, id))
+      .returning();
+    return org || undefined;
+  }
+
+  // Organization settings (backward compatibility)
+  async getOrgSettings(id: string): Promise<OrgSettings | undefined> {
+    const [settings] = await db.select().from(organizationSettings).where(eq(organizationSettings.id, id));
+    return settings || undefined;
+  }
+
+  async createOrgSettings(insertSettings: InsertOrgSettings): Promise<OrgSettings> {
+    const [settings] = await db.insert(organizationSettings).values(insertSettings).returning();
+    return settings;
+  }
+
+  async updateOrgSettings(id: string, updateSettings: Partial<InsertOrgSettings>): Promise<OrgSettings | undefined> {
+    const [settings] = await db.update(organizationSettings)
+      .set(updateSettings)
+      .where(eq(organizationSettings.id, id))
+      .returning();
+    return settings || undefined;
+  }
+
+  async getDefaultOrgSettings(): Promise<OrgSettings | undefined> {
+    const [settings] = await db.select().from(organizationSettings).limit(1);
+    return settings || undefined;
+  }
+
+  // Route management
+  async getRoute(id: string): Promise<Route | undefined> {
+    const [route] = await db.select().from(routes).where(eq(routes.id, id));
+    return route || undefined;
+  }
+
+  async getRoutesByOrganization(organizationId: string): Promise<Route[]> {
+    return await db.select().from(routes).where(eq(routes.organizationId, organizationId));
+  }
+
+  async getAllRoutes(): Promise<Route[]> {
+    return await db.select().from(routes);
+  }
+
+  async createRoute(insertRoute: InsertRoute): Promise<Route> {
+    const [route] = await db.insert(routes).values(insertRoute).returning();
+    return route;
+  }
+
+  async updateRoute(id: string, updateRoute: Partial<InsertRoute>): Promise<Route | undefined> {
+    const [route] = await db.update(routes)
+      .set(updateRoute)
+      .where(eq(routes.id, id))
+      .returning();
+    return route || undefined;
+  }
+
+  async deleteRoute(id: string): Promise<boolean> {
+    const result = await db.delete(routes).where(eq(routes.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Route stops management
+  async getRouteStop(id: string): Promise<RouteStop | undefined> {
+    const [stop] = await db.select().from(routeStops).where(eq(routeStops.id, id));
+    return stop || undefined;
+  }
+
+  async getRouteStopsByRoute(routeId: string): Promise<RouteStop[]> {
+    return await db.select().from(routeStops).where(eq(routeStops.routeId, routeId));
+  }
+
+  async createRouteStop(insertStop: InsertRouteStop): Promise<RouteStop> {
+    const [stop] = await db.insert(routeStops).values(insertStop).returning();
+    return stop;
+  }
+
+  async updateRouteStop(id: string, updateStop: Partial<InsertRouteStop>): Promise<RouteStop | undefined> {
+    const [stop] = await db.update(routeStops)
+      .set(updateStop)
+      .where(eq(routeStops.id, id))
+      .returning();
+    return stop || undefined;
+  }
+
+  async deleteRouteStop(id: string): Promise<boolean> {
+    const result = await db.delete(routeStops).where(eq(routeStops.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -457,4 +606,150 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Seed function to populate initial data
+async function seedDatabase() {
+  try {
+    // Check if we already have organizations
+    const existingOrgs = await db.select().from(organizations);
+    if (existingOrgs.length > 0) {
+      return; // Already seeded
+    }
+
+    // Create default organization
+    const [defaultOrg] = await db.insert(organizations).values({
+      name: "Springfield University",
+      type: "university",
+      logoUrl: null,
+      primaryColor: "#0080FF",
+      isActive: true,
+    }).returning();
+
+    // Create default organization settings (backward compatibility)
+    await db.insert(organizationSettings).values({
+      name: "Springfield University",
+      logoUrl: null,
+      primaryColor: "#0080FF",
+    });
+
+    // Create initial system admin user
+    await db.insert(users).values({
+      id: "dev-system-admin",
+      name: "System Administrator",
+      email: "admin@busbuddy.system",
+      role: "system_admin",
+      organizationId: null,
+      favoriteRouteId: null,
+      isActive: true,
+    });
+
+    // Create initial org admin
+    await db.insert(users).values({
+      id: "dev-org-admin",
+      name: "Sarah Johnson",
+      email: "admin@springfield.edu",
+      role: "org_admin",
+      organizationId: defaultOrg.id,
+      favoriteRouteId: null,
+      isActive: true,
+    });
+
+    // Create initial driver user
+    await db.insert(users).values({
+      id: "dev-driver",
+      name: "Mike Wilson",
+      email: "driver@springfield.edu",
+      role: "driver",
+      organizationId: defaultOrg.id,
+      favoriteRouteId: null,
+      isActive: true,
+    });
+
+    // Create initial rider user
+    await db.insert(users).values({
+      id: "dev-rider",
+      name: "Emma Davis",
+      email: "student@springfield.edu",
+      role: "rider",
+      organizationId: defaultOrg.id,
+      favoriteRouteId: null,
+      isActive: true,
+    });
+
+    // Create sample routes
+    // Main Campus Loop
+    const [route1] = await db.insert(routes).values({
+      name: "Main Campus Loop",
+      type: "shuttle",
+      status: "active",
+      vehicleNumber: "SHUTTLE-001",
+      organizationId: defaultOrg.id,
+      isActive: true,
+    }).returning();
+
+    // West Campus Express
+    const [route2] = await db.insert(routes).values({
+      name: "West Campus Express",
+      type: "bus",
+      status: "active",
+      vehicleNumber: "BUS-105",
+      organizationId: defaultOrg.id,
+      isActive: true,
+    }).returning();
+
+    // Add stops for route 1
+    const stops1 = [
+      { name: "Main Entrance", orderIndex: 1 },
+      { name: "Student Center", orderIndex: 2 },
+      { name: "Library", orderIndex: 3 },
+      { name: "Cafeteria", orderIndex: 4 }
+    ];
+
+    for (const stop of stops1) {
+      await db.insert(routeStops).values({
+        name: stop.name,
+        address: null,
+        placeId: null,
+        routeId: route1.id,
+        orderIndex: stop.orderIndex,
+        latitude: null,
+        longitude: null,
+        approachingRadiusM: 250,
+        arrivalRadiusM: 75,
+        isActive: true,
+      });
+    }
+
+    // Add stops for route 2
+    const stops2 = [
+      { name: "West Gate", orderIndex: 1 },
+      { name: "Engineering Building", orderIndex: 2 },
+      { name: "Research Center", orderIndex: 3 },
+      { name: "Parking Garage B", orderIndex: 4 },
+      { name: "Athletics Complex", orderIndex: 5 }
+    ];
+
+    for (const stop of stops2) {
+      await db.insert(routeStops).values({
+        name: stop.name,
+        address: null,
+        placeId: null,
+        routeId: route2.id,
+        orderIndex: stop.orderIndex,
+        latitude: null,
+        longitude: null,
+        approachingRadiusM: 250,
+        arrivalRadiusM: 75,
+        isActive: true,
+      });
+    }
+
+    console.log("Database seeded successfully!");
+  } catch (error) {
+    console.error("Error seeding database:", error);
+  }
+}
+
+export const storage = new DatabaseStorage();
+
+// Seed the database on startup
+seedDatabase();
