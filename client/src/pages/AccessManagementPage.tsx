@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Shield, Trash2, RotateCcw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AccessManagementPage() {
   const [selectedRoute, setSelectedRoute] = useState("main-campus-loop");
+  
+  // Fetch organization settings for branding
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/org-settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/org-settings");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    }
+  });
   
   // TODO: remove mock functionality - replace with real data
   const mockRoutes = [
@@ -46,7 +57,8 @@ export default function AccessManagementPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <AccessCodeGenerator 
                 routeName={route.name}
-                organizationName="Springfield University"
+                organizationName={orgSettings?.name || "Springfield University"}
+                organizationLogo={orgSettings?.logoUrl || ""}
               />
 
               <Card>

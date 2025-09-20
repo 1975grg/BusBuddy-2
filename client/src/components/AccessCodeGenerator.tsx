@@ -58,24 +58,68 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
   };
 
   const downloadQR = () => {
-    const svg = document.querySelector("#qr-code svg");
-    if (svg) {
-      const svgData = new XMLSerializer().serializeToString(svg);
+    const qrContainer = document.querySelector("#qr-code");
+    const svg = qrContainer?.querySelector("svg");
+    
+    if (svg && qrContainer) {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      const img = new Image();
+      const size = 240; // QR size with padding
       
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        const link = document.createElement("a");
-        link.download = `${routeName}-qr-code.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-      };
+      canvas.width = size;
+      canvas.height = size;
       
-      img.src = "data:image/svg+xml;base64," + btoa(svgData);
+      if (ctx) {
+        // Fill white background
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, size, size);
+        
+        // Draw QR code
+        const svgData = new XMLSerializer().serializeToString(svg);
+        const qrImg = new Image();
+        
+        qrImg.onload = () => {
+          ctx.drawImage(qrImg, 20, 20, 200, 200);
+          
+          // Add organization logo if present
+          if (organizationLogo) {
+            const logoImg = new Image();
+            logoImg.onload = () => {
+              // Draw logo in bottom-right corner with white background
+              const logoSize = 32;
+              const logoX = size - logoSize - 12;
+              const logoY = size - logoSize - 12;
+              
+              // White background for logo
+              ctx.fillStyle = "white";
+              ctx.fillRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
+              
+              // Border around logo
+              ctx.strokeStyle = "#e5e5e5";
+              ctx.lineWidth = 1;
+              ctx.strokeRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
+              
+              // Draw logo
+              ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+              
+              // Download the final image
+              const link = document.createElement("a");
+              link.download = `${routeName.toLowerCase().replace(/\s+/g, '-')}-qr-code.png`;
+              link.href = canvas.toDataURL("image/png");
+              link.click();
+            };
+            logoImg.src = organizationLogo;
+          } else {
+            // Download without logo
+            const link = document.createElement("a");
+            link.download = `${routeName.toLowerCase().replace(/\s+/g, '-')}-qr-code.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+          }
+        };
+        
+        qrImg.src = "data:image/svg+xml;base64," + btoa(svgData);
+      }
     }
   };
 

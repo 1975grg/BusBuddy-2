@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
 import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
 import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
@@ -25,8 +26,7 @@ const mockUser = {
   name: "Sarah Johnson",
   role: "Organization Admin", 
   organization: "Springfield University",
-  avatar: adminIconUrl,
-  orgLogo: "" // Will be populated when organization uploads their logo
+  avatar: adminIconUrl
 };
 
 const getRoleIcon = (role: "admin" | "driver" | "rider") => {
@@ -108,6 +108,16 @@ const riderItems: MenuItem[] = [
 
 export function AppSidebar() {
   const [userRole] = useState<"admin" | "driver" | "rider">("admin"); // TODO: remove mock - get from auth
+  
+  // Fetch organization settings for branding
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/org-settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/org-settings");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    }
+  });
 
   const getMenuItems = () => {
     switch (userRole) {
@@ -131,15 +141,14 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          {/* TODO: replace mockUser.orgLogo with real org logo from settings */}
           <img 
-            src={mockUser.orgLogo || busIconUrl} 
-            alt={mockUser.orgLogo ? `${mockUser.organization} logo` : "Bus Buddy"} 
+            src={orgSettings?.logoUrl || busIconUrl} 
+            alt={orgSettings?.logoUrl ? `${orgSettings.name} logo` : "Bus Buddy"} 
             className="w-8 h-8 rounded-lg object-contain" 
           />
           <div>
             <h2 className="font-bold text-lg">Bus Buddy</h2>
-            <p className="text-sm text-muted-foreground">{mockUser.organization}</p>
+            <p className="text-sm text-muted-foreground">{orgSettings?.name || mockUser.organization}</p>
           </div>
         </div>
       </SidebarHeader>
@@ -174,12 +183,18 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3">
-          <Avatar>
-            <AvatarImage src={getRoleIcon(userRole)} alt={`${userRole} icon`} />
-            <AvatarFallback>
-              <div className={`w-6 h-6 rounded-full ${getRoleColor()}`} />
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar>
+              <AvatarImage src={getRoleIcon(userRole)} alt={`${userRole} icon`} />
+              <AvatarFallback>
+                <div className={`w-6 h-6 rounded-full ${getRoleColor()}`} />
+              </AvatarFallback>
+            </Avatar>
+            {/* GPS ping animation for rider role */}
+            {userRole === "rider" && (
+              <div className="absolute inset-0 rounded-full animate-ping bg-bus-active opacity-20" />
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{mockUser.name}</p>
             <p className="text-xs text-muted-foreground truncate">{mockUser.role}</p>

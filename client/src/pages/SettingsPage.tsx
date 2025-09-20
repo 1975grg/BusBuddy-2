@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LogoUpload } from "@/components/LogoUpload";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,66 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Building, Palette, Shield, Save } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const [orgLogo, setOrgLogo] = useState<string>("");
-  const [orgName, setOrgName] = useState("Springfield University");
+  const [orgName, setOrgName] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#0080FF");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  // TODO: remove mock functionality - replace with real settings data
+  // Fetch current settings
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["/api/org-settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/org-settings");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    }
+  });
+
+  // Update local state when settings load
+  useEffect(() => {
+    if (settings) {
+      setOrgName(settings.name || "");
+      setOrgLogo(settings.logoUrl || "");
+      setPrimaryColor(settings.primaryColor || "#0080FF");
+    }
+  }, [settings]);
+  
+  // Save settings mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (data: { name: string; logoUrl: string; primaryColor: string }) => {
+      const response = await fetch("/api/org-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error("Failed to save settings");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-settings"] });
+      toast({
+        title: "Settings saved",
+        description: "Organization settings have been updated successfully"
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Save failed",
+        description: "There was an error saving your settings. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
   const handleSaveSettings = () => {
-    console.log("Saving settings:", {
-      logo: orgLogo,
+    saveSettingsMutation.mutate({
       name: orgName,
+      logoUrl: orgLogo,
       primaryColor
     });
   };
@@ -158,9 +207,13 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleSaveSettings} data-testid="button-save-settings">
+        <Button 
+          onClick={handleSaveSettings} 
+          disabled={saveSettingsMutation.isPending || isLoading}
+          data-testid="button-save-settings"
+        >
           <Save className="w-4 h-4 mr-2" />
-          Save Settings
+          {saveSettingsMutation.isPending ? "Saving..." : "Save Settings"}
         </Button>
       </div>
     </div>
