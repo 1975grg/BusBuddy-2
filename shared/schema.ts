@@ -45,6 +45,8 @@ export const routes = pgTable("routes", {
 export const routeStops = pgTable("route_stops", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  address: text("address"), // Full formatted address from geocoding service
+  placeId: text("place_id"), // Unique identifier from mapping service
   routeId: varchar("route_id").notNull().references(() => routes.id),
   orderIndex: integer("order_index").notNull(),
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
@@ -84,6 +86,8 @@ export const insertRouteSchema = createInsertSchema(routes).pick({
 
 export const insertRouteStopSchema = createInsertSchema(routeStops).pick({
   name: true,
+  address: true,
+  placeId: true,
   routeId: true,
   orderIndex: true,
   latitude: true,
