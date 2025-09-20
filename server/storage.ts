@@ -5,7 +5,11 @@ import {
   type InsertOrganization,
   type OrgSettings, 
   type InsertOrgSettings,
-  type UserRole 
+  type UserRole,
+  type Route,
+  type InsertRoute,
+  type RouteStop,
+  type InsertRouteStop
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -31,12 +35,29 @@ export interface IStorage {
   createOrgSettings(settings: InsertOrgSettings): Promise<OrgSettings>;
   updateOrgSettings(id: string, settings: Partial<InsertOrgSettings>): Promise<OrgSettings | undefined>;
   getDefaultOrgSettings(): Promise<OrgSettings | undefined>;
+  
+  // Route management
+  getRoute(id: string): Promise<Route | undefined>;
+  getRoutesByOrganization(organizationId: string): Promise<Route[]>;
+  getAllRoutes(): Promise<Route[]>;
+  createRoute(route: InsertRoute): Promise<Route>;
+  updateRoute(id: string, route: Partial<InsertRoute>): Promise<Route | undefined>;
+  deleteRoute(id: string): Promise<boolean>;
+  
+  // Route stops management
+  getRouteStop(id: string): Promise<RouteStop | undefined>;
+  getRouteStopsByRoute(routeId: string): Promise<RouteStop[]>;
+  createRouteStop(stop: InsertRouteStop): Promise<RouteStop>;
+  updateRouteStop(id: string, stop: Partial<InsertRouteStop>): Promise<RouteStop | undefined>;
+  deleteRouteStop(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private organizations: Map<string, Organization>;
   private orgSettings: Map<string, OrgSettings>;
+  private routes: Map<string, Route>;
+  private routeStops: Map<string, RouteStop>;
   private defaultOrgId: string;
   private defaultOrgSettingsId: string;
 
@@ -44,6 +65,8 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.organizations = new Map();
     this.orgSettings = new Map();
+    this.routes = new Map();
+    this.routeStops = new Map();
     
     // Create default organization
     this.defaultOrgId = randomUUID();
@@ -93,6 +116,88 @@ export class MemStorage implements IStorage {
       createdAt: new Date()
     };
     this.users.set(orgAdminId, orgAdmin);
+    
+    // Create sample routes for the default organization
+    this.createSampleRoutes();
+  }
+
+  private createSampleRoutes() {
+    // Main Campus Loop
+    const route1Id = randomUUID();
+    const route1: Route = {
+      id: route1Id,
+      name: "Main Campus Loop",
+      type: "shuttle",
+      status: "active",
+      vehicleNumber: "SHUTTLE-001",
+      organizationId: this.defaultOrgId,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.routes.set(route1Id, route1);
+    
+    // Add stops for route 1
+    const stops1 = [
+      { name: "Main Entrance", orderIndex: 1, estimatedArrival: "2 min" },
+      { name: "Student Center", orderIndex: 2, estimatedArrival: "7 min" },
+      { name: "Library", orderIndex: 3, estimatedArrival: "12 min" },
+      { name: "Cafeteria", orderIndex: 4, estimatedArrival: "15 min" }
+    ];
+    
+    stops1.forEach(stop => {
+      const stopId = randomUUID();
+      const routeStop: RouteStop = {
+        id: stopId,
+        name: stop.name,
+        routeId: route1Id,
+        orderIndex: stop.orderIndex,
+        latitude: null,
+        longitude: null,
+        estimatedArrival: stop.estimatedArrival,
+        isActive: true,
+        createdAt: new Date()
+      };
+      this.routeStops.set(stopId, routeStop);
+    });
+    
+    // West Campus Express
+    const route2Id = randomUUID();
+    const route2: Route = {
+      id: route2Id,
+      name: "West Campus Express",
+      type: "bus",
+      status: "active",
+      vehicleNumber: "BUS-105",
+      organizationId: this.defaultOrgId,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.routes.set(route2Id, route2);
+    
+    // Add stops for route 2
+    const stops2 = [
+      { name: "West Gate", orderIndex: 1, estimatedArrival: "5 min" },
+      { name: "Engineering Building", orderIndex: 2, estimatedArrival: null },
+      { name: "Research Center", orderIndex: 3, estimatedArrival: null },
+      { name: "Parking Garage B", orderIndex: 4, estimatedArrival: null },
+      { name: "Athletics Complex", orderIndex: 5, estimatedArrival: null }
+    ];
+    
+    stops2.forEach(stop => {
+      const stopId = randomUUID();
+      const routeStop: RouteStop = {
+        id: stopId,
+        name: stop.name,
+        routeId: route2Id,
+        orderIndex: stop.orderIndex,
+        latitude: null,
+        longitude: null,
+        estimatedArrival: stop.estimatedArrival,
+        isActive: true,
+        createdAt: new Date()
+      };
+      this.routeStops.set(stopId, routeStop);
+    });
   }
 
   // User management
@@ -189,6 +294,110 @@ export class MemStorage implements IStorage {
 
   async getDefaultOrgSettings(): Promise<OrgSettings | undefined> {
     return this.orgSettings.get(this.defaultOrgSettingsId);
+  }
+  
+  // Route management
+  async getRoute(id: string): Promise<Route | undefined> {
+    return this.routes.get(id);
+  }
+
+  async getRoutesByOrganization(organizationId: string): Promise<Route[]> {
+    return Array.from(this.routes.values()).filter(
+      route => route.organizationId === organizationId && route.isActive
+    );
+  }
+
+  async getAllRoutes(): Promise<Route[]> {
+    return Array.from(this.routes.values()).filter(route => route.isActive);
+  }
+
+  async createRoute(insertRoute: InsertRoute): Promise<Route> {
+    const id = randomUUID();
+    const route: Route = {
+      id,
+      name: insertRoute.name,
+      type: insertRoute.type,
+      status: insertRoute.status || "active",
+      vehicleNumber: insertRoute.vehicleNumber || null,
+      organizationId: insertRoute.organizationId,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.routes.set(id, route);
+    return route;
+  }
+
+  async updateRoute(id: string, updateData: Partial<InsertRoute>): Promise<Route | undefined> {
+    const existing = this.routes.get(id);
+    if (!existing) return undefined;
+    
+    const updated: Route = { ...existing, ...updateData };
+    this.routes.set(id, updated);
+    return updated;
+  }
+
+  async deleteRoute(id: string): Promise<boolean> {
+    const existing = this.routes.get(id);
+    if (!existing) return false;
+    
+    // Soft delete - mark as inactive
+    const updated: Route = { ...existing, isActive: false };
+    this.routes.set(id, updated);
+    
+    // Also soft delete all route stops
+    const stops = await this.getRouteStopsByRoute(id);
+    for (const stop of stops) {
+      await this.deleteRouteStop(stop.id);
+    }
+    
+    return true;
+  }
+  
+  // Route stops management
+  async getRouteStop(id: string): Promise<RouteStop | undefined> {
+    return this.routeStops.get(id);
+  }
+
+  async getRouteStopsByRoute(routeId: string): Promise<RouteStop[]> {
+    return Array.from(this.routeStops.values())
+      .filter(stop => stop.routeId === routeId && stop.isActive)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }
+
+  async createRouteStop(insertStop: InsertRouteStop): Promise<RouteStop> {
+    const id = randomUUID();
+    const stop: RouteStop = {
+      id,
+      name: insertStop.name,
+      routeId: insertStop.routeId,
+      orderIndex: insertStop.orderIndex,
+      latitude: insertStop.latitude || null,
+      longitude: insertStop.longitude || null,
+      estimatedArrival: insertStop.estimatedArrival || null,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.routeStops.set(id, stop);
+    return stop;
+  }
+
+  async updateRouteStop(id: string, updateData: Partial<InsertRouteStop>): Promise<RouteStop | undefined> {
+    const existing = this.routeStops.get(id);
+    if (!existing) return undefined;
+    
+    const updated: RouteStop = { ...existing, ...updateData };
+    this.routeStops.set(id, updated);
+    return updated;
+  }
+
+  async deleteRouteStop(id: string): Promise<boolean> {
+    const existing = this.routeStops.get(id);
+    if (!existing) return false;
+    
+    // Soft delete - mark as inactive
+    const updated: RouteStop = { ...existing, isActive: false };
+    this.routeStops.set(id, updated);
+    return true;
   }
 }
 
