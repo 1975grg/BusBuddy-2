@@ -4,8 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, X } from "lucide-react";
+import { SortableRouteStops } from "./SortableRouteStops";
+import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,7 +21,12 @@ const createRouteSchema = z.object({
   vehicleNumber: z.string().optional(),
   organizationId: z.string().min(1, "Organization is required"),
   stops: z.array(z.object({
+    id: z.string(),
     name: z.string().min(1, "Stop name is required"),
+    address: z.string().optional(),
+    placeId: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
     estimatedArrival: z.string().optional(),
   })).min(1, "At least one stop is required"),
 });
@@ -47,7 +52,7 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
       status: "active",
       vehicleNumber: "",
       organizationId,
-      stops: [{ name: "", estimatedArrival: "" }],
+      stops: [{ id: crypto.randomUUID(), name: "", estimatedArrival: "" }],
     },
   });
 
@@ -73,6 +78,10 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
         const stop = data.stops[i];
         await apiRequest("POST", `/api/routes/${route.id}/stops`, {
           name: stop.name,
+          address: stop.address || null,
+          placeId: stop.placeId || null,
+          latitude: stop.latitude || null,
+          longitude: stop.longitude || null,
           orderIndex: i + 1,
           estimatedArrival: stop.estimatedArrival || null,
         });
@@ -108,14 +117,22 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
 
   const addStop = () => {
     const currentStops = form.getValues("stops");
-    form.setValue("stops", [...currentStops, { name: "", estimatedArrival: "" }]);
+    form.setValue("stops", [...currentStops, { 
+      id: crypto.randomUUID(), 
+      name: "", 
+      estimatedArrival: "" 
+    }]);
   };
 
-  const removeStop = (index: number) => {
+  const removeStop = (stopId: string) => {
     const currentStops = form.getValues("stops");
     if (currentStops.length > 1) {
-      form.setValue("stops", currentStops.filter((_, i) => i !== index));
+      form.setValue("stops", currentStops.filter((stop) => stop.id !== stopId));
     }
+  };
+
+  const handleStopsChange = (newStops: any[]) => {
+    form.setValue("stops", newStops);
   };
 
   return (
@@ -211,75 +228,17 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
               />
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Route Stops</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addStop}
-                  data-testid="button-add-stop"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Stop
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {stops.map((stop, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                    <Badge variant="outline" className="min-w-8 h-6 flex items-center justify-center">
-                      {index + 1}
-                    </Badge>
-                    
-                    <div className="flex-1">
-                      <FormField
-                        control={form.control}
-                        name={`stops.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input {...field} placeholder="Stop name" data-testid={`input-stop-name-${index}`} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="w-32">
-                      <FormField
-                        control={form.control}
-                        name={`stops.${index}.estimatedArrival`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input {...field} placeholder="ETA (e.g., 5 min)" data-testid={`input-stop-eta-${index}`} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {stops.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeStop(index)}
-                        data-testid={`button-remove-stop-${index}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <FormMessage>{form.formState.errors.stops?.message}</FormMessage>
-            </div>
+            <SortableRouteStops
+              stops={stops}
+              control={form.control}
+              setValue={form.setValue}
+              watch={form.watch}
+              onStopsChange={handleStopsChange}
+              onAddStop={addStop}
+              onRemoveStop={removeStop}
+            />
+            
+            <FormMessage>{form.formState.errors.stops?.message}</FormMessage>
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
