@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Plus, Search } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
@@ -8,14 +9,17 @@ import { EditRouteDialog } from "@/components/EditRouteDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Route, RouteStop } from "@shared/schema";
+import type { Route, RouteStop, Organization } from "@shared/schema";
 
 interface RouteWithStops extends Route {
   stops: RouteStop[];
 }
 
+type StatusFilter = "all" | "active" | "inactive";
+
 export default function RoutesPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -26,13 +30,20 @@ export default function RoutesPage() {
     queryKey: ["/api/routes"],
   });
 
-  const filteredRoutes = routes.filter(route =>
-    route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    route.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRoutes = routes.filter(route => {
+    // Filter by search term
+    const matchesSearch = searchTerm === "" || 
+      route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filter by status
+    const matchesStatus = statusFilter === "all" || route.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   // Get the first organization from system admin API for now - in real app this would come from user context
-  const { data: organizations = [] } = useQuery({
+  const { data: organizations = [] } = useQuery<Organization[]>({
     queryKey: ["/api/system/organizations"],
   });
   
@@ -94,6 +105,27 @@ export default function RoutesPage() {
             data-testid="input-search-routes"
           />
         </div>
+        
+        <ToggleGroup 
+          type="single" 
+          value={statusFilter} 
+          onValueChange={(value) => {
+            if (value) {
+              setStatusFilter(value as StatusFilter);
+            }
+          }}
+          data-testid="toggle-status-filter"
+        >
+          <ToggleGroupItem value="all" data-testid="toggle-all">
+            All
+          </ToggleGroupItem>
+          <ToggleGroupItem value="active" data-testid="toggle-active">
+            Active
+          </ToggleGroupItem>
+          <ToggleGroupItem value="inactive" data-testid="toggle-inactive">
+            Inactive
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {isLoading ? (
