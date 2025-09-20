@@ -49,10 +49,7 @@ export default function DriverPage() {
     mutationFn: async ({ routeId }: { routeId: string | null }) => {
       if (!currentUser) throw new Error("User not found");
       
-      return apiRequest(`/api/users/${currentUser.id}/favorite-route`, {
-        method: "PATCH",
-        body: { routeId },
-      });
+      return apiRequest("PATCH", `/api/users/${currentUser.id}/favorite-route`, { routeId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dev/mock-user"] });

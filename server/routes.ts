@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import { 
   insertOrgSettingsSchema, 
@@ -339,7 +340,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { role } = req.params;
       const validatedRole = roleEnum.parse(role);
       
-      // Return mock user data for each role for development purposes
+      // Map roles to actual user IDs in storage
+      const userIds = {
+        system_admin: "dev-system-admin", // This one might not exist in storage
+        org_admin: "dev-org-admin", // This one might not exist in storage
+        driver: "dev-driver", // This one exists in storage
+        rider: "dev-rider" // This one exists in storage
+      };
+      
+      const userId = userIds[validatedRole];
+      
+      // Try to get the real user from storage first
+      const realUser = await storage.getUser(userId);
+      if (realUser) {
+        return res.json(realUser);
+      }
+      
+      // Fallback to mock data for users not in storage (system_admin, org_admin)
       const mockUsers = {
         system_admin: {
           id: "dev-system-admin",
@@ -347,6 +364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: "admin@busbuddy.system",
           role: "system_admin",
           organizationId: null,
+          favoriteRouteId: null,
           isActive: true,
           createdAt: new Date()
         },
@@ -355,31 +373,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: "Sarah Johnson",
           email: "admin@springfield.edu",
           role: "org_admin",
-          organizationId: "dev-org-1",
-          isActive: true,
-          createdAt: new Date()
-        },
-        driver: {
-          id: "dev-driver",
-          name: "Mike Wilson",
-          email: "driver@springfield.edu", 
-          role: "driver",
-          organizationId: "dev-org-1",
-          isActive: true,
-          createdAt: new Date()
-        },
-        rider: {
-          id: "dev-rider",
-          name: "Emma Davis",
-          email: "student@springfield.edu",
-          role: "rider", 
-          organizationId: "dev-org-1",
+          organizationId: (await storage.getAllOrganizations())[0]?.id || null,
+          favoriteRouteId: null,
           isActive: true,
           createdAt: new Date()
         }
       };
       
-      res.json(mockUsers[validatedRole]);
+      // Return mock data for roles that don't exist in storage
+      if (mockUsers[validatedRole]) {
+        return res.json(mockUsers[validatedRole]);
+      }
+      
+      res.status(404).json({ error: "User not found" });
     } catch (error) {
       console.error("Error getting mock user:", error);
       if (error.name === "ZodError") {

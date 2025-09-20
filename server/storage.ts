@@ -120,6 +120,34 @@ export class MemStorage implements IStorage {
     };
     this.users.set(orgAdminId, orgAdmin);
     
+    // Create initial driver user for default org
+    const driverId = "dev-driver"; // Use consistent ID for testing
+    const driver: User = {
+      id: driverId,
+      name: "Mike Wilson",
+      email: "driver@springfield.edu",
+      role: "driver",
+      organizationId: this.defaultOrgId,
+      favoriteRouteId: null,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.users.set(driverId, driver);
+    
+    // Create initial rider user for default org
+    const riderId = "dev-rider"; // Use consistent ID for testing
+    const rider: User = {
+      id: riderId,
+      name: "Emma Davis",
+      email: "student@springfield.edu",
+      role: "rider",
+      organizationId: this.defaultOrgId,
+      favoriteRouteId: null,
+      isActive: true,
+      createdAt: new Date()
+    };
+    this.users.set(riderId, rider);
+    
     // Create sample routes for the default organization
     this.createSampleRoutes();
   }
