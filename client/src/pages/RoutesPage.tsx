@@ -24,8 +24,12 @@ export default function RoutesPage() {
     route.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Mock organization ID for now - in real app this would come from user context
-  const organizationId = "default-org";
+  // Get the first organization from system admin API for now - in real app this would come from user context
+  const { data: organizations = [] } = useQuery({
+    queryKey: ["/api/system/organizations"],
+  });
+  
+  const organizationId = organizations[0]?.id || "";
 
   return (
     <div className="space-y-6">

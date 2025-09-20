@@ -54,27 +54,27 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
   const createRouteMutation = useMutation({
     mutationFn: async (data: CreateRouteData) => {
       // First create the route
-      const route = await apiRequest("/api/routes", {
-        method: "POST",
-        body: JSON.stringify({
-          name: data.name,
-          type: data.type,
-          status: data.status,
-          vehicleNumber: data.vehicleNumber || null,
-          organizationId: data.organizationId,
-        }),
-      });
+      const routeData = {
+        name: data.name,
+        type: data.type,
+        status: data.status,
+        vehicleNumber: data.vehicleNumber || null,
+        organizationId: data.organizationId,
+      };
+      
+      console.log("Creating route with data:", routeData);
+      
+      const routeResponse = await apiRequest("POST", "/api/routes", routeData);
+      
+      const route = await routeResponse.json();
 
       // Then create the stops
       for (let i = 0; i < data.stops.length; i++) {
         const stop = data.stops[i];
-        await apiRequest(`/api/routes/${route.id}/stops`, {
-          method: "POST",
-          body: JSON.stringify({
-            name: stop.name,
-            orderIndex: i + 1,
-            estimatedArrival: stop.estimatedArrival || null,
-          }),
+        await apiRequest("POST", `/api/routes/${route.id}/stops`, {
+          name: stop.name,
+          orderIndex: i + 1,
+          estimatedArrival: stop.estimatedArrival || null,
         });
       }
 
