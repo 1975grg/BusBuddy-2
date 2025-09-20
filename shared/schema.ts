@@ -51,7 +51,9 @@ export const routeStops = pgTable("route_stops", {
   orderIndex: integer("order_index").notNull(),
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
-  estimatedArrival: text("estimated_arrival"), // e.g., "2 min", "5 min"
+  // Geofencing radii for proximity notifications (in meters)
+  approachingRadiusM: integer("approaching_radius_m").notNull().default(250), // Notify when bus is 250m away
+  arrivalRadiusM: integer("arrival_radius_m").notNull().default(75), // Notify when bus arrives (75m)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -92,7 +94,8 @@ export const insertRouteStopSchema = createInsertSchema(routeStops).pick({
   orderIndex: true,
   latitude: true,
   longitude: true,
-  estimatedArrival: true,
+  approachingRadiusM: true,
+  arrivalRadiusM: true,
 });
 
 export const roleEnum = z.enum(["system_admin", "org_admin", "driver", "rider"]);

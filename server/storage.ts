@@ -138,10 +138,10 @@ export class MemStorage implements IStorage {
     
     // Add stops for route 1
     const stops1 = [
-      { name: "Main Entrance", orderIndex: 1, estimatedArrival: "2 min" },
-      { name: "Student Center", orderIndex: 2, estimatedArrival: "7 min" },
-      { name: "Library", orderIndex: 3, estimatedArrival: "12 min" },
-      { name: "Cafeteria", orderIndex: 4, estimatedArrival: "15 min" }
+      { name: "Main Entrance", orderIndex: 1 },
+      { name: "Student Center", orderIndex: 2 },
+      { name: "Library", orderIndex: 3 },
+      { name: "Cafeteria", orderIndex: 4 }
     ];
     
     stops1.forEach(stop => {
@@ -155,7 +155,8 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        estimatedArrival: stop.estimatedArrival,
+        approachingRadiusM: 250, // Default 250m for approaching notification
+        arrivalRadiusM: 75, // Default 75m for arrival notification
         isActive: true,
         createdAt: new Date()
       };
@@ -178,11 +179,11 @@ export class MemStorage implements IStorage {
     
     // Add stops for route 2
     const stops2 = [
-      { name: "West Gate", orderIndex: 1, estimatedArrival: "5 min" },
-      { name: "Engineering Building", orderIndex: 2, estimatedArrival: null },
-      { name: "Research Center", orderIndex: 3, estimatedArrival: null },
-      { name: "Parking Garage B", orderIndex: 4, estimatedArrival: null },
-      { name: "Athletics Complex", orderIndex: 5, estimatedArrival: null }
+      { name: "West Gate", orderIndex: 1 },
+      { name: "Engineering Building", orderIndex: 2 },
+      { name: "Research Center", orderIndex: 3 },
+      { name: "Parking Garage B", orderIndex: 4 },
+      { name: "Athletics Complex", orderIndex: 5 }
     ];
     
     stops2.forEach(stop => {
@@ -196,7 +197,8 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        estimatedArrival: stop.estimatedArrival,
+        approachingRadiusM: 250, // Default 250m for approaching notification
+        arrivalRadiusM: 75, // Default 75m for arrival notification
         isActive: true,
         createdAt: new Date()
       };

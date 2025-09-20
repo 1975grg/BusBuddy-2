@@ -33,7 +33,8 @@ interface RouteStop {
   placeId?: string;
   latitude?: number;
   longitude?: number;
-  estimatedArrival?: string;
+  approachingRadiusM?: number;
+  arrivalRadiusM?: number;
 }
 
 interface RouteStopItemProps {
@@ -117,7 +118,7 @@ function SortableRouteStopItem({ stop, index, control, onRemove, setValue, watch
       </Badge>
 
       {/* Stop Fields */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Address Autocomplete */}
         <div>
           <FormField
@@ -162,27 +163,6 @@ function SortableRouteStopItem({ stop, index, control, onRemove, setValue, watch
                       <MapPin className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-green-600" />
                     )}
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* ETA */}
-        <div>
-          <FormField
-            control={control}
-            name={`stops.${index}.estimatedArrival`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs text-muted-foreground">ETA</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    placeholder="e.g., 5 min"
-                    data-testid={`input-eta-${index}`}
-                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
