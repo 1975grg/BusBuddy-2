@@ -149,6 +149,8 @@ export class MemStorage implements IStorage {
       const routeStop: RouteStop = {
         id: stopId,
         name: stop.name,
+        address: null,
+        placeId: null,
         routeId: route1Id,
         orderIndex: stop.orderIndex,
         latitude: null,
@@ -188,6 +190,8 @@ export class MemStorage implements IStorage {
       const routeStop: RouteStop = {
         id: stopId,
         name: stop.name,
+        address: null,
+        placeId: null,
         routeId: route2Id,
         orderIndex: stop.orderIndex,
         latitude: null,
@@ -369,6 +373,8 @@ export class MemStorage implements IStorage {
     const stop: RouteStop = {
       id,
       name: insertStop.name,
+      address: insertStop.address || null,
+      placeId: insertStop.placeId || null,
       routeId: insertStop.routeId,
       orderIndex: insertStop.orderIndex,
       latitude: insertStop.latitude || null,
