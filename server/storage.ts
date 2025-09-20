@@ -23,6 +23,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUsersByRole(role: UserRole): Promise<User[]>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
+  setUserFavoriteRoute(userId: string, routeId: string | null): Promise<User | undefined>;
   
   // Organization management
   getOrganization(id: string): Promise<Organization | undefined>;
@@ -99,6 +100,7 @@ export class MemStorage implements IStorage {
       email: "admin@busbuddy.system",
       role: "system_admin",
       organizationId: null, // System admins don't belong to a specific org
+      favoriteRouteId: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -112,6 +114,7 @@ export class MemStorage implements IStorage {
       email: "admin@springfield.edu",
       role: "org_admin",
       organizationId: this.defaultOrgId,
+      favoriteRouteId: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -225,6 +228,7 @@ export class MemStorage implements IStorage {
       email: insertUser.email,
       role: insertUser.role,
       organizationId: insertUser.organizationId || null,
+      favoriteRouteId: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -238,6 +242,21 @@ export class MemStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(user => user.organizationId === organizationId);
+  }
+
+  async setUserFavoriteRoute(userId: string, routeId: string | null): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser: User = {
+      ...user,
+      favoriteRouteId: routeId
+    };
+    
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   // Organization management
@@ -381,7 +400,8 @@ export class MemStorage implements IStorage {
       orderIndex: insertStop.orderIndex,
       latitude: insertStop.latitude || null,
       longitude: insertStop.longitude || null,
-      estimatedArrival: insertStop.estimatedArrival || null,
+      approachingRadiusM: insertStop.approachingRadiusM || 250,
+      arrivalRadiusM: insertStop.arrivalRadiusM || 75,
       isActive: true,
       createdAt: new Date()
     };

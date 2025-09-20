@@ -19,6 +19,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   role: text("role").notNull(), // 'system_admin', 'org_admin', 'driver', 'rider'
   organizationId: varchar("organization_id").references(() => organizations.id),
+  favoriteRouteId: varchar("favorite_route_id").references(() => routes.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
