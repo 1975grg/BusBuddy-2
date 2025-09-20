@@ -132,61 +132,67 @@ export function AddressAutocomplete({
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <div className="relative">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onFocus={handleInputFocus}
-            placeholder={placeholder}
-            disabled={disabled}
-            data-testid={testId}
-            className="pr-8"
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-            ) : (
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
+    <div className="relative">
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          value={inputValue}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={handleInputFocus}
+          onBlur={() => {
+            // Delay closing to allow selection clicks
+            setTimeout(() => setIsOpen(false), 200);
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          data-testid={testId}
+          className="pr-8"
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : (
+            <MapPin className="w-4 h-4 text-muted-foreground" />
+          )}
         </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
-        <Command>
-          <CommandList>
-            {suggestions.length > 0 && (
-              <CommandGroup>
-                {suggestions.map((suggestion) => (
-                  <CommandItem
-                    key={suggestion.id}
-                    onSelect={() => handleSelectAddress(suggestion)}
-                    className="flex items-start gap-2 p-3 cursor-pointer"
-                    data-testid={`address-suggestion-${suggestion.id}`}
-                  >
-                    <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">
-                        {suggestion.text}
+      </div>
+
+      {/* Suggestions dropdown */}
+      {isOpen && (suggestions.length > 0 || (debouncedQuery.length >= 3 && !isLoading)) && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-md">
+          <Command>
+            <CommandList>
+              {suggestions.length > 0 && (
+                <CommandGroup>
+                  {suggestions.map((suggestion) => (
+                    <CommandItem
+                      key={suggestion.id}
+                      onSelect={() => handleSelectAddress(suggestion)}
+                      className="flex items-start gap-2 p-3 cursor-pointer"
+                      data-testid={`address-suggestion-${suggestion.id}`}
+                    >
+                      <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {suggestion.text}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {suggestion.place_name}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {suggestion.place_name}
-                      </div>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {!isLoading && debouncedQuery.length >= 3 && suggestions.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground text-center">
-                No addresses found
-              </div>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {!isLoading && debouncedQuery.length >= 3 && suggestions.length === 0 && (
+                <div className="p-4 text-sm text-muted-foreground text-center">
+                  No addresses found
+                </div>
+              )}
+            </CommandList>
+          </Command>
+        </div>
+      )}
+    </div>
   );
 }
