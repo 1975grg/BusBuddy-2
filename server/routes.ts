@@ -389,6 +389,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Favorite Route Management
+  app.patch("/api/users/:id/favorite-route", async (req, res) => {
+    try {
+      const { id: userId } = req.params;
+      const { routeId } = req.body;
+      
+      // Validate request body
+      const favoriteRouteSchema = z.object({
+        routeId: z.string().nullable()
+      });
+      
+      const validatedData = favoriteRouteSchema.parse(req.body);
+      
+      // Get the user first
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // If setting a favorite route, validate it exists and belongs to user's org
+      if (validatedData.routeId) {
+        const route = await storage.getRoute(validatedData.routeId);
+        if (!route) {
+          return res.status(404).json({ error: "Route not found" });
+        }
+        
+        // Check if route belongs to user's organization
+        if (route.organizationId !== user.organizationId) {
+          return res.status(403).json({ error: "Route does not belong to your organization" });
+        }
+        
+        // Check if route is active
+        if (!route.isActive || route.status !== "active") {
+          return res.status(400).json({ error: "Cannot set favorite to inactive route" });
+        }
+      }
+      
+      // Update user's favorite route
+      const updatedUser = await storage.setUserFavoriteRoute(userId, validatedData.routeId);
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Failed to update favorite route" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating favorite route:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Geocoding Routes for Address Autocomplete
   app.get("/api/geocode/search", async (req, res) => {
     try {
