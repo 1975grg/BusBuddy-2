@@ -7,9 +7,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { RoleToggle } from "@/components/RoleToggle";
 
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
+import SystemAdminDashboard from "@/pages/SystemAdminDashboard";
 import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
 import DriverPage from "@/pages/DriverPage";
@@ -21,6 +23,10 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
+      {/* System Admin Routes */}
+      <Route path="/system" component={SystemAdminDashboard} />
+      <Route path="/system/organizations" component={SystemAdminDashboard} />
+      
       {/* Admin Routes */}
       <Route path="/admin" component={AdminDashboardPage} />
       <Route path="/admin/routes" component={RoutesPage} />
@@ -60,7 +66,10 @@ export default function App() {
               <div className="flex flex-col flex-1">
                 <header className="flex items-center justify-between p-4 border-b">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <ThemeToggle />
+                  <div className="flex items-center gap-4">
+                    <RoleToggle />
+                    <ThemeToggle />
+                  </div>
                 </header>
                 <main className="flex-1 overflow-auto p-6">
                   <Router />
