@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Home, Route, Users, Settings, Zap, MapPin } from "lucide-react";
+import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import type { Route } from "@shared/schema";
 import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
 import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
 import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
@@ -45,41 +46,13 @@ interface MenuItem {
   badge?: string;
 }
 
-const adminItems: MenuItem[] = [
-  {
-    title: "Dashboard",
-    url: "/admin",
-    icon: Home,
-  },
-  {
-    title: "Routes",
-    url: "/admin/routes",
-    icon: Route,
-    badge: "5 Active"
-  },
-  {
-    title: "Access Management", 
-    url: "/admin/access",
-    icon: Users,
-  },
-  {
-    title: "Notifications",
-    url: "/admin/notifications",
-    icon: Zap,
-    badge: "89 Sent"
-  },
-  {
-    title: "Settings",
-    url: "/admin/settings",
-    icon: Settings,
-  },
-];
+// Will move this inside the component function
 
 const driverItems: MenuItem[] = [
   {
     title: "My Routes",
     url: "/driver",
-    icon: Route,
+    icon: RouteIcon,
   },
   {
     title: "Trip Control",
@@ -97,7 +70,7 @@ const riderItems: MenuItem[] = [
   {
     title: "My Routes",
     url: "/track/routes",
-    icon: Route,
+    icon: RouteIcon,
   },
   {
     title: "Notifications",
@@ -118,6 +91,43 @@ export function AppSidebar() {
       return response.json();
     }
   });
+
+  // Fetch routes to get active count
+  const { data: routes = [] } = useQuery<Route[]>({
+    queryKey: ["/api/routes"],
+  });
+
+  const activeRoutesCount = routes.filter(route => route.status === "active").length;
+
+  const adminItems: MenuItem[] = [
+    {
+      title: "Dashboard",
+      url: "/admin",
+      icon: Home,
+    },
+    {
+      title: "Routes",
+      url: "/admin/routes",
+      icon: RouteIcon,
+      badge: activeRoutesCount > 0 ? `${activeRoutesCount} Active` : undefined
+    },
+    {
+      title: "Access Management", 
+      url: "/admin/access",
+      icon: Users,
+    },
+    {
+      title: "Notifications",
+      url: "/admin/notifications",
+      icon: Zap,
+      badge: "89 Sent"
+    },
+    {
+      title: "Settings",
+      url: "/admin/settings",
+      icon: Settings,
+    },
+  ];
 
   const getMenuItems = () => {
     switch (userRole) {

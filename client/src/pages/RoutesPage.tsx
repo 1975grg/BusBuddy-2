@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Route, RouteStop } from "@shared/schema";
 
 interface RouteWithStops extends Route {
@@ -13,6 +15,8 @@ interface RouteWithStops extends Route {
 
 export default function RoutesPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Get the default organization for now - in a real app this would be from user context
   const { data: routes = [], isLoading, error } = useQuery<RouteWithStops[]>({
@@ -30,6 +34,41 @@ export default function RoutesPage() {
   });
   
   const organizationId = organizations[0]?.id || "";
+
+  // Toggle route status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ routeId, newStatus }: { routeId: string; newStatus: "active" | "inactive" }) => {
+      return await apiRequest("PUT", `/api/routes/${routeId}`, { status: newStatus });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      toast({
+        title: "Route updated",
+        description: "Route status has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error("Error updating route status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update route status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleStatus = (routeId: string, currentStatus: "active" | "inactive") => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
+    toggleStatusMutation.mutate({ routeId, newStatus });
+  };
+
+  const handleEditRoute = (routeId: string) => {
+    // For now, show a placeholder toast - in the future this could open an edit dialog
+    toast({
+      title: "Edit functionality",
+      description: "Route editing feature coming soon!",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -72,7 +111,7 @@ export default function RoutesPage() {
               const transformedStops = route.stops.map(stop => ({
                 id: stop.id,
                 name: stop.name,
-                eta: stop.estimatedArrival || undefined,
+                eta: undefined, // ETA removed in favor of geofencing
               }));
 
               return (
@@ -85,8 +124,8 @@ export default function RoutesPage() {
                   vehicleNumber={route.vehicleNumber || undefined}
                   stops={transformedStops}
                   ridersCount={0} // TODO: Add riders count to API
-                  onEdit={() => console.log(`Edit route ${route.id}`)}
-                  onToggleStatus={() => console.log(`Toggle status for route ${route.id}`)}
+                  onEdit={() => handleEditRoute(route.id)}
+                  onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
                 />
               );
             })}

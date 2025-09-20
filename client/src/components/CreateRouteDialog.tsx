@@ -50,7 +50,7 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
     resolver: zodResolver(createRouteSchema),
     defaultValues: {
       name: "",
-      type: "shuttle",
+      type: "bus",
       status: "active",
       vehicleNumber: "",
       organizationId: organizationId || "",
