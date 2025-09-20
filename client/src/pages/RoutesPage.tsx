@@ -3,59 +3,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
+import { CreateRouteDialog } from "@/components/CreateRouteDialog";
+import { useQuery } from "@tanstack/react-query";
+import type { Route, RouteStop } from "@shared/schema";
+
+interface RouteWithStops extends Route {
+  stops: RouteStop[];
+}
 
 export default function RoutesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   
-  // TODO: remove mock functionality - replace with real route data
-  const mockRoutes = [
-    {
-      id: "1",
-      name: "Main Campus Loop",
-      type: "shuttle" as const,
-      status: "active" as const,
-      vehicleNumber: "SHUTTLE-001",
-      stops: [
-        { id: "1", name: "Main Entrance", eta: "2 min" },
-        { id: "2", name: "Student Center", eta: "7 min" },
-        { id: "3", name: "Library", eta: "12 min" },
-        { id: "4", name: "Cafeteria", eta: "15 min" }
-      ],
-      ridersCount: 23
-    },
-    {
-      id: "2", 
-      name: "West Campus Express",
-      type: "bus" as const,
-      status: "active" as const,
-      vehicleNumber: "BUS-105",
-      stops: [
-        { id: "5", name: "West Gate", eta: "5 min" },
-        { id: "6", name: "Engineering Building" },
-        { id: "7", name: "Research Center" },
-        { id: "8", name: "Parking Garage B" },
-        { id: "9", name: "Athletics Complex" }
-      ],
-      ridersCount: 41
-    },
-    {
-      id: "3",
-      name: "Hospital Shuttle",
-      type: "shuttle" as const, 
-      status: "inactive" as const,
-      vehicleNumber: "MED-001",
-      stops: [
-        { id: "10", name: "Main Hospital", eta: "N/A" },
-        { id: "11", name: "Emergency Entrance", eta: "N/A" }
-      ],
-      ridersCount: 0
-    }
-  ];
+  // Get the default organization for now - in a real app this would be from user context
+  const { data: routes = [], isLoading, error } = useQuery<RouteWithStops[]>({
+    queryKey: ["/api/routes"],
+  });
 
-  const filteredRoutes = mockRoutes.filter(route =>
+  const filteredRoutes = routes.filter(route =>
     route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     route.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Mock organization ID for now - in real app this would come from user context
+  const organizationId = "default-org";
 
   return (
     <div className="space-y-6">
@@ -64,10 +34,7 @@ export default function RoutesPage() {
           <h1 className="text-2xl font-bold">Routes</h1>
           <p className="text-muted-foreground">Manage your bus and shuttle routes</p>
         </div>
-        <Button data-testid="button-add-route">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Route
-        </Button>
+        <CreateRouteDialog organizationId={organizationId} />
       </div>
 
       <div className="flex items-center gap-4">
@@ -83,21 +50,63 @@ export default function RoutesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredRoutes.map((route) => (
-          <RouteCard
-            key={route.id}
-            {...route}
-            onEdit={() => console.log(`Edit route ${route.id}`)}
-            onToggleStatus={() => console.log(`Toggle status for route ${route.id}`)}
-          />
-        ))}
-      </div>
-
-      {filteredRoutes.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No routes found matching your search.</p>
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
+          ))}
         </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-destructive">Error loading routes. Please try again.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredRoutes.map((route) => {
+              // Transform stops for RouteCard component
+              const transformedStops = route.stops.map(stop => ({
+                id: stop.id,
+                name: stop.name,
+                eta: stop.estimatedArrival || undefined,
+              }));
+
+              return (
+                <RouteCard
+                  key={route.id}
+                  id={route.id}
+                  name={route.name}
+                  type={route.type as "shuttle" | "bus"}
+                  status={route.status as "active" | "inactive"}
+                  vehicleNumber={route.vehicleNumber || undefined}
+                  stops={transformedStops}
+                  ridersCount={0} // TODO: Add riders count to API
+                  onEdit={() => console.log(`Edit route ${route.id}`)}
+                  onToggleStatus={() => console.log(`Toggle status for route ${route.id}`)}
+                />
+              );
+            })}
+          </div>
+
+          {filteredRoutes.length === 0 && !isLoading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                {searchTerm ? "No routes found matching your search." : "No routes created yet."}
+              </p>
+              {!searchTerm && (
+                <CreateRouteDialog 
+                  organizationId={organizationId}
+                  trigger={
+                    <Button className="mt-4">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Your First Route
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
