@@ -5,6 +5,8 @@ import {
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
   insertUserSchema,
+  insertRouteSchema,
+  insertRouteStopSchema,
   roleEnum,
   orgTypeEnum 
 } from "@shared/schema";
@@ -143,6 +145,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Route Management Routes
+  app.get("/api/routes", async (req, res) => {
+    try {
+      const { organizationId } = req.query;
+      
+      let routes;
+      if (organizationId && typeof organizationId === "string") {
+        // Organization-specific routes (for org admins)
+        routes = await storage.getRoutesByOrganization(organizationId);
+      } else {
+        // All routes (for system admins)
+        routes = await storage.getAllRoutes();
+      }
+      
+      // Get route stops for each route
+      const routesWithStops = await Promise.all(routes.map(async (route) => {
+        const stops = await storage.getRouteStopsByRoute(route.id);
+        return { ...route, stops };
+      }));
+      
+      res.json(routesWithStops);
+    } catch (error) {
+      console.error("Error fetching routes:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/routes", async (req, res) => {
+    try {
+      const validatedData = insertRouteSchema.parse(req.body);
+      const route = await storage.createRoute(validatedData);
+      res.status(201).json(route);
+    } catch (error) {
+      console.error("Error creating route:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid route data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/routes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const route = await storage.getRoute(id);
+      
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      const stops = await storage.getRouteStopsByRoute(id);
+      res.json({ ...route, stops });
+    } catch (error) {
+      console.error("Error fetching route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/routes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertRouteSchema.partial().parse(req.body);
+      const updated = await storage.updateRoute(id, validatedData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      const stops = await storage.getRouteStopsByRoute(id);
+      res.json({ ...updated, stops });
+    } catch (error) {
+      console.error("Error updating route:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid route data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/routes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteRoute(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Route Stops Management Routes
+  app.get("/api/routes/:routeId/stops", async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const stops = await storage.getRouteStopsByRoute(routeId);
+      res.json(stops);
+    } catch (error) {
+      console.error("Error fetching route stops:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/routes/:routeId/stops", async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const validatedData = insertRouteStopSchema.parse({ ...req.body, routeId });
+      const stop = await storage.createRouteStop(validatedData);
+      res.status(201).json(stop);
+    } catch (error) {
+      console.error("Error creating route stop:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid route stop data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/stops/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertRouteStopSchema.partial().parse(req.body);
+      const updated = await storage.updateRouteStop(id, validatedData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Route stop not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating route stop:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid route stop data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/stops/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteRouteStop(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Route stop not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting route stop:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
