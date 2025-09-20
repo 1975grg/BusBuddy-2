@@ -17,9 +17,10 @@ interface AccessMethod {
 interface AccessCodeGeneratorProps {
   routeName: string;
   organizationName: string;
+  organizationLogo?: string;
 }
 
-export function AccessCodeGenerator({ routeName, organizationName }: AccessCodeGeneratorProps) {
+export function AccessCodeGenerator({ routeName, organizationName, organizationLogo }: AccessCodeGeneratorProps) {
   const { toast } = useToast();
   const [selectedMethod, setSelectedMethod] = useState<"qr" | "link" | "password">("qr");
   
@@ -128,8 +129,17 @@ export function AccessCodeGenerator({ routeName, organizationName }: AccessCodeG
 
           {selectedMethod === "qr" && (
             <div className="flex flex-col items-center space-y-3">
-              <div id="qr-code" className="bg-white p-4 rounded-lg">
+              <div id="qr-code" className="bg-white p-4 rounded-lg relative">
                 <QRCode value={currentMethod.value} size={200} />
+                {organizationLogo && (
+                  <div className="absolute bottom-2 right-2 w-8 h-8 bg-white rounded p-1 shadow-sm">
+                    <img 
+                      src={organizationLogo} 
+                      alt={organizationName}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button

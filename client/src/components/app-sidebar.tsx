@@ -16,14 +16,26 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
-import adminAvatarUrl from "@assets/generated_images/School_admin_avatar_e511f99c.png";
+import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
+import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
+import riderIconUrl from "@assets/generated_images/Rider_GPS_pin_icon_48a84853.png";
 
 // TODO: remove mock functionality - replace with real user data
 const mockUser = {
   name: "Sarah Johnson",
-  role: "Organization Admin",
+  role: "Organization Admin", 
   organization: "Springfield University",
-  avatar: adminAvatarUrl
+  avatar: adminIconUrl,
+  orgLogo: "" // Will be populated when organization uploads their logo
+};
+
+const getRoleIcon = (role: "admin" | "driver" | "rider") => {
+  switch (role) {
+    case "admin": return adminIconUrl;
+    case "driver": return driverIconUrl;
+    case "rider": return riderIconUrl;
+    default: return adminIconUrl;
+  }
 };
 
 interface MenuItem {
@@ -119,7 +131,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <img src={busIconUrl} alt="Bus Buddy" className="w-8 h-8 rounded-lg" />
+          {/* TODO: replace mockUser.orgLogo with real org logo from settings */}
+          <img 
+            src={mockUser.orgLogo || busIconUrl} 
+            alt={mockUser.orgLogo ? `${mockUser.organization} logo` : "Bus Buddy"} 
+            className="w-8 h-8 rounded-lg object-contain" 
+          />
           <div>
             <h2 className="font-bold text-lg">Bus Buddy</h2>
             <p className="text-sm text-muted-foreground">{mockUser.organization}</p>
@@ -158,8 +175,10 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
-            <AvatarFallback>{mockUser.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            <AvatarImage src={getRoleIcon(userRole)} alt={`${userRole} icon`} />
+            <AvatarFallback>
+              <div className={`w-6 h-6 rounded-full ${getRoleColor()}`} />
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{mockUser.name}</p>

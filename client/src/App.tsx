@@ -15,6 +15,7 @@ import AccessManagementPage from "@/pages/AccessManagementPage";
 import DriverPage from "@/pages/DriverPage";
 import RiderPage from "@/pages/RiderPage";
 import AccessPage from "@/pages/AccessPage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/admin" component={AdminDashboardPage} />
       <Route path="/admin/routes" component={RoutesPage} />
       <Route path="/admin/access" component={AccessManagementPage} />
+      <Route path="/admin/settings" component={SettingsPage} />
       
       {/* Driver Routes */}
       <Route path="/driver" component={DriverPage} />
