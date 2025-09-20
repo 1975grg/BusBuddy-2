@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
+import { EditRouteDialog } from "@/components/EditRouteDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,6 +16,8 @@ interface RouteWithStops extends Route {
 
 export default function RoutesPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -63,11 +66,11 @@ export default function RoutesPage() {
   };
 
   const handleEditRoute = (routeId: string) => {
-    // For now, show a placeholder toast - in the future this could open an edit dialog
-    toast({
-      title: "Edit functionality",
-      description: "Route editing feature coming soon!",
-    });
+    const route = routes.find(r => r.id === routeId);
+    if (route) {
+      setEditingRoute(route);
+      setEditDialogOpen(true);
+    }
   };
 
   return (
@@ -150,6 +153,19 @@ export default function RoutesPage() {
             </div>
           )}
         </>
+      )}
+      
+      {/* Edit Route Dialog */}
+      {editingRoute && (
+        <EditRouteDialog
+          route={editingRoute}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSuccess={() => {
+            setEditingRoute(null);
+            setEditDialogOpen(false);
+          }}
+        />
       )}
     </div>
   );

@@ -307,6 +307,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete all stops for a route
+  app.delete("/api/routes/:id/stops", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // First check if route exists
+      const route = await storage.getRoute(id);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Delete all stops for this route
+      const stops = await storage.getRouteStopsByRoute(id);
+      for (const stop of stops) {
+        if (stop.id) {
+          await storage.deleteRouteStop(stop.id);
+        }
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting route stops:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Development Toggle Route (for switching between user perspectives)
   app.get("/api/dev/mock-user/:role", async (req, res) => {
     try {
