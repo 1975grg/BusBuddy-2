@@ -141,77 +141,6 @@ export default function DriverPage() {
         </Card>
       )}
 
-      {/* Available Routes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Route className="w-5 h-5" />
-            Available Routes ({routes.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {routes.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">
-              No active routes available for your organization.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {routes.map((route) => {
-                const isFavorite = currentUser?.favoriteRouteId === route.id;
-                const isSelected = selectedRoute === route.id;
-                
-                return (
-                  <div
-                    key={route.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isSelected 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover-elevate"
-                    }`}
-                    data-testid={`card-route-${route.id}`}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{route.name}</p>
-                        {isFavorite && (
-                          <Heart className="w-4 h-4 text-primary fill-primary" />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {route.vehicleNumber} • {route.type}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant={isFavorite ? "default" : "ghost"}
-                        onClick={() => handleFavoriteToggle(route.id)}
-                        disabled={favoriteRouteMutation.isPending}
-                        data-testid={`button-favorite-${route.id}`}
-                      >
-                        {isFavorite ? (
-                          <Star className="w-4 h-4 fill-current" />
-                        ) : (
-                          <StarOff className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant={isSelected ? "default" : "outline"}
-                        onClick={() => setSelectedRoute(route.id)}
-                        disabled={isSelected}
-                        data-testid={`button-select-${route.id}`}
-                      >
-                        {isSelected ? "Selected" : "Select"}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Driver Controls and Map */}
       {currentRoute && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -237,6 +166,95 @@ export default function DriverPage() {
           </Card>
         </div>
       )}
+
+      {/* Available Routes Dropdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Route className="w-5 h-5" />
+            Switch Route
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {routes.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">
+              No active routes available for your organization.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <Select
+                value={selectedRoute}
+                onValueChange={setSelectedRoute}
+                data-testid="select-route-dropdown"
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a route to operate..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {routes.map((route) => {
+                    const isFavorite = currentUser?.favoriteRouteId === route.id;
+                    return (
+                      <SelectItem 
+                        key={route.id} 
+                        value={route.id}
+                        data-testid={`option-route-${route.id}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{route.name}</span>
+                            {isFavorite && (
+                              <Heart className="w-3 h-3 text-primary fill-primary" />
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {route.vehicleNumber} • {route.type}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              
+              {/* Favorite Controls */}
+              {selectedRoute && (
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">
+                      {routes.find(r => r.id === selectedRoute)?.name}
+                    </span>
+                    {currentUser?.favoriteRouteId === selectedRoute && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Heart className="w-3 h-3 mr-1 fill-current" />
+                        Favorite
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={currentUser?.favoriteRouteId === selectedRoute ? "default" : "outline"}
+                    onClick={() => handleFavoriteToggle(selectedRoute)}
+                    disabled={favoriteRouteMutation.isPending}
+                    data-testid={`button-favorite-${selectedRoute}`}
+                  >
+                    {currentUser?.favoriteRouteId === selectedRoute ? (
+                      <>
+                        <Star className="w-4 h-4 mr-1 fill-current" />
+                        Favorited
+                      </>
+                    ) : (
+                      <>
+                        <StarOff className="w-4 h-4 mr-1" />
+                        Add to Favorites
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
