@@ -10,14 +10,20 @@ import {
   type InsertRoute,
   type RouteStop,
   type InsertRouteStop,
+  type ServiceAlert,
+  type InsertServiceAlert,
+  type RiderMessage,
+  type InsertRiderMessage,
   users,
   organizations,
   organizationSettings,
   routes,
-  routeStops
+  routeStops,
+  serviceAlerts,
+  riderMessages
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -58,6 +64,18 @@ export interface IStorage {
   createRouteStop(stop: InsertRouteStop): Promise<RouteStop>;
   updateRouteStop(id: string, stop: Partial<InsertRouteStop>): Promise<RouteStop | undefined>;
   deleteRouteStop(id: string): Promise<boolean>;
+  
+  // Service alerts (Admin → Riders)
+  createServiceAlert(alert: InsertServiceAlert): Promise<ServiceAlert>;
+  getActiveServiceAlerts(routeId: string): Promise<ServiceAlert[]>;
+  deactivateServiceAlert(id: string): Promise<boolean>;
+  
+  // Rider messages (Riders → Admin)  
+  createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
+  getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]>;
+  getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]>;
+  updateRiderMessageStatus(id: string, status: string): Promise<RiderMessage | undefined>;
+  addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined>;
 }
 
 // Database-backed storage implementation (from javascript_database blueprint)
@@ -199,6 +217,81 @@ export class DatabaseStorage implements IStorage {
   async deleteRouteStop(id: string): Promise<boolean> {
     const result = await db.delete(routeStops).where(eq(routeStops.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Service alerts (Admin → Riders)
+  async createServiceAlert(insertAlert: InsertServiceAlert): Promise<ServiceAlert> {
+    const [alert] = await db.insert(serviceAlerts).values(insertAlert).returning();
+    return alert;
+  }
+
+  async getActiveServiceAlerts(routeId: string): Promise<ServiceAlert[]> {
+    const now = new Date();
+    return await db.select().from(serviceAlerts)
+      .where(
+        and(
+          eq(serviceAlerts.routeId, routeId),
+          eq(serviceAlerts.isActive, true),
+          // Active from is in the past (or now)
+          sql`${serviceAlerts.activeFrom} <= ${now}`,
+          // Active until is null (no expiry) or in the future
+          sql`${serviceAlerts.activeUntil} IS NULL OR ${serviceAlerts.activeUntil} > ${now}`
+        )
+      );
+  }
+
+  async deactivateServiceAlert(id: string): Promise<boolean> {
+    const result = await db.update(serviceAlerts)
+      .set({ isActive: false })
+      .where(eq(serviceAlerts.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Rider messages (Riders → Admin)
+  async createRiderMessage(insertMessage: InsertRiderMessage): Promise<RiderMessage> {
+    const [message] = await db.insert(riderMessages).values(insertMessage).returning();
+    return message;
+  }
+
+  async getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]> {
+    return await db.select().from(riderMessages)
+      .where(
+        and(
+          eq(riderMessages.routeId, routeId),
+          eq(riderMessages.isActive, true)
+        )
+      );
+  }
+
+  async getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]> {
+    return await db.select().from(riderMessages)
+      .where(
+        and(
+          eq(riderMessages.organizationId, organizationId),
+          eq(riderMessages.isActive, true)
+        )
+      );
+  }
+
+  async updateRiderMessageStatus(id: string, status: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ status })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ 
+        adminResponse: response,
+        respondedByUserId,
+        respondedAt: new Date(),
+        status: "responded"
+      })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
   }
 }
 
@@ -603,6 +696,40 @@ export class MemStorage implements IStorage {
     const updated: RouteStop = { ...existing, isActive: false };
     this.routeStops.set(id, updated);
     return true;
+  }
+
+  // Service alerts (Admin → Riders) - Stub implementations for MemStorage
+  async createServiceAlert(alert: InsertServiceAlert): Promise<ServiceAlert> {
+    throw new Error("Service alerts not implemented in MemStorage");
+  }
+
+  async getActiveServiceAlerts(routeId: string): Promise<ServiceAlert[]> {
+    return [];
+  }
+
+  async deactivateServiceAlert(id: string): Promise<boolean> {
+    return false;
+  }
+
+  // Rider messages (Riders → Admin) - Stub implementations for MemStorage
+  async createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage> {
+    throw new Error("Rider messages not implemented in MemStorage");
+  }
+
+  async getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]> {
+    return [];
+  }
+
+  async getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]> {
+    return [];
+  }
+
+  async updateRiderMessageStatus(id: string, status: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
+  async addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined> {
+    return undefined;
   }
 }
 

@@ -8,8 +8,13 @@ import {
   insertUserSchema,
   insertRouteSchema,
   insertRouteStopSchema,
+  insertServiceAlertSchema,
+  insertRiderMessageSchema,
   roleEnum,
-  orgTypeEnum 
+  orgTypeEnum,
+  alertTypeEnum,
+  alertSeverityEnum,
+  messageTypeEnum
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -527,6 +532,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in geocode details:", error);
       res.status(500).json({ error: "Geocoding details failed" });
+    }
+  });
+
+  // Service Alerts (Admin → Riders)
+  app.post("/api/service-alerts", async (req, res) => {
+    try {
+      const validatedData = insertServiceAlertSchema.parse(req.body);
+      const alert = await storage.createServiceAlert(validatedData);
+      res.status(201).json(alert);
+    } catch (error) {
+      console.error("Error creating service alert:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid alert data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/service-alerts", async (req, res) => {
+    try {
+      const { route_id } = req.query;
+      
+      if (!route_id || typeof route_id !== 'string') {
+        return res.status(400).json({ error: "route_id parameter is required" });
+      }
+      
+      const alerts = await storage.getActiveServiceAlerts(route_id);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching service alerts:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/service-alerts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deactivateServiceAlert(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deactivating service alert:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Rider Messages (Riders → Admin)
+  app.post("/api/rider-messages", async (req, res) => {
+    try {
+      const validatedData = insertRiderMessageSchema.parse(req.body);
+      const message = await storage.createRiderMessage(validatedData);
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error creating rider message:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid message data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/rider-messages", async (req, res) => {
+    try {
+      const { route_id, organization_id } = req.query;
+      
+      let messages = [];
+      if (route_id && typeof route_id === 'string') {
+        messages = await storage.getRiderMessagesByRoute(route_id);
+      } else if (organization_id && typeof organization_id === 'string') {
+        messages = await storage.getRiderMessagesByOrganization(organization_id);
+      } else {
+        return res.status(400).json({ error: "route_id or organization_id parameter is required" });
+      }
+      
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching rider messages:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/rider-messages/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ error: "status is required" });
+      }
+      
+      const message = await storage.updateRiderMessageStatus(id, status);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error updating message status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/rider-messages/:id/respond", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { response, responded_by_user_id } = req.body;
+      
+      if (!response || !responded_by_user_id) {
+        return res.status(400).json({ error: "response and responded_by_user_id are required" });
+      }
+      
+      const message = await storage.addAdminResponse(id, response, responded_by_user_id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error adding admin response:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
