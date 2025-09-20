@@ -363,6 +363,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Geocoding Routes for Address Autocomplete
+  app.get("/api/geocode/search", async (req, res) => {
+    try {
+      const { q: query, limit = 5 } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query parameter is required" });
+      }
+
+      const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+      if (!mapboxToken) {
+        return res.status(500).json({ error: "Mapbox token not configured" });
+      }
+
+      const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=${limit}&types=address,poi`;
+      
+      const response = await fetch(searchUrl);
+      if (!response.ok) {
+        throw new Error(`Mapbox API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Transform Mapbox response to our format
+      const suggestions = data.features.map((feature: any) => ({
+        id: feature.id,
+        place_name: feature.place_name,
+        text: feature.text,
+        center: feature.center, // [longitude, latitude]
+        properties: feature.properties
+      }));
+      
+      res.json({ suggestions });
+    } catch (error) {
+      console.error("Error in geocode search:", error);
+      res.status(500).json({ error: "Geocoding search failed" });
+    }
+  });
+
+  app.get("/api/geocode/details", async (req, res) => {
+    try {
+      const { place_id } = req.query;
+      
+      if (!place_id || typeof place_id !== 'string') {
+        return res.status(400).json({ error: "place_id parameter is required" });
+      }
+
+      const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+      if (!mapboxToken) {
+        return res.status(500).json({ error: "Mapbox token not configured" });
+      }
+
+      const detailsUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(place_id)}.json?access_token=${mapboxToken}`;
+      
+      const response = await fetch(detailsUrl);
+      if (!response.ok) {
+        throw new Error(`Mapbox API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.features || data.features.length === 0) {
+        return res.status(404).json({ error: "Place not found" });
+      }
+      
+      const feature = data.features[0];
+      const result = {
+        id: feature.id,
+        place_name: feature.place_name,
+        text: feature.text,
+        center: feature.center, // [longitude, latitude]
+        properties: feature.properties,
+        address_components: feature.context || []
+      };
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error in geocode details:", error);
+      res.status(500).json({ error: "Geocoding details failed" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
