@@ -586,7 +586,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "route_id parameter is required" });
       }
       
-      const alerts = await storage.getActiveServiceAlerts(route_id);
+      let actualRouteId = route_id;
+      
+      // If route_id doesn't look like a UUID, try to find the route by name
+      if (!route_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const routes = await storage.getRoutesByOrganization("org-1"); // TODO: Get org from context
+        const matchedRoute = routes.find(route => 
+          route.name.toLowerCase().replace(/\s+/g, '-') === route_id.toLowerCase() ||
+          route.name === route_id
+        );
+        
+        if (matchedRoute) {
+          actualRouteId = matchedRoute.id;
+        } else {
+          return res.status(404).json({ error: "Route not found" });
+        }
+      }
+      
+      const alerts = await storage.getActiveServiceAlerts(actualRouteId);
       res.json(alerts);
     } catch (error) {
       console.error("Error fetching service alerts:", error);

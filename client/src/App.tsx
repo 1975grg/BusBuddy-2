@@ -38,6 +38,7 @@ function Router() {
       <Route path="/driver/control" component={DriverPage} />
       
       {/* Rider Routes */}
+      <Route path="/rider" component={RiderPage} />
       <Route path="/track" component={RiderPage} />
       <Route path="/track/routes" component={RiderPage} />
       

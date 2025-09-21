@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, BellOff, Clock, MapPin, Star } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Bell, BellOff, Clock, MapPin, Star, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
+import type { ServiceAlert } from "@shared/schema";
 
 interface Stop {
   id: string;
@@ -19,6 +21,7 @@ interface RiderTrackerProps {
   stops: Stop[];
   defaultStop?: string;
   isNotificationsEnabled?: boolean;
+  serviceAlerts?: ServiceAlert[];
 }
 
 export function RiderTracker({ 
@@ -27,7 +30,8 @@ export function RiderTracker({
   status, 
   stops, 
   defaultStop,
-  isNotificationsEnabled = false 
+  isNotificationsEnabled = false,
+  serviceAlerts = []
 }: RiderTrackerProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(isNotificationsEnabled);
   const [favoriteStop, setFavoriteStop] = useState<string | undefined>(defaultStop);
@@ -53,6 +57,49 @@ export function RiderTracker({
   const setFavorite = (stopId: string) => {
     setFavoriteStop(stopId);
     console.log("Favorite stop set:", stopId);
+  };
+
+  // Helper function to get alert type icon and styling
+  const getAlertTypeInfo = (type: ServiceAlert['type']) => {
+    switch (type) {
+      case 'delayed':
+        return {
+          icon: Clock,
+          bgColor: 'bg-yellow-50 dark:bg-yellow-950/20',
+          borderColor: 'border-yellow-200 dark:border-yellow-800',
+          textColor: 'text-yellow-800 dark:text-yellow-200',
+          iconColor: 'text-yellow-600 dark:text-yellow-400',
+          label: 'Service Delay'
+        };
+      case 'bus_change':
+        return {
+          icon: Bus,
+          bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+          borderColor: 'border-blue-200 dark:border-blue-800',
+          textColor: 'text-blue-800 dark:text-blue-200',
+          iconColor: 'text-blue-600 dark:text-blue-400',
+          label: 'Vehicle Change'
+        };
+      case 'cancelled':
+        return {
+          icon: AlertTriangle,
+          bgColor: 'bg-red-50 dark:bg-red-950/20',
+          borderColor: 'border-red-200 dark:border-red-800',
+          textColor: 'text-red-800 dark:text-red-200',
+          iconColor: 'text-red-600 dark:text-red-400',
+          label: 'Service Cancelled'
+        };
+      case 'general':
+      default:
+        return {
+          icon: Info,
+          bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+          borderColor: 'border-blue-200 dark:border-blue-800',
+          textColor: 'text-blue-800 dark:text-blue-200',
+          iconColor: 'text-blue-600 dark:text-blue-400',
+          label: 'Service Notice'
+        };
+    }
   };
 
   const getStatusBadge = () => {
@@ -96,14 +143,47 @@ export function RiderTracker({
           <LiveMap buses={mockBuses} className="h-48 mb-4" />
           
           {notificationsEnabled && (
-            <div className="mb-4 p-3 bg-primary/10 rounded-lg">
-              <div className="flex items-center gap-2 text-sm">
-                <Bell className="w-4 h-4 text-primary" />
-                <span className="font-medium">Notifications enabled</span>
+            <div className="mb-4 space-y-3" role="region" aria-label="Notifications">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <Bell className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Notifications enabled</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You'll be alerted when the bus is 5 minutes away from your stop.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                You'll be alerted when the bus is 5 minutes away from your stop.
-              </p>
+              
+              {serviceAlerts.length > 0 && (
+                <div className="space-y-2">
+                  {serviceAlerts.map((alert) => {
+                    const alertInfo = getAlertTypeInfo(alert.type);
+                    const IconComponent = alertInfo.icon;
+                    
+                    return (
+                      <Alert
+                        key={alert.id}
+                        className={`${alertInfo.bgColor} ${alertInfo.borderColor}`}
+                        data-testid={`alert-${alert.type}-${alert.id}`}
+                      >
+                        <IconComponent className={`h-4 w-4 ${alertInfo.iconColor}`} />
+                        <AlertDescription className={alertInfo.textColor}>
+                          <div className="space-y-1">
+                            <p className="font-medium">{alertInfo.label}</p>
+                            <p>{alert.message}</p>
+                            {alert.activeFrom && (
+                              <p className="text-xs opacity-75 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Posted: {new Date(alert.activeFrom).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </CardContent>

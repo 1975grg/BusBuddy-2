@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RiderTracker } from "@/components/RiderTracker";
 import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Star, Route, Clock, MessageSquare } from "lucide-react";
+import type { ServiceAlert } from "@shared/schema";
 
 export default function RiderPage() {
-  const [selectedRoute, setSelectedRoute] = useState("main-campus-loop");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  
+  // Extract route ID from URL query parameter using window.location.search
+  const urlParams = new URLSearchParams(window.location.search);
+  const routeId = urlParams.get('route');
+  
+  // Use real route ID if provided, otherwise use mock route for development
+  const [selectedRoute, setSelectedRoute] = useState(routeId || "main-campus-loop");
+  
+  // Update selectedRoute when URL changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentRouteId = urlParams.get('route');
+    if (currentRouteId) {
+      setSelectedRoute(currentRouteId);
+    }
+  }, []);
   
   // TODO: remove mock functionality - replace with real rider data and preferences
   const mockSavedRoutes = [
@@ -40,11 +57,43 @@ export default function RiderPage() {
     }
   ];
 
-  const currentRoute = mockSavedRoutes.find(r => r.id === selectedRoute);
+  // Fetch route data if using a real route ID
+  const { data: realRoute } = useQuery({
+    queryKey: ["/api/routes", selectedRoute],
+    queryFn: async () => {
+      const response = await fetch("/api/routes");
+      const routes = await response.json();
+      return routes.find((r: any) => r.id === selectedRoute || r.name.toLowerCase().replace(/\s+/g, '-') === selectedRoute);
+    },
+    enabled: !!selectedRoute && !mockSavedRoutes.find(r => r.id === selectedRoute), // Only fetch if route not in mock data
+  });
+  
+  // Fetch active service alerts for the current route
+  const { data: serviceAlerts = [], isLoading: alertsLoading } = useQuery<ServiceAlert[]>({
+    queryKey: ["/api/service-alerts", selectedRoute],
+    queryFn: () => fetch(`/api/service-alerts?route_id=${selectedRoute}`).then(res => res.json()),
+    refetchInterval: 30000, // Refresh every 30 seconds
+    enabled: !!selectedRoute, // Only fetch if we have a route ID
+  });
+
+  // Use mock route data if available, otherwise create route data from real route
+  const currentRoute = mockSavedRoutes.find(r => r.id === selectedRoute) || 
+    (realRoute ? {
+      id: realRoute.id,
+      name: realRoute.name,
+      busName: realRoute.vehicleNumber || `${realRoute.type.toUpperCase()}-001`,
+      status: "active" as const,
+      isFavorite: false,
+      stops: [
+        { id: "1", name: "Main Entrance", eta: "5 min", isNext: true },
+        { id: "2", name: "Next Stop", eta: "10 min", isNext: false }
+      ]
+    } : null);
 
   const toggleFavorite = (routeId: string) => {
     console.log(`Toggle favorite for route ${routeId}`);
   };
+
 
   return (
     <div className="space-y-6">
@@ -111,6 +160,7 @@ export default function RiderPage() {
         </CardContent>
       </Card>
 
+
       {currentRoute && (
         <RiderTracker
           routeName={currentRoute.name}
@@ -119,6 +169,7 @@ export default function RiderPage() {
           stops={currentRoute.stops}
           defaultStop="1"
           isNotificationsEnabled={true}
+          serviceAlerts={serviceAlerts}
         />
       )}
 
