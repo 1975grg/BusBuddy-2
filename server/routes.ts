@@ -590,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If route_id doesn't look like a UUID, try to find the route by name
       if (!route_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        const routes = await storage.getRoutesByOrganization("org-1"); // TODO: Get org from context
+        const routes = await storage.getAllRoutes(); // Search all routes instead of by org
         const matchedRoute = routes.find(route => 
           route.name.toLowerCase().replace(/\s+/g, '-') === route_id.toLowerCase() ||
           route.name === route_id
@@ -638,7 +638,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientData = clientSchema.parse(req.body);
       
       // Verify route exists and get organization
-      const route = await storage.getRoute(clientData.routeId);
+      let actualRouteId = clientData.routeId;
+      
+      // If route_id doesn't look like a UUID, try to find the route by name
+      if (!clientData.routeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const routes = await storage.getAllRoutes(); // Search all routes instead of by org
+        const matchedRoute = routes.find(route => 
+          route.name.toLowerCase().replace(/\s+/g, '-') === clientData.routeId.toLowerCase() ||
+          route.name === clientData.routeId
+        );
+        
+        if (matchedRoute) {
+          actualRouteId = matchedRoute.id;
+        } else {
+          return res.status(404).json({ error: "Route not found" });
+        }
+      }
+      
+      const route = await storage.getRoute(actualRouteId);
       if (!route) {
         return res.status(404).json({ error: "Route not found" });
       }
@@ -648,6 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For anonymous riders, userId can be null
       const messageData = {
         ...clientData,
+        routeId: actualRouteId, // Use resolved route ID
         organizationId: route.organizationId,
         userId: null // Anonymous rider message
       };
