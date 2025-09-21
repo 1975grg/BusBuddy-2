@@ -428,8 +428,8 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusM: 250, // Default 250m for approaching notification
-        arrivalRadiusM: 75, // Default 75m for arrival notification
+        approachingRadiusFt: 800, // Default 800ft for approaching notification
+        arrivalRadiusFt: 250, // Default 250ft for arrival notification
         isActive: true,
         createdAt: new Date()
       };
@@ -470,8 +470,8 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusM: 250, // Default 250m for approaching notification
-        arrivalRadiusM: 75, // Default 75m for arrival notification
+        approachingRadiusFt: 800, // Default 800ft for approaching notification
+        arrivalRadiusFt: 250, // Default 250ft for arrival notification
         isActive: true,
         createdAt: new Date()
       };
@@ -670,8 +670,8 @@ export class MemStorage implements IStorage {
       orderIndex: insertStop.orderIndex,
       latitude: insertStop.latitude || null,
       longitude: insertStop.longitude || null,
-      approachingRadiusM: insertStop.approachingRadiusM || 250,
-      arrivalRadiusM: insertStop.arrivalRadiusM || 75,
+      approachingRadiusFt: insertStop.approachingRadiusFt || 800,
+      arrivalRadiusFt: insertStop.arrivalRadiusFt || 250,
       isActive: true,
       createdAt: new Date()
     };
@@ -840,8 +840,8 @@ async function seedDatabase() {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusM: 250,
-        arrivalRadiusM: 75,
+        approachingRadiusFt: 800,
+        arrivalRadiusFt: 250,
         isActive: true,
       });
     }
@@ -864,8 +864,8 @@ async function seedDatabase() {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusM: 250,
-        arrivalRadiusM: 75,
+        approachingRadiusFt: 800,
+        arrivalRadiusFt: 250,
         isActive: true,
       });
     }

@@ -26,8 +26,8 @@ const editRouteSchema = z.object({
     placeId: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
-    approachingRadiusM: z.number().optional(),
-    arrivalRadiusM: z.number().optional(),
+    approachingRadiusFt: z.number().optional(),
+    arrivalRadiusFt: z.number().optional(),
     orderIndex: z.number().optional(),
   })).min(1, "At least one stop is required"),
 });
@@ -79,14 +79,14 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
           placeId: stop.placeId || undefined,
           latitude: stop.latitude ? parseFloat(stop.latitude) : undefined,
           longitude: stop.longitude ? parseFloat(stop.longitude) : undefined,
-          approachingRadiusM: stop.approachingRadiusM || 250,
-          arrivalRadiusM: stop.arrivalRadiusM || 75,
+          approachingRadiusFt: stop.approachingRadiusFt || 800,
+          arrivalRadiusFt: stop.arrivalRadiusFt || 250,
           orderIndex: stop.orderIndex,
         })) : [{ 
           id: crypto.randomUUID(), 
           name: "", 
-          approachingRadiusM: 250,
-          arrivalRadiusM: 75 
+          approachingRadiusFt: 800,
+          arrivalRadiusFt: 250 
         }];
 
       form.reset({
@@ -127,8 +127,8 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
           latitude: stop.latitude ? String(stop.latitude) : null,
           longitude: stop.longitude ? String(stop.longitude) : null,
           orderIndex: i + 1,
-          approachingRadiusM: stop.approachingRadiusM || 250,
-          arrivalRadiusM: stop.arrivalRadiusM || 75,
+          approachingRadiusFt: stop.approachingRadiusFt || 800,
+          arrivalRadiusFt: stop.arrivalRadiusFt || 250,
         });
       }
 
@@ -165,8 +165,8 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
     form.setValue("stops", [...currentStops, { 
       id: crypto.randomUUID(), 
       name: "", 
-      approachingRadiusM: 250,
-      arrivalRadiusM: 75 
+      approachingRadiusFt: 800,
+      arrivalRadiusFt: 250 
     }]);
   };
 

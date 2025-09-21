@@ -28,8 +28,8 @@ const createRouteSchema = z.object({
     placeId: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
-    approachingRadiusM: z.number().optional(),
-    arrivalRadiusM: z.number().optional(),
+    approachingRadiusFt: z.number().optional(),
+    arrivalRadiusFt: z.number().optional(),
   })).min(1, "At least one stop is required"),
 });
 
@@ -57,8 +57,8 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
       stops: [{ 
         id: crypto.randomUUID(), 
         name: "", 
-        approachingRadiusM: 250, // Default 250m for approaching notification
-        arrivalRadiusM: 75 // Default 75m for arrival notification
+        approachingRadiusFt: 800, // Default 800ft for approaching notification
+        arrivalRadiusFt: 250 // Default 250ft for arrival notification
       }],
     },
   });
@@ -97,8 +97,8 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
           latitude: stop.latitude ? String(stop.latitude) : null,
           longitude: stop.longitude ? String(stop.longitude) : null,
           orderIndex: i + 1,
-          approachingRadiusM: stop.approachingRadiusM || 250,
-          arrivalRadiusM: stop.arrivalRadiusM || 75,
+          approachingRadiusFt: stop.approachingRadiusFt || 800,
+          arrivalRadiusFt: stop.arrivalRadiusFt || 250,
         });
       }
 
@@ -146,8 +146,8 @@ export function CreateRouteDialog({ organizationId, trigger, onSuccess }: Create
     form.setValue("stops", [...currentStops, { 
       id: crypto.randomUUID(), 
       name: "", 
-      approachingRadiusM: 250, // Default 250m for approaching notification
-      arrivalRadiusM: 75 // Default 75m for arrival notification
+      approachingRadiusFt: 800, // Default 800ft for approaching notification
+      arrivalRadiusFt: 250 // Default 250ft for arrival notification
     }]);
   };
 

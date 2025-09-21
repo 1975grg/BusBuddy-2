@@ -33,8 +33,8 @@ interface RouteStop {
   placeId?: string;
   latitude?: number;
   longitude?: number;
-  approachingRadiusM?: number;
-  arrivalRadiusM?: number;
+  approachingRadiusFt?: number;
+  arrivalRadiusFt?: number;
 }
 
 interface RouteStopItemProps {
@@ -169,6 +169,63 @@ function SortableRouteStopItem({ stop, index, control, onRemove, setValue, watch
               </FormItem>
             )}
           />
+        </div>
+
+        {/* Geofencing Settings */}
+        <div className="col-span-1 md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Approaching Radius */}
+            <div>
+              <FormField
+                control={control}
+                name={`stops.${index}.approachingRadiusFt`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-muted-foreground">Approaching Radius (ft)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="50"
+                        max="5000"
+                        value={field.value || 800}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 800)}
+                        placeholder="800"
+                        data-testid={`input-approaching-radius-${index}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Arrival Radius */}
+            <div>
+              <FormField
+                control={control}
+                name={`stops.${index}.arrivalRadiusFt`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-muted-foreground">Arrival Radius (ft)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="25"
+                        max="1000"
+                        value={field.value || 250}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 250)}
+                        placeholder="250"
+                        data-testid={`input-arrival-radius-${index}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
