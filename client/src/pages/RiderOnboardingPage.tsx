@@ -44,13 +44,6 @@ export default function RiderOnboardingPage() {
     mutationFn: async () => {
       // Ensure phone number is sent as string (remove non-digits but keep as string)
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
-      
-      console.log("Creating rider profile with data:", {
-        phoneNumber: cleanPhoneNumber,
-        name: name || undefined,
-        organizationId,
-        notificationMethod: "sms",
-      });
 
       // Create rider profile
       const riderProfileResponse = await apiRequest("POST", "/api/rider-profiles", {
@@ -61,14 +54,8 @@ export default function RiderOnboardingPage() {
       });
 
       const riderProfile = await riderProfileResponse.json();
-      console.log("Rider profile created:", riderProfile);
 
       // Create route subscription
-      console.log("Creating route subscription with data:", {
-        routeId,
-        riderProfileId: riderProfile.id,
-        notificationMode,
-      });
 
       const subscriptionResponse = await apiRequest("POST", "/api/route-subscriptions", {
         routeId,
