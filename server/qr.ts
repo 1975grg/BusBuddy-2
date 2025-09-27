@@ -7,8 +7,9 @@ export class QrService {
    * This creates a link that riders can scan to access the route dashboard
    */
   generateRouteUrl(route: Route, organizationId: string): string {
-    const baseUrl = process.env.REPLIT_DOMAIN 
-      ? `https://${process.env.REPLIT_DOMAIN}` 
+    // Use the correct Replit environment variable for public access
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS}` 
       : 'http://localhost:5000';
     
     return `${baseUrl}/ride/${organizationId}/${route.id}`;
