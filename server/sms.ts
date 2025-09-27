@@ -81,6 +81,14 @@ export class SmsService {
   }
 
   /**
+   * Send welcome message to new rider
+   */
+  async sendWelcomeMessage(to: string, routeName: string, organizationName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const message = `🚌 Welcome to ${organizationName}! You're now subscribed to notifications for the ${routeName} route. You'll receive SMS updates when your bus is approaching your selected stops.`;
+    return this.sendSms(to, message);
+  }
+
+  /**
    * Send service alert notification
    */
   async sendServiceAlertNotification(to: string, routeName: string, alertTitle: string, alertMessage: string): Promise<{ success: boolean; messageId?: string; error?: string }> {

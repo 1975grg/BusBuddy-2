@@ -808,6 +808,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertRouteSubscriptionSchema.parse(req.body);
       const subscription = await storage.createRouteSubscription(validatedData);
+      
+      // Send welcome SMS to the new rider
+      try {
+        // Get rider profile to get phone number
+        const riderProfile = await storage.getRiderProfileById(validatedData.riderProfileId);
+        // Get route to get route name
+        const route = await storage.getRouteById(validatedData.routeId);
+        // Get organization to get organization name
+        const organization = riderProfile ? await storage.getOrganizationById(riderProfile.organizationId) : null;
+        
+        if (riderProfile && route && organization && smsService.isConfigured()) {
+          const smsResult = await smsService.sendWelcomeMessage(
+            riderProfile.phoneNumber,
+            route.name,
+            organization.name
+          );
+          
+          if (!smsResult.success) {
+            console.error("Failed to send welcome SMS:", smsResult.error);
+          } else {
+            console.log("Welcome SMS sent successfully:", smsResult.messageId);
+          }
+        } else {
+          console.log("SMS not sent - missing data or SMS not configured");
+        }
+      } catch (smsError) {
+        console.error("Error sending welcome SMS:", smsError);
+        // Don't fail the subscription if SMS fails
+      }
+      
       res.status(201).json(subscription);
     } catch (error) {
       console.error("Error creating route subscription:", error);

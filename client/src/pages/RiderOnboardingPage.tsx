@@ -276,7 +276,7 @@ export default function RiderOnboardingPage() {
                     id="always"
                     checked={notificationMode === "always"}
                     onCheckedChange={(checked) => {
-                      if (checked) setNotificationMode("always");
+                      setNotificationMode(checked ? "always" : "manual");
                     }}
                   />
                   <Label htmlFor="always" className="text-sm">
@@ -288,7 +288,7 @@ export default function RiderOnboardingPage() {
                     id="manual"
                     checked={notificationMode === "manual"}
                     onCheckedChange={(checked) => {
-                      if (checked) setNotificationMode("manual");
+                      setNotificationMode(checked ? "manual" : "always");
                     }}
                   />
                   <Label htmlFor="manual" className="text-sm">
