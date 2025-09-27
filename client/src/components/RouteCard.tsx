@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Users, Settings, MessageSquare } from "lucide-react";
+import { MapPin, Clock, Users, Settings, MessageSquare, QrCode } from "lucide-react";
 
 interface Stop {
   id: string;
@@ -20,6 +20,7 @@ interface RouteCardProps {
   onEdit?: () => void;
   onToggleStatus?: () => void;
   onSendAlert?: () => void;
+  onShowQr?: () => void;
 }
 
 export function RouteCard({ 
@@ -31,7 +32,8 @@ export function RouteCard({
   ridersCount,
   onEdit,
   onToggleStatus,
-  onSendAlert 
+  onSendAlert,
+  onShowQr
 }: RouteCardProps) {
   return (
     <Card className="hover-elevate">
@@ -105,7 +107,15 @@ export function RouteCard({
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1"
+            onClick={onShowQr}
+            data-testid={`button-show-qr-${name.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            <QrCode className="w-4 h-4 mr-2" />
+            QR Code
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
             onClick={onToggleStatus}
             data-testid={`button-toggle-status-${name.toLowerCase().replace(/\s+/g, '-')}`}
           >
@@ -115,7 +125,6 @@ export function RouteCard({
             <Button 
               variant="default" 
               size="sm" 
-              className="flex-1"
               onClick={onSendAlert}
               data-testid={`button-send-alert-${name.toLowerCase().replace(/\s+/g, '-')}`}
             >

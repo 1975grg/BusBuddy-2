@@ -14,13 +14,28 @@ import {
   type InsertServiceAlert,
   type RiderMessage,
   type InsertRiderMessage,
+  type RiderProfile,
+  type InsertRiderProfile,
+  type RouteSubscription,
+  type InsertRouteSubscription,
+  type StopPreference,
+  type InsertStopPreference,
+  type RouteSession,
+  type InsertRouteSession,
+  type NotificationLog,
+  type InsertNotificationLog,
   users,
   organizations,
   organizationSettings,
   routes,
   routeStops,
   serviceAlerts,
-  riderMessages
+  riderMessages,
+  riderProfiles,
+  routeSubscriptions,
+  stopPreferences,
+  routeSessions,
+  notificationLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
@@ -73,6 +88,34 @@ export interface IStorage {
   // Rider messages (Riders → Admin)  
   createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
   getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]>;
+  
+  // Rider profiles management
+  createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile>;
+  getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined>;
+  getRiderProfile(id: string): Promise<RiderProfile | undefined>;
+  
+  // Route subscriptions management
+  createRouteSubscription(subscription: InsertRouteSubscription): Promise<RouteSubscription>;
+  getSubscriptionsByRiderProfile(riderProfileId: string): Promise<RouteSubscription[]>;
+  getSubscriptionsByRoute(routeId: string): Promise<RouteSubscription[]>;
+  updateSubscriptionNotificationMode(subscriptionId: string, notificationMode: 'always' | 'manual'): Promise<RouteSubscription | undefined>;
+  
+  // Stop preferences management
+  createStopPreference(preference: InsertStopPreference): Promise<StopPreference>;
+  getStopPreferencesBySubscription(subscriptionId: string): Promise<StopPreference[]>;
+  
+  // Route sessions management (tracking active routes)
+  createRouteSession(session: InsertRouteSession): Promise<RouteSession>;
+  getActiveRouteSession(routeId: string): Promise<RouteSession | undefined>;
+  updateRouteSessionStatus(sessionId: string, status: 'pending' | 'active' | 'completed' | 'cancelled'): Promise<RouteSession | undefined>;
+  updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined>;
+  
+  // Notification log
+  createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  
+  // Additional route methods
+  getRouteById(id: string): Promise<Route | undefined>;
+  getOrganizationById(id: string): Promise<Organization | undefined>;
   getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]>;
   updateRiderMessageStatus(id: string, status: string): Promise<RiderMessage | undefined>;
   addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined>;
@@ -292,6 +335,107 @@ export class DatabaseStorage implements IStorage {
       .where(eq(riderMessages.id, id))
       .returning();
     return message || undefined;
+  }
+
+  // Rider profiles management
+  async createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile> {
+    const [riderProfile] = await db.insert(riderProfiles).values(profile).returning();
+    return riderProfile;
+  }
+
+  async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select().from(riderProfiles)
+      .where(and(
+        eq(riderProfiles.phoneNumber, phoneNumber),
+        eq(riderProfiles.organizationId, organizationId)
+      ));
+    return profile || undefined;
+  }
+
+  async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select().from(riderProfiles).where(eq(riderProfiles.id, id));
+    return profile || undefined;
+  }
+
+  // Route subscriptions management
+  async createRouteSubscription(subscription: InsertRouteSubscription): Promise<RouteSubscription> {
+    const [sub] = await db.insert(routeSubscriptions).values(subscription).returning();
+    return sub;
+  }
+
+  async getSubscriptionsByRiderProfile(riderProfileId: string): Promise<RouteSubscription[]> {
+    return db.select().from(routeSubscriptions)
+      .where(eq(routeSubscriptions.riderProfileId, riderProfileId));
+  }
+
+  async getSubscriptionsByRoute(routeId: string): Promise<RouteSubscription[]> {
+    return db.select().from(routeSubscriptions)
+      .where(eq(routeSubscriptions.routeId, routeId));
+  }
+
+  async updateSubscriptionNotificationMode(subscriptionId: string, notificationMode: 'always' | 'manual'): Promise<RouteSubscription | undefined> {
+    const [subscription] = await db.update(routeSubscriptions)
+      .set({ notificationMode })
+      .where(eq(routeSubscriptions.id, subscriptionId))
+      .returning();
+    return subscription || undefined;
+  }
+
+  // Stop preferences management
+  async createStopPreference(preference: InsertStopPreference): Promise<StopPreference> {
+    const [pref] = await db.insert(stopPreferences).values(preference).returning();
+    return pref;
+  }
+
+  async getStopPreferencesBySubscription(subscriptionId: string): Promise<StopPreference[]> {
+    return db.select().from(stopPreferences)
+      .where(eq(stopPreferences.subscriptionId, subscriptionId));
+  }
+
+  // Route sessions management (tracking active routes)
+  async createRouteSession(session: InsertRouteSession): Promise<RouteSession> {
+    const [sess] = await db.insert(routeSessions).values(session).returning();
+    return sess;
+  }
+
+  async getActiveRouteSession(routeId: string): Promise<RouteSession | undefined> {
+    const [session] = await db.select().from(routeSessions)
+      .where(and(
+        eq(routeSessions.routeId, routeId),
+        eq(routeSessions.status, 'active')
+      ));
+    return session || undefined;
+  }
+
+  async updateRouteSessionStatus(sessionId: string, status: 'pending' | 'active' | 'completed' | 'cancelled'): Promise<RouteSession | undefined> {
+    const [session] = await db.update(routeSessions)
+      .set({ status })
+      .where(eq(routeSessions.id, sessionId))
+      .returning();
+    return session || undefined;
+  }
+
+  async updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined> {
+    const [session] = await db.update(routeSessions)
+      .set({ currentStopId: stopId })
+      .where(eq(routeSessions.id, sessionId))
+      .returning();
+    return session || undefined;
+  }
+
+  // Notification log
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const [notification] = await db.insert(notificationLog).values(log).returning();
+    return notification;
+  }
+
+  // Additional route methods
+  async getRouteById(id: string): Promise<Route | undefined> {
+    return this.getRoute(id);
+  }
+
+  async getOrganizationById(id: string): Promise<Organization | undefined> {
+    return this.getOrganization(id);
   }
 }
 
@@ -730,6 +874,66 @@ export class MemStorage implements IStorage {
 
   async addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined> {
     return undefined;
+  }
+
+  // Rider profile management implementation
+  async createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile> {
+    const [created] = await db.insert(riderProfiles).values(profile).returning();
+    return created;
+  }
+
+  async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select()
+      .from(riderProfiles)
+      .where(and(eq(riderProfiles.phoneNumber, phoneNumber), eq(riderProfiles.organizationId, organizationId)))
+      .limit(1);
+    return profile;
+  }
+
+  async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select()
+      .from(riderProfiles)
+      .where(eq(riderProfiles.id, id))
+      .limit(1);
+    return profile;
+  }
+
+  // Route subscription management implementation
+  async createRouteSubscription(subscription: InsertRouteSubscription): Promise<RouteSubscription> {
+    const [created] = await db.insert(routeSubscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async getSubscriptionsByRiderProfile(riderProfileId: string): Promise<RouteSubscription[]> {
+    return await db.select()
+      .from(routeSubscriptions)
+      .where(eq(routeSubscriptions.riderProfileId, riderProfileId));
+  }
+
+  async getSubscriptionsByRoute(routeId: string): Promise<RouteSubscription[]> {
+    return await db.select()
+      .from(routeSubscriptions)
+      .where(eq(routeSubscriptions.routeId, routeId));
+  }
+
+  async updateSubscriptionNotificationMode(subscriptionId: string, notificationMode: 'always' | 'manual'): Promise<RouteSubscription | undefined> {
+    const [updated] = await db.update(routeSubscriptions)
+      .set({ notificationMode })
+      .where(eq(routeSubscriptions.id, subscriptionId))
+      .returning();
+    return updated;
+  }
+
+  // Stop preference management implementation
+  async createStopPreference(preference: InsertStopPreference): Promise<StopPreference> {
+    const [created] = await db.insert(stopPreferences).values(preference).returning();
+    return created;
+  }
+
+  async getStopPreferencesBySubscription(subscriptionId: string): Promise<StopPreference[]> {
+    return await db.select()
+      .from(stopPreferences)
+      .where(eq(stopPreferences.subscriptionId, subscriptionId));
   }
 }
 

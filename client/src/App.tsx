@@ -16,6 +16,7 @@ import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
 import DriverPage from "@/pages/DriverPage";
 import RiderPage from "@/pages/RiderPage";
+import RiderOnboardingPage from "@/pages/RiderOnboardingPage";
 import AccessPage from "@/pages/AccessPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/not-found";
@@ -41,6 +42,9 @@ function Router() {
       <Route path="/rider" component={RiderPage} />
       <Route path="/track" component={RiderPage} />
       <Route path="/track/routes" component={RiderPage} />
+      
+      {/* Public Rider Onboarding (QR Code Access) */}
+      <Route path="/ride/:organizationId/:routeId" component={RiderOnboardingPage} />
       
       {/* Public Access */}
       <Route path="/" component={AccessPage} />

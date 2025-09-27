@@ -10,12 +10,20 @@ import {
   insertRouteStopSchema,
   insertServiceAlertSchema,
   insertRiderMessageSchema,
+  insertRiderProfileSchema,
+  insertRouteSubscriptionSchema,
+  insertStopPreferenceSchema,
+  insertRouteSessionSchema,
   roleEnum,
   orgTypeEnum,
   alertTypeEnum,
   alertSeverityEnum,
-  messageTypeEnum
+  messageTypeEnum,
+  notificationMethodEnum,
+  notificationModeEnum
 } from "@shared/schema";
+import { qrService } from "./qr";
+import { smsService } from "./sms";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Organization Settings Routes
@@ -246,6 +254,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // QR Code Generation for Routes
+  app.get("/api/routes/:id/qr", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const route = await storage.getRouteById(id);
+      
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+
+      // Get organization for the route
+      const organization = await storage.getOrganizationById(route.organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      const qrData = await qrService.generatePrintableQrCode(route, route.organizationId, organization.name);
+      res.json(qrData);
+    } catch (error) {
+      console.error("Error generating QR code:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -741,6 +773,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Rider Profile Management Routes
+  app.post("/api/rider-profiles", async (req, res) => {
+    try {
+      const validatedData = insertRiderProfileSchema.parse(req.body);
+      
+      // Check if rider already exists with this phone number in this organization
+      const existingRider = await storage.getRiderProfileByPhone(
+        validatedData.phoneNumber, 
+        validatedData.organizationId
+      );
+      
+      if (existingRider) {
+        return res.json(existingRider); // Return existing profile
+      }
+      
+      const riderProfile = await storage.createRiderProfile(validatedData);
+      res.status(201).json(riderProfile);
+    } catch (error) {
+      console.error("Error creating rider profile:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid rider profile data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Route Subscription Management Routes  
+  app.post("/api/route-subscriptions", async (req, res) => {
+    try {
+      const validatedData = insertRouteSubscriptionSchema.parse(req.body);
+      const subscription = await storage.createRouteSubscription(validatedData);
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error("Error creating route subscription:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid subscription data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Stop Preference Management Routes
+  app.post("/api/stop-preferences", async (req, res) => {
+    try {
+      const validatedData = insertStopPreferenceSchema.parse(req.body);
+      const preference = await storage.createStopPreference(validatedData);
+      res.status(201).json(preference);
+    } catch (error) {
+      console.error("Error creating stop preference:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid stop preference data", details: error.errors });
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });

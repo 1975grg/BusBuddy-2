@@ -5,11 +5,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare } from "lucide-react";
+import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
 import { EditRouteDialog } from "@/components/EditRouteDialog";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
+import { QrCodeDialog } from "@/components/QrCodeDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -32,6 +33,7 @@ export default function RoutesPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [qrRoute, setQrRoute] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -114,6 +116,10 @@ export default function RoutesPage() {
       setEditingRoute(route);
       setEditDialogOpen(true);
     }
+  };
+
+  const handleShowQr = (routeId: string, routeName: string) => {
+    setQrRoute({ id: routeId, name: routeName });
   };
 
   return (
@@ -224,6 +230,7 @@ export default function RoutesPage() {
                     onEdit={() => handleEditRoute(route.id)}
                     onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
                     onSendAlert={() => handleSendAlert(route)}
+                    onShowQr={() => handleShowQr(route.id, route.name)}
                   />
                 );
               })}
@@ -261,6 +268,15 @@ export default function RoutesPage() {
                       <TableCell>{route.stops.length} stops</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleShowQr(route.id, route.name)}
+                            title="Show QR Code"
+                            data-testid={`button-show-qr-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -329,6 +345,20 @@ export default function RoutesPage() {
             setAlertDialogOpen(open);
             if (!open) {
               setAlertRoute(null);
+            }
+          }}
+        />
+      )}
+
+      {/* QR Code Dialog */}
+      {qrRoute && (
+        <QrCodeDialog
+          routeId={qrRoute.id}
+          routeName={qrRoute.name}
+          open={!!qrRoute}
+          onOpenChange={(open) => {
+            if (!open) {
+              setQrRoute(null);
             }
           }}
         />
