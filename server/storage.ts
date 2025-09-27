@@ -93,7 +93,6 @@ export interface IStorage {
   createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile>;
   getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined>;
   getRiderProfile(id: string): Promise<RiderProfile | undefined>;
-  getRiderProfileById(id: string): Promise<RiderProfile | undefined>;
   getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>>;
   deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }>;
   
@@ -439,6 +438,95 @@ export class DatabaseStorage implements IStorage {
 
   async getOrganizationById(id: string): Promise<Organization | undefined> {
     return this.getOrganization(id);
+  }
+
+  // Rider profile management implementation
+  async createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile> {
+    const [created] = await db.insert(riderProfiles).values(profile).returning();
+    return created;
+  }
+
+  async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select()
+      .from(riderProfiles)
+      .where(and(eq(riderProfiles.phoneNumber, phoneNumber), eq(riderProfiles.organizationId, organizationId)))
+      .limit(1);
+    return profile;
+  }
+
+  async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
+    const [profile] = await db.select()
+      .from(riderProfiles)
+      .where(eq(riderProfiles.id, id))
+      .limit(1);
+    return profile;
+  }
+
+  async getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>> {
+    const results = await db.select({
+      id: riderProfiles.id,
+      phoneNumber: riderProfiles.phoneNumber,
+      name: riderProfiles.name,
+      organizationId: riderProfiles.organizationId,
+      notificationMethod: riderProfiles.notificationMethod,
+      email: riderProfiles.email,
+      isActive: riderProfiles.isActive,
+      createdAt: riderProfiles.createdAt,
+      subscriptionId: routeSubscriptions.id,
+      notificationMode: routeSubscriptions.notificationMode
+    })
+    .from(riderProfiles)
+    .innerJoin(routeSubscriptions, eq(riderProfiles.id, routeSubscriptions.riderProfileId))
+    .where(eq(routeSubscriptions.routeId, routeId));
+    
+    return results;
+  }
+
+  async deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }> {
+    try {
+      // Get rider profile and subscription details before deletion
+      const riderProfile = await this.getRiderProfile(riderProfileId);
+      const [subscription] = await db.select()
+        .from(routeSubscriptions)
+        .where(and(
+          eq(routeSubscriptions.riderProfileId, riderProfileId),
+          eq(routeSubscriptions.routeId, routeId)
+        ))
+        .limit(1);
+
+      if (!subscription) {
+        return { success: false };
+      }
+
+      // Delete stop preferences for this subscription
+      await db.delete(stopPreferences)
+        .where(eq(stopPreferences.subscriptionId, subscription.id));
+
+      // Delete the route subscription
+      await db.delete(routeSubscriptions)
+        .where(eq(routeSubscriptions.id, subscription.id));
+
+      // Check if rider has any other subscriptions
+      const remainingSubscriptions = await db.select()
+        .from(routeSubscriptions)
+        .where(eq(routeSubscriptions.riderProfileId, riderProfileId))
+        .limit(1);
+
+      // If no other subscriptions, delete the rider profile
+      if (remainingSubscriptions.length === 0) {
+        await db.delete(riderProfiles)
+          .where(eq(riderProfiles.id, riderProfileId));
+      }
+
+      return { 
+        success: true, 
+        deletedSubscription: subscription,
+        riderProfile 
+      };
+    } catch (error) {
+      console.error('Error deleting rider from route:', error);
+      return { success: false };
+    }
   }
 }
 
@@ -879,101 +967,25 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  // Rider profile management implementation
+  // Rider profile management - Stub implementations for MemStorage
   async createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile> {
-    const [created] = await db.insert(riderProfiles).values(profile).returning();
-    return created;
+    throw new Error("Rider profiles not implemented in MemStorage");
   }
 
   async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
-    const [profile] = await db.select()
-      .from(riderProfiles)
-      .where(and(eq(riderProfiles.phoneNumber, phoneNumber), eq(riderProfiles.organizationId, organizationId)))
-      .limit(1);
-    return profile;
+    throw new Error("Rider profiles not implemented in MemStorage");
   }
 
   async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
-    const [profile] = await db.select()
-      .from(riderProfiles)
-      .where(eq(riderProfiles.id, id))
-      .limit(1);
-    return profile;
-  }
-
-  async getRiderProfileById(id: string): Promise<RiderProfile | undefined> {
-    const [profile] = await db.select()
-      .from(riderProfiles)
-      .where(eq(riderProfiles.id, id))
-      .limit(1);
-    return profile;
+    throw new Error("Rider profiles not implemented in MemStorage");
   }
 
   async getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>> {
-    const results = await db.select({
-      id: riderProfiles.id,
-      phoneNumber: riderProfiles.phoneNumber,
-      name: riderProfiles.name,
-      organizationId: riderProfiles.organizationId,
-      notificationMethod: riderProfiles.notificationMethod,
-      email: riderProfiles.email,
-      isActive: riderProfiles.isActive,
-      createdAt: riderProfiles.createdAt,
-      subscriptionId: routeSubscriptions.id,
-      notificationMode: routeSubscriptions.notificationMode
-    })
-    .from(riderProfiles)
-    .innerJoin(routeSubscriptions, eq(riderProfiles.id, routeSubscriptions.riderProfileId))
-    .where(eq(routeSubscriptions.routeId, routeId));
-    
-    return results;
+    return [];
   }
 
   async deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }> {
-    try {
-      // Get rider profile and subscription details before deletion
-      const riderProfile = await this.getRiderProfileById(riderProfileId);
-      const [subscription] = await db.select()
-        .from(routeSubscriptions)
-        .where(and(
-          eq(routeSubscriptions.riderProfileId, riderProfileId),
-          eq(routeSubscriptions.routeId, routeId)
-        ))
-        .limit(1);
-
-      if (!subscription) {
-        return { success: false };
-      }
-
-      // Delete stop preferences for this subscription
-      await db.delete(stopPreferences)
-        .where(eq(stopPreferences.subscriptionId, subscription.id));
-
-      // Delete the route subscription
-      await db.delete(routeSubscriptions)
-        .where(eq(routeSubscriptions.id, subscription.id));
-
-      // Check if rider has any other subscriptions
-      const remainingSubscriptions = await db.select()
-        .from(routeSubscriptions)
-        .where(eq(routeSubscriptions.riderProfileId, riderProfileId))
-        .limit(1);
-
-      // If no other subscriptions, delete the rider profile
-      if (remainingSubscriptions.length === 0) {
-        await db.delete(riderProfiles)
-          .where(eq(riderProfiles.id, riderProfileId));
-      }
-
-      return { 
-        success: true, 
-        deletedSubscription: subscription,
-        riderProfile 
-      };
-    } catch (error) {
-      console.error('Error deleting rider from route:', error);
-      return { success: false };
-    }
+    return { success: false };
   }
 
   // Route subscription management implementation

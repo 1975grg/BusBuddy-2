@@ -867,10 +867,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/routes/:routeId/riders", async (req, res) => {
     try {
       const { routeId } = req.params;
+      console.log("Fetching riders for route:", routeId);
       const riders = await storage.getRidersForRoute(routeId);
+      console.log("Found riders:", riders.length, riders);
       res.json(riders);
     } catch (error) {
       console.error("Error fetching riders for route:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: "Internal server error" });
     }
   });
