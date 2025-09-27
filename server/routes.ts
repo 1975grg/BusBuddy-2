@@ -812,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send welcome SMS to the new rider
       try {
         // Get rider profile to get phone number
-        const riderProfile = await storage.getRiderProfileById(validatedData.riderProfileId);
+        const riderProfile = await storage.getRiderProfile(validatedData.riderProfileId);
         // Get route to get route name
         const route = await storage.getRouteById(validatedData.routeId);
         // Get organization to get organization name
