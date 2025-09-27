@@ -32,15 +32,19 @@ export class SmsService {
       // Ensure phone number is in E.164 format (add +1 if missing)
       const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
       
+      console.log(`SMS Debug: Original: ${to}, Formatted: ${formattedTo}, From: ${this.fromNumber}`);
+      
       const twilioMessage = await this.client!.messages.create({
         body: message,
         from: this.fromNumber!,
         to: formattedTo,
       });
 
+      console.log(`SMS sent successfully to ${formattedTo}: ${twilioMessage.sid}`);
       return { success: true, messageId: twilioMessage.sid };
     } catch (error) {
       console.error('SMS send error:', error);
+      console.error(`Failed to send SMS to: ${to} (formatted as: ${to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`})`);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown SMS error' 
