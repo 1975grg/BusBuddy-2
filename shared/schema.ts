@@ -94,6 +94,78 @@ export const riderMessages = pgTable("rider_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Rider profiles for QR code access (anonymous riders)
+export const riderProfiles = pgTable("rider_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull(),
+  name: text("name"), // Optional display name
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  notificationMethod: text("notification_method").notNull().default("sms"), // 'sms', 'email', 'both'
+  email: text("email"), // Optional for email notifications
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Route subscriptions - which riders are subscribed to which routes
+export const routeSubscriptions = pgTable("route_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  riderProfileId: varchar("rider_profile_id").notNull().references(() => riderProfiles.id),
+  notificationMode: text("notification_mode").notNull().default("always"), // 'always', 'manual'
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stop preferences - which specific stops each rider cares about
+export const stopPreferences = pgTable("stop_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => routeSubscriptions.id),
+  stopId: varchar("stop_id").notNull().references(() => routeStops.id),
+  notifyOnApproaching: boolean("notify_on_approaching").notNull().default(true),
+  notifyOnArrival: boolean("notify_on_arrival").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Route sessions - track when routes are active/running
+export const routeSessions = pgTable("route_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  driverUserId: varchar("driver_user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"), // 'pending', 'active', 'completed', 'cancelled'
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  currentStopId: varchar("current_stop_id").references(() => routeStops.id),
+  estimatedCompletionTime: timestamp("estimated_completion_time"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Driver schedules for automatic route starting
+export const driverSchedules = pgTable("driver_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  driverUserId: varchar("driver_user_id").notNull().references(() => users.id),
+  scheduledTime: text("scheduled_time").notNull(), // "HH:MM" format
+  daysOfWeek: text("days_of_week").array().notNull(), // ['monday', 'tuesday', ...]
+  vacationWeeks: text("vacation_weeks").array().default([]), // ['2024-12-23', '2024-12-30'] - week start dates
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notification log for tracking sent messages
+export const notificationLog = pgTable("notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  riderProfileId: varchar("rider_profile_id").references(() => riderProfiles.id),
+  routeSessionId: varchar("route_session_id").references(() => routeSessions.id),
+  type: text("type").notNull(), // 'route_started', 'approaching_stop', 'arrived_at_stop', 'route_completed', 'service_alert'
+  method: text("method").notNull(), // 'sms', 'email', 'push'
+  recipient: text("recipient").notNull(), // phone number or email
+  message: text("message").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'sent', 'failed'
+  externalId: text("external_id"), // SMS service message ID
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -163,6 +235,76 @@ export const riderMessagesRelations = relations(riderMessages, ({ one }) => ({
   }),
 }));
 
+export const riderProfilesRelations = relations(riderProfiles, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [riderProfiles.organizationId],
+    references: [organizations.id],
+  }),
+  subscriptions: many(routeSubscriptions),
+  notifications: many(notificationLog),
+}));
+
+export const routeSubscriptionsRelations = relations(routeSubscriptions, ({ one, many }) => ({
+  route: one(routes, {
+    fields: [routeSubscriptions.routeId],
+    references: [routes.id],
+  }),
+  riderProfile: one(riderProfiles, {
+    fields: [routeSubscriptions.riderProfileId],
+    references: [riderProfiles.id],
+  }),
+  stopPreferences: many(stopPreferences),
+}));
+
+export const stopPreferencesRelations = relations(stopPreferences, ({ one }) => ({
+  subscription: one(routeSubscriptions, {
+    fields: [stopPreferences.subscriptionId],
+    references: [routeSubscriptions.id],
+  }),
+  stop: one(routeStops, {
+    fields: [stopPreferences.stopId],
+    references: [routeStops.id],
+  }),
+}));
+
+export const routeSessionsRelations = relations(routeSessions, ({ one, many }) => ({
+  route: one(routes, {
+    fields: [routeSessions.routeId],
+    references: [routes.id],
+  }),
+  driver: one(users, {
+    fields: [routeSessions.driverUserId],
+    references: [users.id],
+  }),
+  currentStop: one(routeStops, {
+    fields: [routeSessions.currentStopId],
+    references: [routeStops.id],
+  }),
+  notifications: many(notificationLog),
+}));
+
+export const driverSchedulesRelations = relations(driverSchedules, ({ one }) => ({
+  route: one(routes, {
+    fields: [driverSchedules.routeId],
+    references: [routes.id],
+  }),
+  driver: one(users, {
+    fields: [driverSchedules.driverUserId],
+    references: [users.id],
+  }),
+}));
+
+export const notificationLogRelations = relations(notificationLog, ({ one }) => ({
+  riderProfile: one(riderProfiles, {
+    fields: [notificationLog.riderProfileId],
+    references: [riderProfiles.id],
+  }),
+  routeSession: one(routeSessions, {
+    fields: [notificationLog.routeSessionId],
+    references: [routeSessions.id],
+  }),
+}));
+
 export const insertOrganizationSchema = createInsertSchema(organizations).pick({
   name: true,
   type: true,
@@ -224,6 +366,50 @@ export const insertRiderMessageSchema = createInsertSchema(riderMessages).pick({
   userId: true,
 });
 
+export const insertRiderProfileSchema = createInsertSchema(riderProfiles).pick({
+  phoneNumber: true,
+  name: true,
+  organizationId: true,
+  notificationMethod: true,
+  email: true,
+});
+
+export const insertRouteSubscriptionSchema = createInsertSchema(routeSubscriptions).pick({
+  routeId: true,
+  riderProfileId: true,
+  notificationMode: true,
+});
+
+export const insertStopPreferenceSchema = createInsertSchema(stopPreferences).pick({
+  subscriptionId: true,
+  stopId: true,
+  notifyOnApproaching: true,
+  notifyOnArrival: true,
+});
+
+export const insertRouteSessionSchema = createInsertSchema(routeSessions).pick({
+  routeId: true,
+  driverUserId: true,
+  estimatedCompletionTime: true,
+});
+
+export const insertDriverScheduleSchema = createInsertSchema(driverSchedules).pick({
+  routeId: true,
+  driverUserId: true,
+  scheduledTime: true,
+  daysOfWeek: true,
+  vacationWeeks: true,
+});
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLog).pick({
+  riderProfileId: true,
+  routeSessionId: true,
+  type: true,
+  method: true,
+  recipient: true,
+  message: true,
+});
+
 export const roleEnum = z.enum(["system_admin", "org_admin", "driver", "rider"]);
 export const orgTypeEnum = z.enum(["university", "school", "hospital", "airport", "hotel"]);
 export const routeTypeEnum = z.enum(["shuttle", "bus"]);
@@ -232,6 +418,13 @@ export const alertTypeEnum = z.enum(["delayed", "bus_change", "cancelled", "gene
 export const alertSeverityEnum = z.enum(["info", "warning", "critical"]);
 export const messageTypeEnum = z.enum(["lost_items", "pickup_change", "general"]);
 export const messageStatusEnum = z.enum(["new", "read", "resolved"]);
+export const notificationMethodEnum = z.enum(["sms", "email", "both"]);
+export const notificationModeEnum = z.enum(["always", "manual"]);
+export const routeSessionStatusEnum = z.enum(["pending", "active", "completed", "cancelled"]);
+export const notificationTypeEnum = z.enum(["route_started", "approaching_stop", "arrived_at_stop", "route_completed", "service_alert"]);
+export const notificationDeliveryMethodEnum = z.enum(["sms", "email", "push"]);
+export const notificationStatusEnum = z.enum(["pending", "sent", "failed"]);
+export const dayOfWeekEnum = z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
 
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizations.$inferSelect;
@@ -247,6 +440,18 @@ export type InsertServiceAlert = z.infer<typeof insertServiceAlertSchema>;
 export type ServiceAlert = typeof serviceAlerts.$inferSelect;
 export type InsertRiderMessage = z.infer<typeof insertRiderMessageSchema>;
 export type RiderMessage = typeof riderMessages.$inferSelect;
+export type InsertRiderProfile = z.infer<typeof insertRiderProfileSchema>;
+export type RiderProfile = typeof riderProfiles.$inferSelect;
+export type InsertRouteSubscription = z.infer<typeof insertRouteSubscriptionSchema>;
+export type RouteSubscription = typeof routeSubscriptions.$inferSelect;
+export type InsertStopPreference = z.infer<typeof insertStopPreferenceSchema>;
+export type StopPreference = typeof stopPreferences.$inferSelect;
+export type InsertRouteSession = z.infer<typeof insertRouteSessionSchema>;
+export type RouteSession = typeof routeSessions.$inferSelect;
+export type InsertDriverSchedule = z.infer<typeof insertDriverScheduleSchema>;
+export type DriverSchedule = typeof driverSchedules.$inferSelect;
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+export type NotificationLog = typeof notificationLog.$inferSelect;
 export type UserRole = z.infer<typeof roleEnum>;
 export type OrganizationType = z.infer<typeof orgTypeEnum>;
 export type RouteType = z.infer<typeof routeTypeEnum>;
@@ -255,3 +460,10 @@ export type AlertType = z.infer<typeof alertTypeEnum>;
 export type AlertSeverity = z.infer<typeof alertSeverityEnum>;
 export type MessageType = z.infer<typeof messageTypeEnum>;
 export type MessageStatus = z.infer<typeof messageStatusEnum>;
+export type NotificationMethod = z.infer<typeof notificationMethodEnum>;
+export type NotificationMode = z.infer<typeof notificationModeEnum>;
+export type RouteSessionStatus = z.infer<typeof routeSessionStatusEnum>;
+export type NotificationType = z.infer<typeof notificationTypeEnum>;
+export type NotificationDeliveryMethod = z.infer<typeof notificationDeliveryMethodEnum>;
+export type NotificationStatus = z.infer<typeof notificationStatusEnum>;
+export type DayOfWeek = z.infer<typeof dayOfWeekEnum>;
