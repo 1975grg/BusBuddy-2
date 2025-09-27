@@ -863,6 +863,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route Rider Management Routes
+  app.get("/api/routes/:routeId/riders", async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const riders = await storage.getRidersForRoute(routeId);
+      res.json(riders);
+    } catch (error) {
+      console.error("Error fetching riders for route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/routes/:routeId/riders/:riderProfileId", async (req, res) => {
+    try {
+      const { routeId, riderProfileId } = req.params;
+      
+      const result = await storage.deleteRiderFromRoute(riderProfileId, routeId);
+      
+      if (!result.success) {
+        return res.status(404).json({ error: "Rider subscription not found" });
+      }
+
+      // Send deletion SMS if we have the rider info and SMS is configured
+      if (result.riderProfile && result.deletedSubscription && smsService.isConfigured()) {
+        try {
+          const route = await storage.getRouteById(routeId);
+          const organization = await storage.getOrganizationById(result.riderProfile.organizationId);
+          
+          if (route && organization) {
+            const smsResult = await smsService.sendRiderRemovedMessage(
+              result.riderProfile.phoneNumber,
+              route.name,
+              organization.name
+            );
+            
+            if (!smsResult.success) {
+              console.error("Failed to send deletion SMS:", smsResult.error);
+            } else {
+              console.log("Deletion SMS sent successfully:", smsResult.messageId);
+            }
+          }
+        } catch (smsError) {
+          console.error("Error sending deletion SMS:", smsError);
+          // Don't fail the deletion if SMS fails
+        }
+      }
+
+      res.json({ 
+        message: "Rider removed successfully",
+        deletedSubscription: result.deletedSubscription 
+      });
+    } catch (error) {
+      console.error("Error deleting rider from route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

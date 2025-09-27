@@ -5,6 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { SortableRouteStops } from "./SortableRouteStops";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +15,8 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Route, RouteStop } from "@shared/schema";
+import { Trash2, Users } from "lucide-react";
+import type { Route, RouteStop, RiderProfile } from "@shared/schema";
 
 const editRouteSchema = z.object({
   name: z.string().min(1, "Route name is required"),
@@ -51,6 +55,17 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
     queryFn: async () => {
       const response = await fetch(`/api/routes/${route.id}/stops`);
       if (!response.ok) throw new Error("Failed to fetch stops");
+      return response.json();
+    },
+    enabled: open && !!route.id,
+  });
+
+  // Fetch riders for the route
+  const { data: riders = [] } = useQuery<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>>({
+    queryKey: ["/api/routes", route.id, "riders"],
+    queryFn: async () => {
+      const response = await fetch(`/api/routes/${route.id}/riders`);
+      if (!response.ok) throw new Error("Failed to fetch riders");
       return response.json();
     },
     enabled: open && !!route.id,
@@ -149,6 +164,28 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
       toast({
         title: "Error",
         description: "Failed to update route. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRiderMutation = useMutation({
+    mutationFn: async ({ riderId, riderName }: { riderId: string; riderName?: string }) => {
+      const response = await apiRequest("DELETE", `/api/routes/${route.id}/riders/${riderId}`);
+      return await response.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", route.id, "riders"] });
+      toast({
+        title: "Rider removed",
+        description: `${variables.riderName || "The rider"} has been removed from this route and notified via SMS.`,
+      });
+    },
+    onError: (error) => {
+      console.error("Error removing rider:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove rider. Please try again.",
         variant: "destructive",
       });
     },
@@ -277,6 +314,82 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
             />
             
             <FormMessage>{form.formState.errors.stops?.message}</FormMessage>
+
+            {/* Rider Management Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Subscribed Riders ({riders.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {riders.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No riders have subscribed to this route yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {riders.map((rider) => (
+                      <div 
+                        key={rider.id} 
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                        data-testid={`rider-item-${rider.id}`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              {rider.name || "Unnamed Rider"}
+                            </span>
+                            <Badge variant={rider.notificationMode === "always" ? "default" : "secondary"}>
+                              {rider.notificationMode === "always" ? "Auto" : "Manual"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {rider.phoneNumber}
+                          </p>
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-remove-rider-${rider.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remove Rider</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to remove{" "}
+                                <strong>{rider.name || rider.phoneNumber}</strong> from this route?
+                                They will receive an SMS notification about the removal.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteRiderMutation.mutate({ 
+                                  riderId: rider.id, 
+                                  riderName: rider.name || rider.phoneNumber 
+                                })}
+                                className="bg-destructive hover:bg-destructive/90"
+                                disabled={deleteRiderMutation.isPending}
+                              >
+                                {deleteRiderMutation.isPending ? "Removing..." : "Remove Rider"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

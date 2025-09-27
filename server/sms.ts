@@ -89,6 +89,14 @@ export class SmsService {
   }
 
   /**
+   * Send removal notification when rider is deleted from a route
+   */
+  async sendRiderRemovedMessage(to: string, routeName: string, organizationName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const message = `🚌 ${organizationName}: You've been removed from ${routeName} route notifications. Thanks for using our service! If this was a mistake, please contact support.`;
+    return this.sendSms(to, message);
+  }
+
+  /**
    * Send service alert notification
    */
   async sendServiceAlertNotification(to: string, routeName: string, alertTitle: string, alertMessage: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
