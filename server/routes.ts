@@ -937,6 +937,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary debug endpoint to test SMS configuration
+  app.get("/api/debug/sms-config", async (req, res) => {
+    const isConfigured = smsService.isConfigured();
+    res.json({
+      isConfigured,
+      hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+      hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+      hasPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER,
+      twilioAccountSidLength: process.env.TWILIO_ACCOUNT_SID?.length || 0,
+      twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || 'not set',
+    });
+  });
+
+  // Temporary debug endpoint to test SMS sending
+  app.post("/api/debug/test-sms", async (req, res) => {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: "phone and message are required" });
+    }
+    
+    console.log("Debug SMS test starting...");
+    const result = await smsService.sendSms(phone, message);
+    console.log("Debug SMS test result:", result);
+    res.json(result);
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
