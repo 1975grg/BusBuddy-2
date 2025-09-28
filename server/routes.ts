@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -20,7 +22,8 @@ import {
   alertSeverityEnum,
   messageTypeEnum,
   notificationMethodEnum,
-  notificationModeEnum
+  notificationModeEnum,
+  stopPreferences
 } from "@shared/schema";
 import { qrService } from "./qr";
 import { smsService } from "./sms";
@@ -356,8 +359,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Route not found" });
       }
       
-      // Delete all stops for this route
+      // Get all stops for this route
       const stops = await storage.getRouteStopsByRoute(id);
+      
+      // First delete all stop preferences that reference these stops
+      for (const stop of stops) {
+        if (stop.id) {
+          // Delete stop preferences for this stop
+          await db.delete(stopPreferences)
+            .where(eq(stopPreferences.stopId, stop.id));
+        }
+      }
+      
+      // Then delete all stops for this route
       for (const stop of stops) {
         if (stop.id) {
           await storage.deleteRouteStop(stop.id);
