@@ -937,6 +937,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary debug endpoint to test SMS sending
+  app.post("/api/debug/test-sms", async (req, res) => {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: "phone and message are required" });
+    }
+    
+    console.log("Debug SMS test starting...");
+    const result = await smsService.sendSms(phone, message);
+    console.log("Debug SMS test result:", result);
+    res.json(result);
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
