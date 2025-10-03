@@ -1,14 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Clock, MapPin } from "lucide-react";
 
 interface Bus {
   id: string;
   name: string;
   status: "active" | "delayed" | "offline";
-  lat: number;
-  lng: number;
+  lat: number | string;
+  lng: number | string;
   eta: string;
   nextStop: string;
 }
@@ -20,80 +20,164 @@ interface LiveMapProps {
 
 export function LiveMap({ buses, className }: LiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const markers = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const [mapError, setMapError] = useState<string | null>(null);
 
-  // TODO: remove mock functionality - replace with real MapLibre integration
+  // Initialize map once
   useEffect(() => {
-    if (!mapContainer.current) return;
-    
-    // Mock map initialization
-    console.log("Map initialized with buses:", buses);
-  }, [buses]);
+    if (!mapContainer.current || map.current) return;
 
-  const getStatusColor = (status: Bus["status"]) => {
-    switch (status) {
-      case "active": return "bg-bus-active";
-      case "delayed": return "bg-bus-delayed";
-      case "offline": return "bg-bus-offline";
+    try {
+      // Default center (will adjust to first bus location)
+      const defaultCenter: [number, number] = [-79.9481, 39.6567]; // Morgantown, WV area
+      
+      map.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${import.meta.env.MAPBOX_ACCESS_TOKEN}`,
+        center: defaultCenter,
+        zoom: 13,
+      });
+
+      map.current.on('error', (e) => {
+        console.error('Map error:', e);
+        setMapError('Failed to load map. Please check your connection.');
+      });
+
+      map.current.on('load', () => {
+        console.log('Map loaded successfully');
+      });
+    } catch (error) {
+      console.error('Failed to initialize map:', error);
+      setMapError('Failed to initialize map.');
     }
-  };
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, []);
+
+  // Update bus markers when buses change
+  useEffect(() => {
+    if (!map.current) return;
+
+    const currentBusIds = new Set(buses.map(b => b.id));
+    
+    // Remove markers for buses that no longer exist
+    markers.current.forEach((marker, id) => {
+      if (!currentBusIds.has(id)) {
+        marker.remove();
+        markers.current.delete(id);
+      }
+    });
+
+    // Add or update markers for current buses
+    buses.forEach((bus) => {
+      const lat = typeof bus.lat === 'string' ? parseFloat(bus.lat) : bus.lat;
+      const lng = typeof bus.lng === 'string' ? parseFloat(bus.lng) : bus.lng;
+
+      if (isNaN(lat) || isNaN(lng)) {
+        console.warn(`Invalid coordinates for bus ${bus.id}:`, { lat: bus.lat, lng: bus.lng });
+        return;
+      }
+
+      let marker = markers.current.get(bus.id);
+
+      if (!marker) {
+        // Create new marker
+        const el = document.createElement('div');
+        el.className = 'bus-marker';
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.borderRadius = '50%';
+        el.style.border = '3px solid white';
+        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.cursor = 'pointer';
+        
+        // Set color based on status
+        const statusColors = {
+          active: '#22c55e',
+          delayed: '#f59e0b', 
+          offline: '#ef4444',
+        };
+        el.style.backgroundColor = statusColors[bus.status];
+
+        // Create popup with bus info
+        const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+          <div style="padding: 8px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${bus.name}</div>
+            <div style="font-size: 12px; color: #666;">
+              <div style="margin-bottom: 2px;">⏱️ ${bus.eta}</div>
+              <div>📍 ${bus.nextStop}</div>
+            </div>
+          </div>
+        `);
+
+        marker = new maplibregl.Marker(el)
+          .setLngLat([lng, lat])
+          .setPopup(popup)
+          .addTo(map.current!);
+
+        markers.current.set(bus.id, marker);
+
+        // Center map on first bus
+        if (markers.current.size === 1) {
+          map.current?.flyTo({
+            center: [lng, lat],
+            zoom: 14,
+            duration: 1000,
+          });
+        }
+      } else {
+        // Update existing marker position
+        marker.setLngLat([lng, lat]);
+        
+        // Update marker color if status changed
+        const el = marker.getElement();
+        const statusColors = {
+          active: '#22c55e',
+          delayed: '#f59e0b',
+          offline: '#ef4444',
+        };
+        el.style.backgroundColor = statusColors[bus.status];
+
+        // Update popup content
+        const popup = marker.getPopup();
+        if (popup) {
+          popup.setHTML(`
+            <div style="padding: 8px;">
+              <div style="font-weight: 600; margin-bottom: 4px;">${bus.name}</div>
+              <div style="font-size: 12px; color: #666;">
+                <div style="margin-bottom: 2px;">⏱️ ${bus.eta}</div>
+                <div>📍 ${bus.nextStop}</div>
+              </div>
+            </div>
+          `);
+        }
+      }
+    });
+  }, [buses]);
 
   return (
     <div className={className}>
       <div 
         ref={mapContainer} 
         className="w-full h-full bg-muted rounded-md relative overflow-hidden"
+        data-testid="map-container"
       >
-        {/* Mock map background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
-          {/* Street pattern */}
-          <svg className="absolute inset-0 w-full h-full">
-            <defs>
-              <pattern id="streets" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-                {/* Main streets - highly visible */}
-                <path d="M0,30 L60,30 M30,0 L30,60" stroke="#94a3b8" strokeWidth="2.5" className="dark:stroke-slate-600"/>
-                {/* Side streets - visible */}
-                <path d="M0,15 L60,15 M0,45 L60,45 M15,0 L15,60 M45,0 L45,60" stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#streets)" opacity="0.6" />
-          </svg>
-        </div>
-        
-        {/* Bus markers */}
-        {buses.map((bus, index) => {
-          // For mock map, center the first bus and offset others slightly
-          const left = index === 0 ? 50 : 50 + (index * 10);
-          const top = index === 0 ? 50 : 50 + (index * 10);
-          
-          return (
-            <div
-              key={bus.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2"
-              style={{
-                left: `${left}%`,
-                top: `${top}%`,
-              }}
-            >
-              <div className={`w-6 h-6 rounded-full ${getStatusColor(bus.status)} border-3 border-white shadow-lg animate-pulse`} />
-            
-              {/* ETA card on hover */}
-              <Card className="absolute bottom-6 left-1/2 transform -translate-x-1/2 p-2 min-w-32 opacity-0 hover:opacity-100 transition-opacity z-10">
-                <div className="text-sm font-medium">{bus.name}</div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  {bus.eta}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="w-3 h-3" />
-                  {bus.nextStop}
-                </div>
-              </Card>
-            </div>
-          );
-        })}
+        {mapError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+            <Card className="p-4 max-w-sm">
+              <p className="text-sm text-destructive">{mapError}</p>
+            </Card>
+          </div>
+        )}
         
         {/* Legend */}
-        <Card className="absolute top-4 right-4 p-3">
+        <Card className="absolute top-4 right-4 p-3 z-10" data-testid="map-legend">
           <div className="text-sm font-medium mb-2">Bus Status</div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs">
