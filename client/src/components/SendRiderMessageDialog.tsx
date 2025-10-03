@@ -32,6 +32,8 @@ const clientMessageSchema = insertRiderMessageSchema.omit({
   organizationId: true 
 }).extend({
   message: z.string().min(10, "Please provide more details (at least 10 characters)").max(1000, "Message must be 1000 characters or less"),
+  riderName: z.string().optional(),
+  riderEmail: z.string().email("Please enter a valid email").optional().or(z.literal("")),
 });
 
 type ClientMessageData = z.infer<typeof clientMessageSchema>;

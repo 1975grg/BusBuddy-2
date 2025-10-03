@@ -11,6 +11,7 @@ import { RoleToggle } from "@/components/RoleToggle";
 
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
+import AdminMessagesPage from "@/pages/AdminMessagesPage";
 import SystemAdminDashboard from "@/pages/SystemAdminDashboard";
 import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/admin" component={AdminDashboardPage} />
       <Route path="/admin/routes" component={RoutesPage} />
       <Route path="/admin/access" component={AccessManagementPage} />
+      <Route path="/admin/messages" component={AdminMessagesPage} />
       <Route path="/admin/settings" component={SettingsPage} />
       
       {/* Driver Routes */}

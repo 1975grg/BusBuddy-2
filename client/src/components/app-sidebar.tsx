@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin } from "lucide-react";
+import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -115,6 +115,11 @@ export function AppSidebar() {
       title: "Access Management", 
       url: "/admin/access",
       icon: Users,
+    },
+    {
+      title: "Messages",
+      url: "/admin/messages",
+      icon: MessageSquare,
     },
     {
       title: "Notifications",

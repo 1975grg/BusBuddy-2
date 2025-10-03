@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DriverControls } from "@/components/DriverControls";
 import { LiveMap } from "@/components/LiveMap";
+import { SendDriverMessageDialog } from "@/components/SendDriverMessageDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Star, StarOff, Heart } from "lucide-react";
+import { Route, MapPin, Star, StarOff, Heart, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Route as RouteType, User, RouteSession } from "@shared/schema";
@@ -14,6 +15,7 @@ import driverAvatarUrl from "@assets/generated_images/Bus_driver_avatar_a7c98208
 
 export default function DriverPage() {
   const [selectedRoute, setSelectedRoute] = useState<string>("");
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Get current driver (mock for now)
@@ -282,6 +284,40 @@ export default function DriverPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Contact Admin Section */}
+      {currentRoute && currentUser && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Need Help?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Report issues with the route, vehicle, or schedule to the admin team.
+              </p>
+              <Button 
+                onClick={() => setMessageDialogOpen(true)}
+                className="w-full"
+                data-testid="button-contact-admin"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Contact Admin
+              </Button>
+            </CardContent>
+          </Card>
+
+          <SendDriverMessageDialog
+            route={currentRoute}
+            driverUserId={currentUser.id}
+            open={messageDialogOpen}
+            onOpenChange={setMessageDialogOpen}
+          />
+        </>
+      )}
     </div>
   );
 }
