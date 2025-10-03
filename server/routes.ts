@@ -12,6 +12,7 @@ import {
   insertRouteStopSchema,
   insertServiceAlertSchema,
   insertRiderMessageSchema,
+  insertDriverMessageSchema,
   insertRiderProfileSchema,
   insertRouteSubscriptionSchema,
   insertStopPreferenceSchema,
@@ -912,6 +913,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Driver Message Routes (Drivers → Admin)
+  app.post("/api/driver-messages", async (req, res) => {
+    try {
+      const validatedData = insertDriverMessageSchema.parse(req.body);
+      const message = await storage.createDriverMessage(validatedData);
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error creating driver message:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid driver message data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/driver-messages", async (req, res) => {
+    try {
+      const { route_id, organization_id } = req.query;
+      
+      let messages;
+      if (route_id && typeof route_id === "string") {
+        messages = await storage.getDriverMessagesByRoute(route_id);
+      } else if (organization_id && typeof organization_id === "string") {
+        messages = await storage.getDriverMessagesByOrganization(organization_id);
+      } else {
+        return res.status(400).json({ error: "route_id or organization_id is required" });
+      }
+      
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching driver messages:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ error: "status is required" });
+      }
+      
+      const message = await storage.updateDriverMessageStatus(id, status);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error updating driver message status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/respond", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { response, responded_by_user_id } = req.body;
+      
+      if (!response || !responded_by_user_id) {
+        return res.status(400).json({ error: "response and responded_by_user_id are required" });
+      }
+      
+      const message = await storage.respondToDriverMessage(id, response, responded_by_user_id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error adding admin response to driver message:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

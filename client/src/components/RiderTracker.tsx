@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ interface Stop {
 }
 
 interface RiderTrackerProps {
+  routeId: string;
   routeName: string;
   busName: string;
   status: "active" | "delayed" | "offline";
@@ -25,6 +27,7 @@ interface RiderTrackerProps {
 }
 
 export function RiderTracker({ 
+  routeId,
   routeName, 
   busName, 
   status, 
@@ -36,18 +39,33 @@ export function RiderTracker({
   const [notificationsEnabled, setNotificationsEnabled] = useState(isNotificationsEnabled);
   const [favoriteStop, setFavoriteStop] = useState<string | undefined>(defaultStop);
 
-  // TODO: remove mock functionality - replace with real bus data
-  const mockBuses = [
+  // Fetch active route session for live GPS tracking
+  const { data: activeSession } = useQuery({
+    queryKey: ["/api/route-sessions/active", routeId],
+    queryFn: async () => {
+      const response = await fetch(`/api/route-sessions/active/${routeId}`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error("Failed to fetch active session");
+      }
+      return response.json();
+    },
+    refetchInterval: 5000, // Refresh GPS location every 5 seconds
+    enabled: !!routeId,
+  });
+
+  // Convert active session to bus data for LiveMap
+  const buses = activeSession?.currentLatitude && activeSession?.currentLongitude ? [
     {
-      id: "bus-1",
+      id: activeSession.id,
       name: busName,
-      status,
-      lat: 40.7128,
-      lng: -74.0060,
-      eta: stops.find(s => s.isNext)?.eta || "5 min",
-      nextStop: stops.find(s => s.isNext)?.name || "Main Street"
+      status: activeSession.status === 'active' ? status : 'offline' as const,
+      lat: Number(activeSession.currentLatitude),
+      lng: Number(activeSession.currentLongitude),
+      eta: stops.find(s => s.isNext)?.eta || "N/A",
+      nextStop: stops.find(s => s.isNext)?.name || "Unknown"
     }
-  ];
+  ] : [];
 
   const toggleNotifications = () => {
     setNotificationsEnabled(!notificationsEnabled);
@@ -140,7 +158,7 @@ export function RiderTracker({
           </div>
         </CardHeader>
         <CardContent>
-          <LiveMap buses={mockBuses} className="h-48 mb-4" />
+          <LiveMap buses={buses} className="h-48 mb-4" />
           
           {notificationsEnabled && (
             <div className="mb-4 space-y-3" role="region" aria-label="Notifications">

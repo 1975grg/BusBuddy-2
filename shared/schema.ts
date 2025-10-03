@@ -94,6 +94,22 @@ export const riderMessages = pgTable("rider_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Messages sent by drivers to admins
+export const driverMessages = pgTable("driver_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  driverUserId: varchar("driver_user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // 'route_issue', 'vehicle_problem', 'schedule_change', 'general'
+  message: text("message").notNull(),
+  status: text("status").notNull().default("new"), // 'new', 'read', 'resolved'
+  adminResponse: text("admin_response"), // Admin reply
+  respondedByUserId: varchar("responded_by_user_id").references(() => users.id),
+  respondedAt: timestamp("responded_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Rider profiles for QR code access (anonymous riders)
 export const riderProfiles = pgTable("rider_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -240,6 +256,25 @@ export const riderMessagesRelations = relations(riderMessages, ({ one }) => ({
   }),
 }));
 
+export const driverMessagesRelations = relations(driverMessages, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [driverMessages.organizationId],
+    references: [organizations.id],
+  }),
+  route: one(routes, {
+    fields: [driverMessages.routeId],
+    references: [routes.id],
+  }),
+  driver: one(users, {
+    fields: [driverMessages.driverUserId],
+    references: [users.id],
+  }),
+  respondedBy: one(users, {
+    fields: [driverMessages.respondedByUserId],
+    references: [users.id],
+  }),
+}));
+
 export const riderProfilesRelations = relations(riderProfiles, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [riderProfiles.organizationId],
@@ -371,6 +406,14 @@ export const insertRiderMessageSchema = createInsertSchema(riderMessages).pick({
   userId: true,
 });
 
+export const insertDriverMessageSchema = createInsertSchema(driverMessages).pick({
+  organizationId: true,
+  routeId: true,
+  driverUserId: true,
+  type: true,
+  message: true,
+});
+
 export const insertRiderProfileSchema = createInsertSchema(riderProfiles).pick({
   phoneNumber: true,
   name: true,
@@ -447,6 +490,8 @@ export type InsertServiceAlert = z.infer<typeof insertServiceAlertSchema>;
 export type ServiceAlert = typeof serviceAlerts.$inferSelect;
 export type InsertRiderMessage = z.infer<typeof insertRiderMessageSchema>;
 export type RiderMessage = typeof riderMessages.$inferSelect;
+export type InsertDriverMessage = z.infer<typeof insertDriverMessageSchema>;
+export type DriverMessage = typeof driverMessages.$inferSelect;
 export type InsertRiderProfile = z.infer<typeof insertRiderProfileSchema>;
 export type RiderProfile = typeof riderProfiles.$inferSelect;
 export type InsertRouteSubscription = z.infer<typeof insertRouteSubscriptionSchema>;

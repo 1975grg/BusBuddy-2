@@ -163,6 +163,7 @@ export default function RiderPage() {
 
       {currentRoute && (
         <RiderTracker
+          routeId={currentRoute.id}
           routeName={currentRoute.name}
           busName={currentRoute.busName}
           status={currentRoute.status}

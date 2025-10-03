@@ -14,6 +14,8 @@ import {
   type InsertServiceAlert,
   type RiderMessage,
   type InsertRiderMessage,
+  type DriverMessage,
+  type InsertDriverMessage,
   type RiderProfile,
   type InsertRiderProfile,
   type RouteSubscription,
@@ -31,6 +33,7 @@ import {
   routeStops,
   serviceAlerts,
   riderMessages,
+  driverMessages,
   riderProfiles,
   routeSubscriptions,
   stopPreferences,
@@ -88,6 +91,13 @@ export interface IStorage {
   // Rider messages (Riders → Admin)  
   createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
   getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]>;
+  
+  // Driver messages (Drivers → Admin)
+  createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage>;
+  getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]>;
+  getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]>;
+  updateDriverMessageStatus(id: string, status: string): Promise<DriverMessage | undefined>;
+  respondToDriverMessage(id: string, response: string, respondedByUserId: string): Promise<DriverMessage | undefined>;
   
   // Rider profiles management
   createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile>;
@@ -338,6 +348,53 @@ export class DatabaseStorage implements IStorage {
         status: "responded"
       })
       .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  // Driver messages (Drivers → Admin)
+  async createDriverMessage(insertMessage: InsertDriverMessage): Promise<DriverMessage> {
+    const [message] = await db.insert(driverMessages).values(insertMessage).returning();
+    return message;
+  }
+
+  async getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]> {
+    return await db.select().from(driverMessages)
+      .where(
+        and(
+          eq(driverMessages.routeId, routeId),
+          eq(driverMessages.isActive, true)
+        )
+      );
+  }
+
+  async getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]> {
+    return await db.select().from(driverMessages)
+      .where(
+        and(
+          eq(driverMessages.organizationId, organizationId),
+          eq(driverMessages.isActive, true)
+        )
+      );
+  }
+
+  async updateDriverMessageStatus(id: string, status: string): Promise<DriverMessage | undefined> {
+    const [message] = await db.update(driverMessages)
+      .set({ status })
+      .where(eq(driverMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async respondToDriverMessage(id: string, response: string, respondedByUserId: string): Promise<DriverMessage | undefined> {
+    const [message] = await db.update(driverMessages)
+      .set({ 
+        adminResponse: response,
+        respondedByUserId,
+        respondedAt: new Date(),
+        status: "responded"
+      })
+      .where(eq(driverMessages.id, id))
       .returning();
     return message || undefined;
   }
@@ -975,6 +1032,27 @@ export class MemStorage implements IStorage {
   }
 
   async addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
+  // Driver messages (Drivers → Admin) - Stub implementations for MemStorage
+  async createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage> {
+    throw new Error("Driver messages not implemented in MemStorage");
+  }
+
+  async getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]> {
+    return [];
+  }
+
+  async getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]> {
+    return [];
+  }
+
+  async updateDriverMessageStatus(id: string, status: string): Promise<DriverMessage | undefined> {
+    return undefined;
+  }
+
+  async respondToDriverMessage(id: string, response: string, respondedByUserId: string): Promise<DriverMessage | undefined> {
     return undefined;
   }
 
