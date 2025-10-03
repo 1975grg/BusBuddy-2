@@ -34,7 +34,27 @@ export function LiveMap({ buses, className }: LiveMapProps) {
       
       map.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${import.meta.env.MAPBOX_ACCESS_TOKEN}`,
+        style: {
+          version: 8,
+          sources: {
+            'osm': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '&copy; OpenStreetMap Contributors',
+              maxzoom: 19
+            }
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm',
+              minzoom: 0,
+              maxzoom: 22
+            }
+          ]
+        },
         center: defaultCenter,
         zoom: 13,
       });
