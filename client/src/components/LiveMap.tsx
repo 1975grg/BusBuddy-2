@@ -44,21 +44,19 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         className="w-full h-full bg-muted rounded-md relative overflow-hidden"
       >
         {/* Mock map background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-          <div className="absolute inset-0 opacity-20">
-            {/* Street pattern */}
-            <svg className="w-full h-full">
-              <defs>
-                <pattern id="streets" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
-                  {/* Main streets */}
-                  <path d="M0,40 L80,40 M40,0 L40,80" stroke="currentColor" strokeWidth="3" className="text-slate-400 dark:text-slate-600"/>
-                  {/* Side streets */}
-                  <path d="M0,20 L80,20 M0,60 L80,60 M20,0 L20,80 M60,0 L60,80" stroke="currentColor" strokeWidth="1.5" className="text-slate-300 dark:text-slate-700" opacity="0.6"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#streets)" />
-            </svg>
-          </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+          {/* Street pattern */}
+          <svg className="absolute inset-0 w-full h-full">
+            <defs>
+              <pattern id="streets" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+                {/* Main streets - highly visible */}
+                <path d="M0,30 L60,30 M30,0 L30,60" stroke="#94a3b8" strokeWidth="2.5" className="dark:stroke-slate-600"/>
+                {/* Side streets - visible */}
+                <path d="M0,15 L60,15 M0,45 L60,45 M15,0 L15,60 M45,0 L45,60" stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#streets)" opacity="0.6" />
+          </svg>
         </div>
         
         {/* Bus markers */}
