@@ -90,3 +90,62 @@ Preferred communication style: Simple, everyday language.
 1. Configure Twilio webhook URL in Twilio Console pointing to `/api/twilio/sms-webhook`
 2. Complete A2P 10DLC registration for SMS delivery
 3. (Recommended) Implement Twilio signature verification for webhook security
+
+## Bidirectional Messaging System
+
+### Architecture
+- **Communication Paths**: Riders ↔ Admin and Drivers ↔ Admin (no direct Rider ↔ Driver communication by design)
+- **Real-time Updates**: 10-second polling for admin inbox to show new messages
+- **Message Attribution**: All responses tracked with admin user ID for audit trail
+
+### Driver Messaging
+- **Access**: "Contact Admin" button on driver page (/driver)
+- **Message Types**: vehicle_problem, route_issue, schedule_change, general
+- **Form Validation**: 10-1000 character message requirement
+- **Component**: SendDriverMessageDialog with type selection and preview
+
+### Rider Messaging
+- **Access**: "Contact Support" button on rider page (/rider)
+- **Message Types**: lost_items, pickup_change, general
+- **Optional Fields**: riderName and riderEmail for anonymous riders
+- **Form Validation**: Email validation allows empty string or valid email format
+- **Component**: SendRiderMessageDialog with optional contact information
+
+### Admin Inbox
+- **Location**: /admin/messages (accessible from sidebar Messages link)
+- **Unified View**: Combined rider and driver messages sorted by creation date
+- **Filtering**: All, new, read, resolved status filters
+- **Response Flow**: Click message card to view details and respond inline
+- **Organization Scoping**: Messages filtered by admin's organization (MVP: uses first org admin)
+
+### API Endpoints
+**Driver Messages:**
+- POST /api/driver-messages - Create driver message
+- GET /api/driver-messages?route_id=X or ?organization_id=X - List messages
+- PATCH /api/driver-messages/:id/status - Update message status
+- PATCH /api/driver-messages/:id/respond - Admin responds to driver
+
+**Rider Messages:**
+- POST /api/rider-messages - Create rider message
+- GET /api/rider-messages?route_id=X or ?organization_id=X - List messages
+- PATCH /api/rider-messages/:id/status - Update message status
+- PATCH /api/rider-messages/:id/respond - Admin responds to rider
+
+### Database Schema
+**driver_messages table:**
+- organizationId, routeId, driverUserId (foreign keys)
+- type, message (content)
+- status (new, read, resolved)
+- adminResponse, respondedByUserId (response tracking)
+
+**rider_messages table:**
+- organizationId, routeId (foreign keys)
+- type, message (content)
+- riderName, riderEmail, userId (contact/identity)
+- status (new, read, resolved)
+- adminResponse, respondedByUserId (response tracking)
+
+### MVP Limitations
+- Admin inbox uses first org admin lookup (not session-based auth)
+- Works correctly for single-organization deployments
+- Multi-organization production requires proper authentication context integration
