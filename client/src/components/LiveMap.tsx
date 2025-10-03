@@ -28,6 +28,14 @@ export function LiveMap({ buses, className }: LiveMapProps) {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    // Suppress harmless MapLibre tile abort errors
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes('signal is aborted')) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     try {
       // Default center (will adjust to first bus location)
       const defaultCenter: [number, number] = [-79.9481, 39.6567]; // Morgantown, WV area
@@ -63,16 +71,13 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         console.error('Map error:', e);
         setMapError('Failed to load map. Please check your connection.');
       });
-
-      map.current.on('load', () => {
-        console.log('Map loaded successfully');
-      });
     } catch (error) {
       console.error('Failed to initialize map:', error);
       setMapError('Failed to initialize map.');
     }
 
     return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       if (map.current) {
         map.current.remove();
         map.current = null;
