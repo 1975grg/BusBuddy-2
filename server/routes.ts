@@ -803,10 +803,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (existingRider) {
-        return res.json(existingRider); // Return existing profile
+        // Update existing rider's consent if it has changed
+        const consentChanged = existingRider.smsConsent !== validatedData.smsConsent;
+        
+        if (consentChanged || validatedData.name !== existingRider.name) {
+          const updatedProfile = await storage.updateRiderProfile(existingRider.id, {
+            name: validatedData.name,
+            smsConsent: validatedData.smsConsent,
+            smsConsentDate: validatedData.smsConsent ? new Date() : null,
+          });
+          return res.json(updatedProfile);
+        }
+        
+        return res.json(existingRider); // Return existing profile if no changes
       }
       
-      const riderProfile = await storage.createRiderProfile(validatedData);
+      // Automatically set consent date when consent is given for new riders
+      const profileData = {
+        ...validatedData,
+        smsConsentDate: validatedData.smsConsent ? new Date() : null,
+      };
+      
+      const riderProfile = await storage.createRiderProfile(profileData);
       res.status(201).json(riderProfile);
     } catch (error) {
       console.error("Error creating rider profile:", error);
@@ -832,17 +850,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get organization to get organization name
         const organization = riderProfile ? await storage.getOrganizationById(riderProfile.organizationId) : null;
         
+        // Check SMS consent before sending
         if (riderProfile && route && organization && smsService.isConfigured()) {
-          const smsResult = await smsService.sendWelcomeMessage(
-            riderProfile.phoneNumber,
-            route.name,
-            organization.name
-          );
-          
-          if (!smsResult.success) {
-            console.error("Failed to send welcome SMS:", smsResult.error);
+          if (riderProfile.smsConsent) {
+            const smsResult = await smsService.sendWelcomeMessage(
+              riderProfile.phoneNumber,
+              route.name,
+              organization.name
+            );
+            
+            if (!smsResult.success) {
+              console.error("Failed to send welcome SMS:", smsResult.error);
+            } else {
+              console.log("Welcome SMS sent successfully:", smsResult.messageId);
+            }
           } else {
-            console.log("Welcome SMS sent successfully:", smsResult.messageId);
+            console.log("SMS not sent - rider has not given SMS consent");
           }
         } else {
           console.log("SMS not sent - missing data or SMS not configured");
@@ -902,24 +925,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Rider subscription not found" });
       }
 
-      // Send deletion SMS if we have the rider info and SMS is configured
+      // Send deletion SMS if we have the rider info, SMS is configured, and rider has consent
       if (result.riderProfile && result.deletedSubscription && smsService.isConfigured()) {
         try {
-          const route = await storage.getRouteById(routeId);
-          const organization = await storage.getOrganizationById(result.riderProfile.organizationId);
-          
-          if (route && organization) {
-            const smsResult = await smsService.sendRiderRemovedMessage(
-              result.riderProfile.phoneNumber,
-              route.name,
-              organization.name
-            );
+          if (result.riderProfile.smsConsent) {
+            const route = await storage.getRouteById(routeId);
+            const organization = await storage.getOrganizationById(result.riderProfile.organizationId);
             
-            if (!smsResult.success) {
-              console.error("Failed to send deletion SMS:", smsResult.error);
-            } else {
-              console.log("Deletion SMS sent successfully:", smsResult.messageId);
+            if (route && organization) {
+              const smsResult = await smsService.sendRiderRemovedMessage(
+                result.riderProfile.phoneNumber,
+                route.name,
+                organization.name
+              );
+              
+              if (!smsResult.success) {
+                console.error("Failed to send deletion SMS:", smsResult.error);
+              } else {
+                console.log("Deletion SMS sent successfully:", smsResult.messageId);
+              }
             }
+          } else {
+            console.log("Deletion SMS not sent - rider has not given SMS consent");
           }
         } catch (smsError) {
           console.error("Error sending deletion SMS:", smsError);

@@ -102,6 +102,8 @@ export const riderProfiles = pgTable("rider_profiles", {
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   notificationMethod: text("notification_method").notNull().default("sms"), // 'sms', 'email', 'both'
   email: text("email"), // Optional for email notifications
+  smsConsent: boolean("sms_consent").notNull().default(false), // TCPA compliance - explicit SMS opt-in
+  smsConsentDate: timestamp("sms_consent_date"), // When consent was given
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -372,6 +374,8 @@ export const insertRiderProfileSchema = createInsertSchema(riderProfiles).pick({
   organizationId: true,
   notificationMethod: true,
   email: true,
+  smsConsent: true,
+  smsConsentDate: true,
 });
 
 export const insertRouteSubscriptionSchema = createInsertSchema(routeSubscriptions).pick({

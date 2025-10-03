@@ -337,12 +337,15 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
                         data-testid={`rider-item-${rider.id}`}
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">
                               {rider.name || "Unnamed Rider"}
                             </span>
                             <Badge variant={rider.notificationMode === "always" ? "default" : "secondary"}>
                               {rider.notificationMode === "always" ? "Auto" : "Manual"}
+                            </Badge>
+                            <Badge variant={rider.smsConsent ? "default" : "destructive"} className="text-xs">
+                              SMS: {rider.smsConsent ? "✓" : "✗"}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">

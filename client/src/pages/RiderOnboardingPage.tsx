@@ -22,6 +22,7 @@ export default function RiderOnboardingPage() {
   const [name, setName] = useState("");
   const [selectedStops, setSelectedStops] = useState<Set<string>>(new Set());
   const [notificationMode, setNotificationMode] = useState<"always" | "manual">("always");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -33,11 +34,12 @@ export default function RiderOnboardingPage() {
   });
 
   // Get organization information
-  const { data: organization } = useQuery<Organization>({
+  const { data: organizations } = useQuery<Organization[]>({
     queryKey: [`/api/system/organizations`],
-    select: (orgs: Organization[]) => orgs.find(org => org.id === organizationId),
     enabled: !!organizationId,
   });
+  
+  const organization = organizations?.find(org => org.id === organizationId);
 
   // Subscribe to route mutation
   const subscribeToRouteMutation = useMutation({
@@ -51,6 +53,8 @@ export default function RiderOnboardingPage() {
         name: name || undefined,
         organizationId,
         notificationMethod: "sms",
+        smsConsent: smsConsent,
+        // smsConsentDate will be set automatically on backend when smsConsent is true
       });
 
       const riderProfile = await riderProfileResponse.json();
@@ -114,6 +118,15 @@ export default function RiderOnboardingPage() {
       toast({
         title: "Phone number required",
         description: "Please enter your phone number to receive notifications.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!smsConsent) {
+      toast({
+        title: "SMS consent required",
+        description: "Please agree to receive SMS notifications to continue.",
         variant: "destructive",
       });
       return;
@@ -297,6 +310,21 @@ export default function RiderOnboardingPage() {
                 </div>
               </div>
             </div>
+
+            {/* SMS Consent Checkbox */}
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="sms-consent"
+                  checked={smsConsent}
+                  onCheckedChange={(checked) => setSmsConsent(checked as boolean)}
+                  data-testid="checkbox-sms-consent"
+                />
+                <Label htmlFor="sms-consent" className="text-sm leading-relaxed cursor-pointer">
+                  I consent to receive SMS notifications about my bus route. Message and data rates may apply. Reply STOP to unsubscribe at any time.
+                </Label>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -344,7 +372,7 @@ export default function RiderOnboardingPage() {
         <div className="sticky bottom-4">
           <Button
             onClick={handleSubscribe}
-            disabled={subscribeToRouteMutation.isPending || !phoneNumber.trim() || selectedStops.size === 0}
+            disabled={subscribeToRouteMutation.isPending || !phoneNumber.trim() || !smsConsent || selectedStops.size === 0}
             className="w-full py-6 text-lg"
             data-testid="button-subscribe"
           >

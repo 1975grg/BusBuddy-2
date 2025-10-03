@@ -93,6 +93,7 @@ export interface IStorage {
   createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile>;
   getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined>;
   getRiderProfile(id: string): Promise<RiderProfile | undefined>;
+  updateRiderProfile(id: string, profile: Partial<InsertRiderProfile>): Promise<RiderProfile | undefined>;
   getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>>;
   deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }>;
   
@@ -359,6 +360,14 @@ export class DatabaseStorage implements IStorage {
     return profile || undefined;
   }
 
+  async updateRiderProfile(id: string, profile: Partial<InsertRiderProfile>): Promise<RiderProfile | undefined> {
+    const [updated] = await db.update(riderProfiles)
+      .set(profile)
+      .where(eq(riderProfiles.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
   // Route subscriptions management
   async createRouteSubscription(subscription: InsertRouteSubscription): Promise<RouteSubscription> {
     const [sub] = await db.insert(routeSubscriptions).values(subscription).returning();
@@ -470,6 +479,8 @@ export class DatabaseStorage implements IStorage {
       organizationId: riderProfiles.organizationId,
       notificationMethod: riderProfiles.notificationMethod,
       email: riderProfiles.email,
+      smsConsent: riderProfiles.smsConsent,
+      smsConsentDate: riderProfiles.smsConsentDate,
       isActive: riderProfiles.isActive,
       createdAt: riderProfiles.createdAt,
       subscriptionId: routeSubscriptions.id,
@@ -977,6 +988,10 @@ export class MemStorage implements IStorage {
   }
 
   async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
+    throw new Error("Rider profiles not implemented in MemStorage");
+  }
+
+  async updateRiderProfile(id: string, profile: Partial<InsertRiderProfile>): Promise<RiderProfile | undefined> {
     throw new Error("Rider profiles not implemented in MemStorage");
   }
 
