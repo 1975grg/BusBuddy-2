@@ -18,19 +18,6 @@ interface LiveMapProps {
   className?: string;
 }
 
-// Global error suppression for MapLibre tile abort errors
-if (typeof window !== 'undefined') {
-  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    if (event.reason?.message?.includes('signal is aborted') || 
-        event.reason?.message?.includes('user aborted') ||
-        event.reason?.message?.includes('AbortError')) {
-      event.stopImmediatePropagation();
-      event.preventDefault();
-      return false;
-    }
-  }, true); // Use capture phase to catch earlier
-}
-
 export function LiveMap({ buses, className }: LiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
