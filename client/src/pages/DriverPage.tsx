@@ -99,13 +99,13 @@ export default function DriverPage() {
     refetchInterval: 10000, // Refetch every 10 seconds to stay in sync
   });
   
-  // Mock bus data for the map (would be real GPS data in production)
-  const mockBuses = currentRoute ? [{
+  // Bus data for the map - uses real GPS from active session
+  const buses = currentRoute && activeSession ? [{
     id: "current-bus", 
     name: currentRoute.vehicleNumber || "Unknown",
     status: "active" as const,
-    lat: 40.7128,
-    lng: -74.0060,
+    lat: activeSession.currentLatitude || 40.7128,
+    lng: activeSession.currentLongitude || -74.0060,
     eta: "N/A", // Would come from real GPS tracking
     nextStop: "Unknown" // Would come from route progress
   }] : [];
@@ -190,7 +190,7 @@ export default function DriverPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <LiveMap buses={mockBuses} className="h-64" />
+              <LiveMap buses={buses} className="h-64" />
             </CardContent>
           </Card>
         </div>
