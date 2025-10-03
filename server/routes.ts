@@ -964,6 +964,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Twilio webhook for incoming SMS (STOP keyword handling)
+  app.post("/api/twilio/sms-webhook", async (req, res) => {
+    try {
+      // Twilio sends data as application/x-www-form-urlencoded
+      const { From: fromPhone, Body: messageBody } = req.body;
+      
+      if (!fromPhone || !messageBody) {
+        console.error("Twilio webhook missing required fields");
+        return res.status(400).send("Missing required fields");
+      }
+
+      console.log(`Incoming SMS from ${fromPhone}: ${messageBody}`);
+
+      // Check if message is a TCPA-compliant opt-out keyword (case-insensitive)
+      // Supported keywords: STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT
+      const normalizedMessage = messageBody.trim().toUpperCase();
+      const optOutKeywords = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
+      if (optOutKeywords.includes(normalizedMessage)) {
+        // Format phone number to match database format (remove non-digits and leading 1)
+        let cleanPhone = fromPhone.replace(/\D/g, '');
+        // Remove leading 1 (country code) if present (for US/Canada numbers)
+        if (cleanPhone.startsWith('1')) {
+          cleanPhone = cleanPhone.substring(1);
+        }
+        
+        // Try to find rider across all organizations
+        const organizations = await storage.getAllOrganizations();
+        let riderFound = false;
+        let wasOptedIn = false;
+        
+        for (const org of organizations) {
+          const rider = await storage.getRiderProfileByPhone(cleanPhone, org.id);
+          
+          if (rider) {
+            riderFound = true;
+            
+            // Only update and send confirmation if they were opted in
+            if (rider.smsConsent) {
+              wasOptedIn = true;
+              await storage.updateRiderProfile(rider.id, {
+                smsConsent: false,
+                smsConsentDate: null
+              });
+              
+              console.log(`Rider ${rider.id} opted out of SMS via STOP keyword`);
+              
+              // Send confirmation message
+              if (smsService.isConfigured()) {
+                const confirmResult = await smsService.sendSms(
+                  fromPhone,
+                  `You've been unsubscribed from Bus Buddy SMS notifications. You will no longer receive text alerts.`
+                );
+                
+                if (confirmResult.success) {
+                  console.log("STOP confirmation sent successfully");
+                } else {
+                  console.error("Failed to send STOP confirmation:", confirmResult.error);
+                }
+              }
+              
+              break; // Found and processed, stop searching
+            }
+          }
+        }
+        
+        if (!riderFound) {
+          console.log(`STOP received from unknown number: ${fromPhone}`);
+        } else if (!wasOptedIn) {
+          console.log(`STOP received from ${fromPhone} but already opted out - no action taken`);
+        }
+      }
+      
+      // Respond to Twilio with empty TwiML (required for webhook)
+      res.type('text/xml');
+      res.send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      
+    } catch (error) {
+      console.error("Error processing Twilio webhook:", error);
+      res.status(500).send("Internal server error");
+    }
+  });
+
   // Temporary debug endpoint to test SMS configuration
   app.get("/api/debug/sms-config", async (req, res) => {
     const isConfigured = smsService.isConfigured();

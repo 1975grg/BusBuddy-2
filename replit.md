@@ -42,11 +42,13 @@ Preferred communication style: Simple, everyday language.
 - **Real-time Updates**: Live GPS tracking with offline caching and data backfill capabilities
 - **Geofencing Integration**: Automatic stop advancement using location-based triggers
 - **Component-driven Development**: Reusable UI components with consistent design system
+- **TCPA Compliance**: SMS consent tracking with opt-out keyword support (STOP, UNSUBSCRIBE, etc.)
 
 ## External Dependencies
 
 ### Core Infrastructure
 - **Database**: Neon PostgreSQL serverless platform
+- **SMS Service**: Twilio for SMS notifications with TCPA-compliant opt-out handling
 - **Email Service**: SendGrid for transactional emails and notifications
 - **Maps & Geolocation**: Browser Geolocation API with planned MapLibre integration
 - **Session Storage**: PostgreSQL-backed session management
@@ -67,3 +69,24 @@ Preferred communication style: Simple, everyday language.
 - **Date/Time**: date-fns for date manipulation and formatting
 - **QR Code Generation**: react-qr-code for access code generation
 - **Class Management**: clsx and tailwind-merge for conditional styling
+
+## SMS Notifications & TCPA Compliance
+
+### SMS Opt-In/Opt-Out System
+- **Consent Tracking**: Database-level SMS consent field with timestamp for audit trail
+- **Opt-Out Keywords**: Support for all TCPA-standard keywords (STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT)
+- **Webhook Processing**: Twilio webhook endpoint at `/api/twilio/sms-webhook` for automated opt-out handling
+- **Welcome Message**: All riders receive "Reply STOP to opt out anytime" instruction upon first subscription
+- **Idempotent Processing**: Multiple STOP messages handled gracefully without duplicate confirmations
+- **Re-subscription**: Riders can opt back in through QR code onboarding with consent checkbox
+
+### Implementation Details
+- **Phone Normalization**: Automatic conversion between Twilio format (+1XXXXXXXXXX) and database format (XXXXXXXXXX)
+- **Multi-organization Search**: Webhook searches across all organizations to find matching rider
+- **Admin Visibility**: SMS consent status visible in Access Management interface
+- **Consent Updates**: updateRiderProfile storage method supports consent field modifications
+
+### Production Setup Requirements
+1. Configure Twilio webhook URL in Twilio Console pointing to `/api/twilio/sms-webhook`
+2. Complete A2P 10DLC registration for SMS delivery
+3. (Recommended) Implement Twilio signature verification for webhook security
