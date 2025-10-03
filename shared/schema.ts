@@ -137,6 +137,9 @@ export const routeSessions = pgTable("route_sessions", {
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   currentStopId: varchar("current_stop_id").references(() => routeStops.id),
+  currentLatitude: decimal("current_latitude", { precision: 10, scale: 8 }),
+  currentLongitude: decimal("current_longitude", { precision: 11, scale: 8 }),
+  lastLocationUpdate: timestamp("last_location_update"),
   estimatedCompletionTime: timestamp("estimated_completion_time"),
   createdAt: timestamp("created_at").defaultNow(),
 });

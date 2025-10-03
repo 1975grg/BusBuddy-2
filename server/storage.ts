@@ -110,8 +110,10 @@ export interface IStorage {
   // Route sessions management (tracking active routes)
   createRouteSession(session: InsertRouteSession): Promise<RouteSession>;
   getActiveRouteSession(routeId: string): Promise<RouteSession | undefined>;
+  getRouteSession(sessionId: string): Promise<RouteSession | undefined>;
   updateRouteSessionStatus(sessionId: string, status: 'pending' | 'active' | 'completed' | 'cancelled'): Promise<RouteSession | undefined>;
   updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined>;
+  updateRouteSessionLocation(sessionId: string, latitude: string, longitude: string): Promise<RouteSession | undefined>;
   
   // Notification log
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
@@ -434,6 +436,24 @@ export class DatabaseStorage implements IStorage {
     return session || undefined;
   }
 
+  async getRouteSession(sessionId: string): Promise<RouteSession | undefined> {
+    const [session] = await db.select().from(routeSessions)
+      .where(eq(routeSessions.id, sessionId));
+    return session || undefined;
+  }
+
+  async updateRouteSessionLocation(sessionId: string, latitude: string, longitude: string): Promise<RouteSession | undefined> {
+    const [session] = await db.update(routeSessions)
+      .set({ 
+        currentLatitude: latitude, 
+        currentLongitude: longitude,
+        lastLocationUpdate: new Date()
+      })
+      .where(eq(routeSessions.id, sessionId))
+      .returning();
+    return session || undefined;
+  }
+
   // Notification log
   async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
     const [notification] = await db.insert(notificationLog).values(log).returning();
@@ -447,28 +467,6 @@ export class DatabaseStorage implements IStorage {
 
   async getOrganizationById(id: string): Promise<Organization | undefined> {
     return this.getOrganization(id);
-  }
-
-  // Rider profile management implementation
-  async createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile> {
-    const [created] = await db.insert(riderProfiles).values(profile).returning();
-    return created;
-  }
-
-  async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
-    const [profile] = await db.select()
-      .from(riderProfiles)
-      .where(and(eq(riderProfiles.phoneNumber, phoneNumber), eq(riderProfiles.organizationId, organizationId)))
-      .limit(1);
-    return profile;
-  }
-
-  async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
-    const [profile] = await db.select()
-      .from(riderProfiles)
-      .where(eq(riderProfiles.id, id))
-      .limit(1);
-    return profile;
   }
 
   async getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>> {
@@ -547,6 +545,7 @@ export class MemStorage implements IStorage {
   private orgSettings: Map<string, OrgSettings>;
   private routes: Map<string, Route>;
   private routeStops: Map<string, RouteStop>;
+  private routeSessions: Map<string, RouteSession>;
   private defaultOrgId: string;
   private defaultOrgSettingsId: string;
 
@@ -556,6 +555,7 @@ export class MemStorage implements IStorage {
     this.orgSettings = new Map();
     this.routes = new Map();
     this.routeStops = new Map();
+    this.routeSessions = new Map();
     
     // Create default organization
     this.defaultOrgId = randomUUID();
@@ -1039,6 +1039,98 @@ export class MemStorage implements IStorage {
     return await db.select()
       .from(stopPreferences)
       .where(eq(stopPreferences.subscriptionId, subscriptionId));
+  }
+
+  // Route session management implementation
+  async createRouteSession(session: InsertRouteSession): Promise<RouteSession> {
+    const id = randomUUID();
+    const newSession: RouteSession = {
+      id,
+      ...session,
+      status: 'pending',
+      startedAt: null,
+      completedAt: null,
+      currentStopId: null,
+      currentLatitude: null,
+      currentLongitude: null,
+      lastLocationUpdate: null,
+      estimatedCompletionTime: session.estimatedCompletionTime ?? null,
+      createdAt: new Date(),
+    };
+    this.routeSessions.set(id, newSession);
+    return newSession;
+  }
+
+  async getActiveRouteSession(routeId: string): Promise<RouteSession | undefined> {
+    return Array.from(this.routeSessions.values()).find(
+      s => s.routeId === routeId && s.status === 'active'
+    );
+  }
+
+  async getRouteSession(sessionId: string): Promise<RouteSession | undefined> {
+    return this.routeSessions.get(sessionId);
+  }
+
+  async updateRouteSessionStatus(sessionId: string, status: 'pending' | 'active' | 'completed' | 'cancelled'): Promise<RouteSession | undefined> {
+    const session = this.routeSessions.get(sessionId);
+    if (!session) return undefined;
+    
+    const updated = {
+      ...session,
+      status,
+      startedAt: status === 'active' && !session.startedAt ? new Date() : session.startedAt,
+      completedAt: (status === 'completed' || status === 'cancelled') ? new Date() : session.completedAt,
+    };
+    this.routeSessions.set(sessionId, updated);
+    return updated;
+  }
+
+  async updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined> {
+    const session = this.routeSessions.get(sessionId);
+    if (!session) return undefined;
+    
+    const updated = { ...session, currentStopId: stopId };
+    this.routeSessions.set(sessionId, updated);
+    return updated;
+  }
+
+  async updateRouteSessionLocation(sessionId: string, latitude: string, longitude: string): Promise<RouteSession | undefined> {
+    const session = this.routeSessions.get(sessionId);
+    if (!session) return undefined;
+    
+    const updated = {
+      ...session,
+      currentLatitude: latitude,
+      currentLongitude: longitude,
+      lastLocationUpdate: new Date(),
+    };
+    this.routeSessions.set(sessionId, updated);
+    return updated;
+  }
+
+  // Notification log implementation
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const id = randomUUID();
+    const notification: NotificationLog = {
+      id,
+      ...log,
+      riderProfileId: log.riderProfileId ?? null,
+      routeSessionId: log.routeSessionId ?? null,
+      status: 'pending',
+      externalId: null,
+      sentAt: null,
+      createdAt: new Date(),
+    };
+    return notification;
+  }
+
+  // Additional helper methods
+  async getRouteById(id: string): Promise<Route | undefined> {
+    return this.getRoute(id);
+  }
+
+  async getOrganizationById(id: string): Promise<Organization | undefined> {
+    return this.getOrganization(id);
   }
 }
 

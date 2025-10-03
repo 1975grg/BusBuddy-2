@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Route, MapPin, Star, StarOff, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Route as RouteType, User } from "@shared/schema";
+import type { Route as RouteType, User, RouteSession } from "@shared/schema";
 import driverAvatarUrl from "@assets/generated_images/Bus_driver_avatar_a7c98208.png";
 
 export default function DriverPage() {
@@ -71,6 +71,31 @@ export default function DriverPage() {
   };
 
   const currentRoute = routes.find(r => r.id === selectedRoute);
+
+  // Query for active session when route is selected
+  const { data: activeSession, isLoading: sessionLoading } = useQuery({
+    queryKey: ["/api/route-sessions/active", selectedRoute],
+    queryFn: async () => {
+      if (!selectedRoute) return null;
+      
+      try {
+        const response = await fetch(`/api/route-sessions/active/${selectedRoute}`);
+        if (response.status === 404) {
+          // No active session found - this is normal
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch active session: ${response.statusText}`);
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Error fetching active session:", error);
+        return null;
+      }
+    },
+    enabled: !!selectedRoute,
+    refetchInterval: 10000, // Refetch every 10 seconds to stay in sync
+  });
   
   // Mock bus data for the map (would be real GPS data in production)
   const mockBuses = currentRoute ? [{
@@ -141,11 +166,14 @@ export default function DriverPage() {
       )}
 
       {/* Driver Controls and Map */}
-      {currentRoute && (
+      {currentRoute && currentUser && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
             <DriverControls
+              routeId={currentRoute.id}
               routeName={currentRoute.name}
+              driverUserId={currentUser.id}
+              existingSession={activeSession}
               currentStop={undefined} // Would come from real GPS tracking
               nextStop={undefined} // Would come from real route progress
               eta={undefined} // Would come from real GPS tracking

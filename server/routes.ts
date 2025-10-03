@@ -385,6 +385,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route Session Management Routes (GPS Tracking)
+  app.post("/api/route-sessions/start", async (req, res) => {
+    try {
+      const { routeId, driverUserId, estimatedCompletionTime } = req.body;
+      
+      if (!routeId || !driverUserId) {
+        return res.status(400).json({ error: "routeId and driverUserId are required" });
+      }
+
+      // Check if there's already an active session for this route
+      const existingSession = await storage.getActiveRouteSession(routeId);
+      if (existingSession) {
+        return res.status(400).json({ error: "Route already has an active session" });
+      }
+
+      // Create and start the session
+      const session = await storage.createRouteSession({
+        routeId,
+        driverUserId,
+        estimatedCompletionTime: estimatedCompletionTime ? new Date(estimatedCompletionTime) : undefined,
+      });
+
+      // Immediately set status to active and record start time
+      const activeSession = await storage.updateRouteSessionStatus(session.id, 'active');
+      
+      res.status(201).json(activeSession);
+    } catch (error) {
+      console.error("Error starting route session:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/route-sessions/:id/location", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { latitude, longitude } = req.body;
+      
+      // Validate latitude and longitude are provided and are numbers
+      if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {
+        return res.status(400).json({ error: "latitude and longitude are required" });
+      }
+
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+
+      // Validate numeric conversion and ranges
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ error: "latitude and longitude must be valid numbers" });
+      }
+
+      if (lat < -90 || lat > 90) {
+        return res.status(400).json({ error: "latitude must be between -90 and 90" });
+      }
+
+      if (lng < -180 || lng > 180) {
+        return res.status(400).json({ error: "longitude must be between -180 and 180" });
+      }
+
+      const session = await storage.updateRouteSessionLocation(id, String(lat), String(lng));
+      
+      if (!session) {
+        return res.status(404).json({ error: "Route session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error updating session location:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/route-sessions/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || !['pending', 'active', 'completed', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: "Valid status is required" });
+      }
+
+      const session = await storage.updateRouteSessionStatus(id, status);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Route session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error updating session status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/route-sessions/active/:routeId", async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const session = await storage.getActiveRouteSession(routeId);
+      
+      if (!session) {
+        return res.status(404).json({ error: "No active session found for this route" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error fetching active session:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/route-sessions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const session = await storage.getRouteSession(id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Route session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error fetching route session:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Development Toggle Route (for switching between user perspectives)
   app.get("/api/dev/mock-user/:role", async (req, res) => {
     try {
