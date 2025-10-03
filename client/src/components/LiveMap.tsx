@@ -18,6 +18,19 @@ interface LiveMapProps {
   className?: string;
 }
 
+// Global error suppression for MapLibre tile abort errors
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+    if (event.reason?.message?.includes('signal is aborted') || 
+        event.reason?.message?.includes('user aborted') ||
+        event.reason?.message?.includes('AbortError')) {
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      return false;
+    }
+  }, true); // Use capture phase to catch earlier
+}
+
 export function LiveMap({ buses, className }: LiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -27,14 +40,6 @@ export function LiveMap({ buses, className }: LiveMapProps) {
   // Initialize map once
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
-
-    // Suppress harmless MapLibre tile abort errors
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason?.message?.includes('signal is aborted')) {
-        event.preventDefault();
-      }
-    };
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     try {
       // Default center (will adjust to first bus location)
@@ -77,7 +82,6 @@ export function LiveMap({ buses, className }: LiveMapProps) {
     }
 
     return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       if (map.current) {
         map.current.remove();
         map.current = null;
