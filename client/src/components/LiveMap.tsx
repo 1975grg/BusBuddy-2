@@ -44,13 +44,16 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         className="w-full h-full bg-muted rounded-md relative overflow-hidden"
       >
         {/* Mock map background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
-          <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+          <div className="absolute inset-0 opacity-20">
             {/* Street pattern */}
             <svg className="w-full h-full">
               <defs>
-                <pattern id="streets" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-                  <path d="M0,50 L100,50 M50,0 L50,100" stroke="currentColor" strokeWidth="2"/>
+                <pattern id="streets" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+                  {/* Main streets */}
+                  <path d="M0,40 L80,40 M40,0 L40,80" stroke="currentColor" strokeWidth="3" className="text-slate-400 dark:text-slate-600"/>
+                  {/* Side streets */}
+                  <path d="M0,20 L80,20 M0,60 L80,60 M20,0 L20,80 M60,0 L60,80" stroke="currentColor" strokeWidth="1.5" className="text-slate-300 dark:text-slate-700" opacity="0.6"/>
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#streets)" />
@@ -59,31 +62,37 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         </div>
         
         {/* Bus markers */}
-        {buses.map((bus, index) => (
-          <div
-            key={bus.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${30 + index * 20}%`,
-              top: `${40 + index * 10}%`,
-            }}
-          >
-            <div className={`w-4 h-4 rounded-full ${getStatusColor(bus.status)} border-2 border-white shadow-lg`} />
+        {buses.map((bus, index) => {
+          // For mock map, center the first bus and offset others slightly
+          const left = index === 0 ? 50 : 50 + (index * 10);
+          const top = index === 0 ? 50 : 50 + (index * 10);
+          
+          return (
+            <div
+              key={bus.id}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+              }}
+            >
+              <div className={`w-6 h-6 rounded-full ${getStatusColor(bus.status)} border-3 border-white shadow-lg animate-pulse`} />
             
-            {/* ETA card on hover */}
-            <Card className="absolute bottom-6 left-1/2 transform -translate-x-1/2 p-2 min-w-32 opacity-0 hover:opacity-100 transition-opacity z-10">
-              <div className="text-sm font-medium">{bus.name}</div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                {bus.eta}
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="w-3 h-3" />
-                {bus.nextStop}
-              </div>
-            </Card>
-          </div>
-        ))}
+              {/* ETA card on hover */}
+              <Card className="absolute bottom-6 left-1/2 transform -translate-x-1/2 p-2 min-w-32 opacity-0 hover:opacity-100 transition-opacity z-10">
+                <div className="text-sm font-medium">{bus.name}</div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  {bus.eta}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="w-3 h-3" />
+                  {bus.nextStop}
+                </div>
+              </Card>
+            </div>
+          );
+        })}
         
         {/* Legend */}
         <Card className="absolute top-4 right-4 p-3">
