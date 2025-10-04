@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -111,6 +111,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.sendStatus(404);
       }
       return res.sendStatus(500);
+    }
+  });
+
+  // Organization Management (for org admins)
+  app.get("/api/organization", async (req, res) => {
+    try {
+      // MVP: Get first organization (single-org deployment)
+      const organizations = await storage.getAllOrganizations();
+      const organization = organizations[0];
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      res.json(organization);
+    } catch (error) {
+      console.error("Error fetching organization:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/organization/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate only the fields being updated (partial schema)
+      const partialSchema = insertOrganizationSchema.partial();
+      const validatedData = partialSchema.parse(req.body);
+      
+      // Only pass defined fields to prevent overwriting with undefined
+      const updateData: Partial<typeof validatedData> = {};
+      if (validatedData.name !== undefined) updateData.name = validatedData.name;
+      if (validatedData.logoUrl !== undefined) updateData.logoUrl = validatedData.logoUrl;
+      if (validatedData.primaryColor !== undefined) updateData.primaryColor = validatedData.primaryColor;
+      if (validatedData.type !== undefined) updateData.type = validatedData.type;
+      
+      const updated = await storage.updateOrganization(id, updateData);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      // Handle validation errors
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors 
+        });
+      }
+      console.error("Error updating organization:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

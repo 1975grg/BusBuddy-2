@@ -17,29 +17,31 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Fetch current settings
-  const { data: settings, isLoading } = useQuery({
-    queryKey: ["/api/org-settings"],
+  // Fetch current organization
+  const { data: organization, isLoading } = useQuery({
+    queryKey: ["/api/organization"],
     queryFn: async () => {
-      const response = await fetch("/api/org-settings");
-      if (!response.ok) throw new Error("Failed to fetch settings");
+      const response = await fetch("/api/organization");
+      if (!response.ok) throw new Error("Failed to fetch organization");
       return response.json();
     }
   });
 
-  // Update local state when settings load
+  // Update local state when organization loads
   useEffect(() => {
-    if (settings) {
-      setOrgName(settings.name || "");
-      setOrgLogo(settings.logoUrl || "");
-      setPrimaryColor(settings.primaryColor || "#0080FF");
+    if (organization) {
+      setOrgName(organization.name || "");
+      setOrgLogo(organization.logoUrl || "");
+      setPrimaryColor(organization.primaryColor || "#0080FF");
     }
-  }, [settings]);
+  }, [organization]);
   
   // Save settings mutation
   const saveSettingsMutation = useMutation({
     mutationFn: async (data: { name: string; logoUrl: string; primaryColor: string }) => {
-      const response = await fetch("/api/org-settings", {
+      if (!organization?.id) throw new Error("Organization ID not found");
+      
+      const response = await fetch(`/api/organization/${organization.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
@@ -48,7 +50,7 @@ export default function SettingsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/org-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
       toast({
         title: "Settings saved",
         description: "Organization settings have been updated successfully"
