@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Upload, X, Building, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ObjectUploader } from "@/components/ObjectUploader";
 
 interface LogoUploadProps {
   currentLogo?: string;
@@ -14,80 +15,45 @@ interface LogoUploadProps {
 
 export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: LogoUploadProps) {
   const [uploadedLogo, setUploadedLogo] = useState<string | null>(currentLogo || null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image file (PNG, JPG, SVG)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast({
-        title: "File too large",
-        description: "Please upload an image smaller than 5MB",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsUploading(true);
+  const handleGetUploadParameters = async () => {
+    const response = await fetch("/api/objects/upload", {
+      method: "POST",
+    });
     
-    try {
-      // TODO: remove mock functionality - replace with real file upload to object storage
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setUploadedLogo(result);
-        onLogoUpdate?.(result);
+    if (!response.ok) {
+      throw new Error("Failed to get upload URL");
+    }
+    
+    const { uploadURL, objectPath } = await response.json();
+    
+    return {
+      method: "PUT" as const,
+      url: uploadURL,
+      objectPath,
+    };
+  };
+
+  const handleComplete = (result: { successful: Array<{ uploadURL: string; objectPath: string }> }) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFile = result.successful[0];
+      const objectPath = uploadedFile.objectPath;
+      
+      if (objectPath) {
+        setUploadedLogo(objectPath);
+        onLogoUpdate?.(objectPath);
         toast({
           title: "Logo uploaded successfully",
           description: "Your organization logo has been updated",
         });
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error("Upload failed:", error);
-      toast({
-        title: "Upload failed",
-        description: "There was an error uploading your logo. Please try again.",
-        variant: "destructive"
-      });
-      setIsUploading(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileSelect(files[0]);
+      }
     }
   };
 
   const removeLogo = () => {
     setUploadedLogo(null);
     onLogoUpdate?.("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   return (
@@ -119,6 +85,7 @@ export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: Logo
                   src={uploadedLogo}
                   alt={`${organizationName} logo`}
                   className="max-w-full max-h-full object-contain rounded"
+                  data-testid="img-uploaded-logo"
                 />
               </div>
               <Button
@@ -137,27 +104,15 @@ export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: Logo
             </div>
           </div>
         ) : (
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive 
-                ? "border-primary bg-primary/5" 
-                : "border-muted-foreground/25 hover:border-muted-foreground/50"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragActive(true);
-            }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
-          >
+          <div className="border-2 border-dashed rounded-lg p-8 text-center border-muted-foreground/25">
             <div className="space-y-3">
               <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
                 <Upload className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <p className="font-medium">Drop your logo here</p>
+                <p className="font-medium">No logo uploaded yet</p>
                 <p className="text-sm text-muted-foreground">
-                  or click to browse files
+                  Click the button below to upload
                 </p>
               </div>
               <div className="text-xs text-muted-foreground">
@@ -167,27 +122,16 @@ export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: Logo
           </div>
         )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileInputChange}
-          className="hidden"
-          data-testid="input-logo-file"
-        />
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="flex-1"
-            data-testid="button-browse-logo"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {isUploading ? "Uploading..." : uploadedLogo ? "Change Logo" : "Browse Files"}
-          </Button>
-        </div>
+        <ObjectUploader
+          maxNumberOfFiles={1}
+          maxFileSize={5 * 1024 * 1024}
+          onGetUploadParameters={handleGetUploadParameters}
+          onComplete={handleComplete}
+          buttonClassName="w-full"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          {uploadedLogo ? "Change Logo" : "Upload Logo"}
+        </ObjectUploader>
       </CardContent>
     </Card>
   );

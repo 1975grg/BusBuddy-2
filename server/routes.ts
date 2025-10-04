@@ -28,6 +28,7 @@ import {
 } from "@shared/schema";
 import { qrService } from "./qr";
 import { smsService } from "./sms";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Organization Settings Routes
@@ -62,6 +63,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating org settings:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Object Storage Routes (logo upload)
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const { uploadURL, objectPath } = await objectStorageService.getObjectEntityUploadURL();
+      
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Endpoint to set ACL policy after upload
+  app.put("/api/objects/acl", async (req, res) => {
+    try {
+      const { objectPath } = req.body;
+      if (!objectPath) {
+        return res.status(400).json({ error: "objectPath is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const finalPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+        owner: "system",
+        visibility: "public",
+      });
+      
+      res.json({ objectPath: finalPath });
+    } catch (error) {
+      console.error("Error setting ACL policy:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error retrieving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
     }
   });
 
