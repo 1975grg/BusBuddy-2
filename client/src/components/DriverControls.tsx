@@ -35,6 +35,14 @@ export function DriverControls({
   const watchIdRef = useRef<number | null>(null);
   const gpsErrorShownRef = useRef<boolean>(false);
   const watchPositionSucceededRef = useRef<boolean>(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const tripStatusRef = useRef<"stopped" | "active" | "paused">("stopped");
+
+  // Sync refs with state
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+    tripStatusRef.current = tripStatus;
+  }, [sessionId, tripStatus]);
 
   // Initialize state from existing session - handle all session statuses
   useEffect(() => {
@@ -237,17 +245,25 @@ export function DriverControls({
           
           // Set up 5-second interval as backup ONLY after watchPosition succeeds
           locationIntervalRef.current = setInterval(() => {
+            // Check if session is still active before attempting to get location (use refs for current state)
+            if (!sessionIdRef.current || tripStatusRef.current !== "active") {
+              return;
+            }
+            
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 const { latitude, longitude } = position.coords;
                 
-                // Don't send update if previous mutation is still pending (prevents pile-up)
-                if (!updateLocationMutation.isPending) {
-                  updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+                // Double-check session is still active before sending update (use refs for current state)
+                if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+                  updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
                 }
               },
               (error) => {
-                console.error("GPS interval error:", error);
+                // Only log GPS errors if session is still active (use refs for current state)
+                if (sessionIdRef.current && tripStatusRef.current === "active") {
+                  console.error("GPS interval error:", error);
+                }
               },
               {
                 enableHighAccuracy: true,
