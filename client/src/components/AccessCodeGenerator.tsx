@@ -7,43 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Download, QrCode, Link2, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface AccessMethod {
-  type: "qr" | "link" | "password";
-  value: string;
-  label: string;
-}
+import { useQuery } from "@tanstack/react-query";
 
 interface AccessCodeGeneratorProps {
+  routeId: string;
   routeName: string;
   organizationName: string;
   organizationLogo?: string;
 }
 
-export function AccessCodeGenerator({ routeName, organizationName, organizationLogo }: AccessCodeGeneratorProps) {
+export function AccessCodeGenerator({ routeId, routeName, organizationName, organizationLogo }: AccessCodeGeneratorProps) {
   const { toast } = useToast();
   const [selectedMethod, setSelectedMethod] = useState<"qr" | "link" | "password">("qr");
   
-  // TODO: remove mock functionality - replace with real access code generation
-  const mockAccessMethods: AccessMethod[] = [
-    {
-      type: "qr",
-      value: `https://busbuddy.app/track/${routeName.toLowerCase().replace(/\s+/g, '-')}?org=${organizationName}`,
-      label: "QR Code"
-    },
-    {
-      type: "link",
-      value: `https://busbuddy.app/track/${routeName.toLowerCase().replace(/\s+/g, '-')}?org=${organizationName}`,
-      label: "Magic Link"
-    },
-    {
-      type: "password",
-      value: "SCHOOL123",
-      label: "Access Password"
-    }
-  ];
-
-  const currentMethod = mockAccessMethods.find(m => m.type === selectedMethod)!;
+  // Fetch real QR code data from API (same as QrCodeDialog)
+  const { data: qrData, isLoading } = useQuery({
+    queryKey: [`/api/routes/${routeId}/qr`],
+    enabled: !!routeId,
+  });
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -58,70 +39,38 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
   };
 
   const downloadQR = () => {
-    const qrContainer = document.querySelector("#qr-code");
-    const svg = qrContainer?.querySelector("svg");
+    if (!qrData?.qrCodeDataUrl) return;
+
+    const link = document.createElement('a');
+    link.href = qrData.qrCodeDataUrl;
+    link.download = `${routeName.toLowerCase().replace(/\s+/g, '-')}-qr-code.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    if (svg && qrContainer) {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const size = 240; // QR size with padding
-      
-      canvas.width = size;
-      canvas.height = size;
-      
-      if (ctx) {
-        // Fill white background
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, size, size);
-        
-        // Draw QR code
-        const svgData = new XMLSerializer().serializeToString(svg);
-        const qrImg = new Image();
-        
-        qrImg.onload = () => {
-          ctx.drawImage(qrImg, 20, 20, 200, 200);
-          
-          // Add organization logo if present
-          if (organizationLogo) {
-            const logoImg = new Image();
-            logoImg.onload = () => {
-              // Draw logo in bottom-right corner with white background
-              const logoSize = 32;
-              const logoX = size - logoSize - 12;
-              const logoY = size - logoSize - 12;
-              
-              // White background for logo
-              ctx.fillStyle = "white";
-              ctx.fillRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
-              
-              // Border around logo
-              ctx.strokeStyle = "#e5e5e5";
-              ctx.lineWidth = 1;
-              ctx.strokeRect(logoX - 4, logoY - 4, logoSize + 8, logoSize + 8);
-              
-              // Draw logo
-              ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-              
-              // Download the final image
-              const link = document.createElement("a");
-              link.download = `${routeName.toLowerCase().replace(/\s+/g, '-')}-qr-code.png`;
-              link.href = canvas.toDataURL("image/png");
-              link.click();
-            };
-            logoImg.src = organizationLogo;
-          } else {
-            // Download without logo
-            const link = document.createElement("a");
-            link.download = `${routeName.toLowerCase().replace(/\s+/g, '-')}-qr-code.png`;
-            link.href = canvas.toDataURL("image/png");
-            link.click();
-          }
-        };
-        
-        qrImg.src = "data:image/svg+xml;base64," + btoa(svgData);
-      }
-    }
+    toast({
+      title: "QR code downloaded!",
+      description: "The QR code image has been saved to your downloads.",
+    });
   };
+
+  const currentValue = qrData?.url || '';
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <QrCode className="w-5 h-5" />
+            Access Code Generator
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -157,6 +106,7 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
               variant={selectedMethod === "password" ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedMethod("password")}
+              disabled
               data-testid="button-method-password"
             >
               <Key className="w-4 h-4 mr-1" />
@@ -167,29 +117,26 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">{currentMethod.label}</Label>
+            <Label className="text-sm font-medium">
+              {selectedMethod === "qr" ? "QR Code" : selectedMethod === "link" ? "Magic Link" : "Access Password"}
+            </Label>
             <Badge variant="outline">{routeName}</Badge>
           </div>
 
-          {selectedMethod === "qr" && (
+          {selectedMethod === "qr" && qrData?.qrCodeDataUrl && (
             <div className="flex flex-col items-center space-y-3">
-              <div id="qr-code" className="bg-white p-4 rounded-lg relative">
-                <QRCode value={currentMethod.value} size={200} />
-                {organizationLogo && (
-                  <div className="absolute bottom-2 right-2 w-8 h-8 bg-white rounded p-1 shadow-sm">
-                    <img 
-                      src={organizationLogo} 
-                      alt={organizationName}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                )}
+              <div className="bg-white p-4 rounded-lg border">
+                <img 
+                  src={qrData.qrCodeDataUrl} 
+                  alt={`QR code for ${routeName}`}
+                  className="w-48 h-48"
+                />
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => copyToClipboard(currentMethod.value)}
+                  onClick={() => copyToClipboard(currentValue)}
                   data-testid="button-copy-qr"
                 >
                   <Copy className="w-4 h-4 mr-1" />
@@ -211,7 +158,7 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
           {selectedMethod === "link" && (
             <div className="space-y-2">
               <Input
-                value={currentMethod.value}
+                value={currentValue}
                 readOnly
                 className="font-mono text-sm"
                 data-testid="input-magic-link"
@@ -219,7 +166,7 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => copyToClipboard(currentMethod.value)}
+                onClick={() => copyToClipboard(currentValue)}
                 className="w-full"
                 data-testid="button-copy-link"
               >
@@ -230,29 +177,16 @@ export function AccessCodeGenerator({ routeName, organizationName, organizationL
           )}
 
           {selectedMethod === "password" && (
-            <div className="space-y-2">
-              <Input
-                value={currentMethod.value}
-                readOnly
-                className="font-mono text-lg text-center"
-                data-testid="input-access-password"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(currentMethod.value)}
-                className="w-full"
-                data-testid="button-copy-password"
-              >
-                <Copy className="w-4 h-4 mr-1" />
-                Copy Password
-              </Button>
+            <div className="space-y-2 opacity-50">
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Password access coming soon
+              </p>
             </div>
           )}
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Share this {currentMethod.label.toLowerCase()} with riders to give them access to track the {routeName} route.
+          Share this {selectedMethod === "qr" ? "QR code" : selectedMethod === "link" ? "link" : "password"} with riders to give them access to track the {routeName} route.
         </div>
       </CardContent>
     </Card>
