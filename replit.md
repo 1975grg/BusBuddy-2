@@ -111,11 +111,13 @@ Preferred communication style: Simple, everyday language.
 - **Form Validation**: Email validation allows empty string or valid email format
 - **Component**: SendRiderMessageDialog with optional contact information
 
-### Admin Inbox
-- **Location**: /admin/messages (accessible from sidebar Messages link)
-- **Unified View**: Combined rider and driver messages sorted by creation date
-- **Filtering**: All, new, read, resolved status filters
-- **Response Flow**: Click message card to view details and respond inline
+### Support Center
+- **Location**: /admin/support (accessible from sidebar Support link)
+- **Two Tabs**: 
+  - **Inbox**: Unified view of rider and driver messages sorted by creation date
+  - **Alerts**: Send broadcast alerts to all riders on specific routes
+- **Inbox Features**: Filtering (all, new, read, resolved), inline response, mark resolved
+- **Alerts Features**: Send service alerts to routes with SMS notifications to riders with consent
 - **Organization Scoping**: Messages filtered by admin's organization (MVP: uses first org admin)
 
 ### API Endpoints
@@ -173,12 +175,31 @@ Active notifications sent to riders:
 1. **Route Started**: Sent when driver begins the route
 2. **Approaching Stop**: Bus is 2-3 minutes away from rider's home stop
 3. **Arrived at Stop**: Bus has reached rider's home stop
-4. **Service Alerts**: Delays, cancellations, or important updates
+4. **Service Alerts**: Sent when admin creates alert from Support Center Alerts tab
+   - Automatically sent to all riders on route with SMS consent
+   - Alert types: delayed, bus_change, cancelled, general
+   - Severity levels: info, warning, critical
 
 Removed notifications:
 - ~~Route Completed~~ - No longer sent to avoid notification fatigue
 
-### Admin Notification Management
-- **Notifications removed from admin sidebar** - Reduces UI clutter and prevents notification overload
-- **Notification logs available via API** - Admins can still access notification history for debugging
-- **Focus on Messages**: Admin sidebar now emphasizes rider/driver messages over notification logs
+## Admin Dashboard & Navigation
+
+### Dashboard Simplification
+- **Streamlined Metrics**: Reduced from 4 to 2 key metrics
+  - Active Routes (with Live Tracking status)
+  - Support Requests (with attention status)
+- **Action Cards**: Three primary workflows with consistent naming
+  - **Routes**: Create and manage bus routes, vehicles, and stops
+  - **Access**: Add riders/drivers and manage access controls
+  - **Support**: View messages and send alerts
+- **Navigation**: "Add Route" button navigates to Routes page for route creation
+
+### Sidebar Navigation
+- **Consistent Naming**: Simplified titles throughout
+  - Dashboard → Admin dashboard
+  - Routes → Route management
+  - Access → Rider/driver access (previously "Access Management")
+  - Support → Communications hub (previously "Messages")
+  - Settings → Organization settings
+- **Removed**: Notifications page (consolidated into Support Center)
