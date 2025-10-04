@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -64,24 +63,6 @@ export default function App() {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
   };
-
-  // Suppress MapLibre tile abort errors (cosmetic errors during map cleanup)
-  useEffect(() => {
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const message = event.reason?.message || '';
-      if (message.includes('signal is aborted without reason') || 
-          message.includes('The user aborted a request')) {
-        event.preventDefault();
-        event.stopPropagation();
-        return false;
-      }
-    };
-    
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

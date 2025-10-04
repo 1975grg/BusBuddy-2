@@ -44,6 +44,18 @@ Preferred communication style: Simple, everyday language.
 - **Component-driven Development**: Reusable UI components with consistent design system
 - **TCPA Compliance**: SMS consent tracking with opt-out keyword support (STOP, UNSUBSCRIBE, etc.)
 
+### Error Handling & Performance
+- **MapLibre Error Suppression**: Global unhandledrejection handler in index.html suppresses cosmetic tile abort errors
+  - Prevents Vite error overlay from appearing during map navigation/zoom
+  - Runs in capture phase before Vite runtime-error-modal plugin
+  - Filters "signal is aborted" and "user aborted" messages
+- **GPS Tracking Cleanup**: Session and trip status refs cleared before stopping GPS to prevent lingering interval callbacks
+  - Prevents "GPS interval error" after trip ends
+  - Refs checked in interval callback to ensure session is still active
+- **Access Management Scalability**: Select dropdown used instead of tabs to handle 13+ active routes efficiently
+  - Routes displayed alphabetically (matching Routes page default)
+  - No UI overflow issues with large route counts
+
 ## External Dependencies
 
 ### Core Infrastructure
