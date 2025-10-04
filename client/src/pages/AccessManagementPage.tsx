@@ -3,8 +3,8 @@ import { AccessCodeGenerator } from "@/components/AccessCodeGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Shield, Trash2, RotateCcw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users, Shield, Trash2, RotateCcw, Bus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Route } from "@shared/schema";
 
@@ -72,23 +72,29 @@ export default function AccessManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Access Management</h1>
-        <p className="text-muted-foreground">Generate access codes and manage rider permissions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Access Management</h1>
+          <p className="text-muted-foreground">Generate access codes and manage rider permissions</p>
+        </div>
+        <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+          <SelectTrigger className="w-64" data-testid="select-route">
+            <Bus className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Select route" />
+          </SelectTrigger>
+          <SelectContent>
+            {activeRoutes.map((route) => (
+              <SelectItem key={route.id} value={route.id} data-testid={`option-route-${route.id}`}>
+                {route.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <Tabs value={selectedRoute} onValueChange={setSelectedRoute}>
-        <TabsList className={`grid w-full ${activeRoutes.length === 1 ? 'grid-cols-1' : activeRoutes.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-          {activeRoutes.map((route) => (
-            <TabsTrigger key={route.id} value={route.id} className="text-sm" data-testid={`tab-route-${route.id}`}>
-              {route.name}
-              <Badge variant="secondary" className="ml-2">0</Badge>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {activeRoutes.map((route) => (
-          <TabsContent key={route.id} value={route.id} className="space-y-6">
+      {activeRoutes.map((route) => (
+        selectedRoute === route.id && (
+          <div key={route.id} className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <AccessCodeGenerator 
                 routeId={route.id}
@@ -166,9 +172,9 @@ export default function AccessManagementPage() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-        ))}
-      </Tabs>
+          </div>
+        )
+      ))}
     </div>
   );
 }

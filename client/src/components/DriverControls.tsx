@@ -124,7 +124,14 @@ export function DriverControls({
       return response.json();
     },
     onSuccess: () => {
+      // Clear refs FIRST before stopping GPS tracking
+      sessionIdRef.current = null;
+      tripStatusRef.current = "stopped";
+      
+      // Then stop GPS tracking
       stopGPSTracking();
+      
+      // Finally update state
       setTripStatus("stopped");
       setSessionId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/route-sessions/active", routeId] });
@@ -151,7 +158,13 @@ export function DriverControls({
       return response.json();
     },
     onSuccess: () => {
+      // Clear refs FIRST
+      tripStatusRef.current = "paused";
+      
+      // Then stop GPS tracking
       stopGPSTracking();
+      
+      // Finally update state
       setTripStatus("paused");
       queryClient.invalidateQueries({ queryKey: ["/api/route-sessions/active", routeId] });
       toast({ 

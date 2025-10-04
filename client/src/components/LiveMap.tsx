@@ -28,14 +28,6 @@ export function LiveMap({ buses, className }: LiveMapProps) {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Add global error handler to suppress MapLibre tile abort errors (cosmetic errors during cleanup)
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason?.message?.includes('signal is aborted without reason')) {
-        event.preventDefault(); // Suppress the error overlay
-      }
-    };
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
     try {
       // Default center (will adjust to first bus location)
       const defaultCenter: [number, number] = [-79.9481, 39.6567]; // Morgantown, WV area
@@ -77,7 +69,6 @@ export function LiveMap({ buses, className }: LiveMapProps) {
     }
 
     return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       if (map.current) {
         map.current.remove();
         map.current = null;
