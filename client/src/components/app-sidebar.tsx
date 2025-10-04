@@ -122,12 +122,6 @@ export function AppSidebar() {
       icon: MessageSquare,
     },
     {
-      title: "Notifications",
-      url: "/admin/notifications",
-      icon: Zap,
-      badge: "89 Sent"
-    },
-    {
       title: "Settings",
       url: "/admin/settings",
       icon: Settings,

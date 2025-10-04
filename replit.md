@@ -149,3 +149,36 @@ Preferred communication style: Simple, everyday language.
 - Admin inbox uses first org admin lookup (not session-based auth)
 - Works correctly for single-organization deployments
 - Multi-organization production requires proper authentication context integration
+
+## Rider Experience & Notifications
+
+### Route Assignment
+- **Single Route Access**: Riders are locked to their assigned route after QR code onboarding
+- **No Route Switching**: Rider page (/rider) does not allow switching between routes - they only see their assigned route
+- **URL-based Access**: Route ID passed via query parameter (`?route=<route_id>`) determines which route they track
+- **Persistent Access**: Once onboarded, riders access their route via the unique QR code or magic link
+
+### Stop Preferences & Notifications
+- **Home Stop Selection**: During onboarding, riders select their home stop (where they get picked up/dropped off)
+- **Bidirectional Notifications**: Single home stop subscription works for both:
+  - Morning: Bus approaching home for pickup to school
+  - Afternoon: Bus approaching home for dropoff from school
+- **Stop-Specific Alerts**: Only riders with preferences for a specific stop receive notifications when the bus approaches that stop
+- **Geofencing Radii**:
+  - Approaching notification: 800ft radius (~2-3 minutes before arrival)
+  - Arrival notification: 250ft radius (at the stop)
+
+### SMS Notification Types
+Active notifications sent to riders:
+1. **Route Started**: Sent when driver begins the route
+2. **Approaching Stop**: Bus is 2-3 minutes away from rider's home stop
+3. **Arrived at Stop**: Bus has reached rider's home stop
+4. **Service Alerts**: Delays, cancellations, or important updates
+
+Removed notifications:
+- ~~Route Completed~~ - No longer sent to avoid notification fatigue
+
+### Admin Notification Management
+- **Notifications removed from admin sidebar** - Reduces UI clutter and prevents notification overload
+- **Notification logs available via API** - Admins can still access notification history for debugging
+- **Focus on Messages**: Admin sidebar now emphasizes rider/driver messages over notification logs

@@ -177,7 +177,7 @@ export const notificationLog = pgTable("notification_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   riderProfileId: varchar("rider_profile_id").references(() => riderProfiles.id),
   routeSessionId: varchar("route_session_id").references(() => routeSessions.id),
-  type: text("type").notNull(), // 'route_started', 'approaching_stop', 'arrived_at_stop', 'route_completed', 'service_alert'
+  type: text("type").notNull(), // 'route_started', 'approaching_stop', 'arrived_at_stop', 'service_alert'
   method: text("method").notNull(), // 'sms', 'email', 'push'
   recipient: text("recipient").notNull(), // phone number or email
   message: text("message").notNull(),
@@ -471,7 +471,7 @@ export const messageStatusEnum = z.enum(["new", "read", "resolved"]);
 export const notificationMethodEnum = z.enum(["sms", "email", "both"]);
 export const notificationModeEnum = z.enum(["always", "manual"]);
 export const routeSessionStatusEnum = z.enum(["pending", "active", "completed", "cancelled"]);
-export const notificationTypeEnum = z.enum(["route_started", "approaching_stop", "arrived_at_stop", "route_completed", "service_alert"]);
+export const notificationTypeEnum = z.enum(["route_started", "approaching_stop", "arrived_at_stop", "service_alert"]);
 export const notificationDeliveryMethodEnum = z.enum(["sms", "email", "push"]);
 export const notificationStatusEnum = z.enum(["pending", "sent", "failed"]);
 export const dayOfWeekEnum = z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);

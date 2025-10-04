@@ -77,14 +77,6 @@ export class SmsService {
   }
 
   /**
-   * Send route completed notification
-   */
-  async sendRouteCompletedNotification(to: string, routeName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const message = `🚌 Bus Buddy: The ${routeName} route has been completed. Thank you for riding with us!`;
-    return this.sendSms(to, message);
-  }
-
-  /**
    * Send welcome message to new rider
    */
   async sendWelcomeMessage(to: string, routeName: string, organizationName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {

@@ -1,32 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RiderTracker } from "@/components/RiderTracker";
 import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Star, Route, Clock, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import type { ServiceAlert } from "@shared/schema";
 
 export default function RiderPage() {
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   
-  // Extract route ID from URL query parameter using window.location.search
+  // Extract route ID from URL query parameter - riders are locked to their assigned route
   const urlParams = new URLSearchParams(window.location.search);
   const routeId = urlParams.get('route');
   
-  // Use real route ID if provided, otherwise use mock route for development
-  const [selectedRoute, setSelectedRoute] = useState(routeId || "main-campus-loop");
-  
-  // Update selectedRoute when URL changes
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentRouteId = urlParams.get('route');
-    if (currentRouteId) {
-      setSelectedRoute(currentRouteId);
-    }
-  }, []);
+  // No route switching allowed - riders only see their assigned route
+  const selectedRoute = routeId || "main-campus-loop";
   
   // TODO: remove mock functionality - replace with real rider data and preferences
   const mockSavedRoutes = [
@@ -90,76 +79,13 @@ export default function RiderPage() {
       ]
     } : null);
 
-  const toggleFavorite = (routeId: string) => {
-    console.log(`Toggle favorite for route ${routeId}`);
-  };
-
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Track Your Bus</h1>
-        <p className="text-muted-foreground">Real-time location and arrival estimates</p>
+        <p className="text-muted-foreground">Real-time location and arrival estimates for your route</p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Route className="w-5 h-5" />
-            My Routes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {mockSavedRoutes.map((route) => (
-              <div
-                key={route.id}
-                className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                  selectedRoute === route.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                }`}
-                onClick={() => setSelectedRoute(route.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(route.id);
-                    }}
-                    data-testid={`button-favorite-${route.id}`}
-                  >
-                    <Star className={`w-4 h-4 ${
-                      route.isFavorite ? "fill-yellow-400 text-yellow-400" : ""
-                    }`} />
-                  </Button>
-                  <div>
-                    <p className="font-medium">{route.name}</p>
-                    <p className="text-sm text-muted-foreground">{route.busName}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {route.status === "active" && (
-                    <Badge className="bg-bus-active text-white">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {route.stops.find(s => s.isNext)?.eta}
-                    </Badge>
-                  )}
-                  {route.status === "delayed" && (
-                    <Badge className="bg-bus-delayed text-white">Delayed</Badge>
-                  )}
-                  {selectedRoute === route.id && (
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
 
       {currentRoute && (
         <RiderTracker
