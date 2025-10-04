@@ -1,29 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Route, Zap, Mail, AlertTriangle, Plus } from "lucide-react";
+import { Users, Route, MessageSquare, Plus } from "lucide-react";
 
 interface DashboardStats {
   activeRoutes: number;
-  totalRiders: number;
-  notificationsSent: number;
-  issuesReported: number;
+  supportRequests: number;
 }
 
 interface AdminDashboardProps {
   organizationName: string;
   stats: DashboardStats;
-  onAddRoute?: () => void;
-  onManageUsers?: () => void;
-  onViewNotifications?: () => void;
+  onManageRoutes?: () => void;
+  onManageAccess?: () => void;
+  onOpenSupport?: () => void;
 }
 
 export function AdminDashboard({ 
   organizationName, 
   stats, 
-  onAddRoute, 
-  onManageUsers, 
-  onViewNotifications 
+  onManageRoutes,
+  onManageAccess, 
+  onOpenSupport 
 }: AdminDashboardProps) {
   return (
     <div className="space-y-6">
@@ -32,15 +30,16 @@ export function AdminDashboard({
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">{organizationName}</p>
         </div>
-        <Button onClick={onAddRoute} data-testid="button-add-route">
+        <Button onClick={onManageRoutes} data-testid="button-add-route">
           <Plus className="w-4 h-4 mr-2" />
           Add Route
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Compact Status Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Routes</CardTitle>
             <Route className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -53,58 +52,33 @@ export function AdminDashboard({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Riders</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Support Requests</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalRiders}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Currently tracking
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Notifications Sent</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.notificationsSent}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Last 24 hours
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Issues Reported</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.issuesReported}</div>
-            <Badge variant={stats.issuesReported > 0 ? "destructive" : "secondary"} className="mt-1">
-              {stats.issuesReported > 0 ? "Needs Attention" : "All Clear"}
+            <div className="text-2xl font-bold">{stats.supportRequests}</div>
+            <Badge variant={stats.supportRequests > 0 ? "destructive" : "secondary"} className="mt-1">
+              {stats.supportRequests > 0 ? "Needs Attention" : "All Clear"}
             </Badge>
           </CardContent>
         </Card>
       </div>
 
+      {/* Main Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="hover-elevate">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Route className="w-5 h-5" />
-              Route Management
+              Routes
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
               Create and manage bus routes, assign vehicles, and set up stops.
             </p>
-            <Button className="w-full" onClick={onAddRoute} data-testid="button-manage-routes">
+            <Button className="w-full" onClick={onManageRoutes} data-testid="button-manage-routes">
               Manage Routes
             </Button>
           </CardContent>
@@ -114,14 +88,14 @@ export function AdminDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              User Access
+              Access
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Generate QR codes, manage passwords, and control rider access.
+              Add riders and drivers, generate QR codes, and manage access.
             </p>
-            <Button className="w-full" variant="outline" onClick={onManageUsers} data-testid="button-manage-users">
+            <Button className="w-full" variant="outline" onClick={onManageAccess} data-testid="button-manage-access">
               Manage Access
             </Button>
           </CardContent>
@@ -130,16 +104,16 @@ export function AdminDashboard({
         <Card className="hover-elevate">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              Notifications
+              <MessageSquare className="w-5 h-5" />
+              Support
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              View notification activity and manage alert preferences.
+              View rider and driver messages, send alerts to routes.
             </p>
-            <Button className="w-full" variant="outline" onClick={onViewNotifications} data-testid="button-view-notifications">
-              View Activity
+            <Button className="w-full" variant="outline" onClick={onOpenSupport} data-testid="button-open-support">
+              Open Support
             </Button>
           </CardContent>
         </Card>

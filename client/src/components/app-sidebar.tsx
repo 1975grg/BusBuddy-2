@@ -112,13 +112,13 @@ export function AppSidebar() {
       badge: activeRoutesCount > 0 ? `${activeRoutesCount} Active` : undefined
     },
     {
-      title: "Access Management", 
+      title: "Access", 
       url: "/admin/access",
       icon: Users,
     },
     {
-      title: "Messages",
-      url: "/admin/messages",
+      title: "Support",
+      url: "/admin/support",
       icon: MessageSquare,
     },
     {
