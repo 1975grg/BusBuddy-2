@@ -303,7 +303,8 @@ export class DatabaseStorage implements IStorage {
           // Active until is null (no expiry) or in the future
           sql`${serviceAlerts.activeUntil} IS NULL OR ${serviceAlerts.activeUntil} > ${now}`
         )
-      );
+      )
+      .orderBy(desc(serviceAlerts.createdAt)); // Newest first
   }
 
   async deactivateServiceAlert(id: string): Promise<boolean> {
@@ -414,22 +415,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]> {
+    // Filter out archived messages and sort by: newest date first, critical priority first within same day
     return await db.select().from(driverMessages)
       .where(
         and(
           eq(driverMessages.routeId, routeId),
-          eq(driverMessages.isActive, true)
+          eq(driverMessages.isActive, true),
+          isNull(driverMessages.archivedAt)
         )
+      )
+      .orderBy(
+        desc(driverMessages.createdAt),
+        sql`CASE WHEN ${driverMessages.priority} = 'critical' THEN 1 WHEN ${driverMessages.priority} = 'high' THEN 2 ELSE 3 END`
       );
   }
 
   async getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]> {
+    // Filter out archived messages and sort by: newest date first, critical priority first within same day
     return await db.select().from(driverMessages)
       .where(
         and(
           eq(driverMessages.organizationId, organizationId),
-          eq(driverMessages.isActive, true)
+          eq(driverMessages.isActive, true),
+          isNull(driverMessages.archivedAt)
         )
+      )
+      .orderBy(
+        desc(driverMessages.createdAt),
+        sql`CASE WHEN ${driverMessages.priority} = 'critical' THEN 1 WHEN ${driverMessages.priority} = 'high' THEN 2 ELSE 3 END`
       );
   }
 
@@ -449,6 +462,41 @@ export class DatabaseStorage implements IStorage {
         respondedAt: new Date(),
         status: "responded"
       })
+      .where(eq(driverMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async archiveDriverMessage(id: string, archivedByUserId: string): Promise<DriverMessage | undefined> {
+    const [message] = await db.update(driverMessages)
+      .set({ 
+        archivedAt: new Date(),
+        archivedByUserId
+      })
+      .where(eq(driverMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async restoreDriverMessage(id: string): Promise<DriverMessage | undefined> {
+    const [message] = await db.update(driverMessages)
+      .set({ 
+        archivedAt: null,
+        archivedByUserId: null
+      })
+      .where(eq(driverMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async deleteDriverMessage(id: string): Promise<boolean> {
+    const result = await db.delete(driverMessages).where(eq(driverMessages.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateDriverMessagePriority(id: string, priority: string): Promise<DriverMessage | undefined> {
+    const [message] = await db.update(driverMessages)
+      .set({ priority })
       .where(eq(driverMessages.id, id))
       .returning();
     return message || undefined;
@@ -1090,6 +1138,22 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
+  async archiveRiderMessage(id: string, archivedByUserId: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
+  async restoreRiderMessage(id: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
+  async deleteRiderMessage(id: string): Promise<boolean> {
+    return false;
+  }
+
+  async updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
   // Driver messages (Drivers → Admin) - Stub implementations for MemStorage
   async createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage> {
     throw new Error("Driver messages not implemented in MemStorage");
@@ -1108,6 +1172,22 @@ export class MemStorage implements IStorage {
   }
 
   async respondToDriverMessage(id: string, response: string, respondedByUserId: string): Promise<DriverMessage | undefined> {
+    return undefined;
+  }
+
+  async archiveDriverMessage(id: string, archivedByUserId: string): Promise<DriverMessage | undefined> {
+    return undefined;
+  }
+
+  async restoreDriverMessage(id: string): Promise<DriverMessage | undefined> {
+    return undefined;
+  }
+
+  async deleteDriverMessage(id: string): Promise<boolean> {
+    return false;
+  }
+
+  async updateDriverMessagePriority(id: string, priority: string): Promise<DriverMessage | undefined> {
     return undefined;
   }
 
