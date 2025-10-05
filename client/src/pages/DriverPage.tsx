@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DriverControls } from "@/components/DriverControls";
 import { LiveMap } from "@/components/LiveMap";
 import { SendDriverMessageDialog } from "@/components/SendDriverMessageDialog";
+import { MessageHistory } from "@/components/MessageHistory";
+import { DriverServiceAlerts } from "@/components/DriverServiceAlerts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -316,6 +318,10 @@ export default function DriverPage() {
             open={messageDialogOpen}
             onOpenChange={setMessageDialogOpen}
           />
+
+          <DriverServiceAlerts routeId={selectedRoute} />
+
+          <MessageHistory userType="driver" routeId={selectedRoute} userId={currentUser.id} />
         </>
       )}
     </div>
