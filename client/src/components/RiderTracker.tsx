@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bell, BellOff, Clock, MapPin, Star, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
+import { MessageHistory } from "./MessageHistory";
 import type { ServiceAlert } from "@shared/schema";
 
 interface Stop {
@@ -266,6 +267,8 @@ export function RiderTracker({
           </div>
         </CardContent>
       </Card>
+
+      <MessageHistory userType="rider" routeId={routeId} />
     </div>
   );
 }
