@@ -54,12 +54,15 @@ export function RiderTracker({
     enabled: !!routeId,
   });
 
+  // Use calculated status from backend, fallback to prop status
+  const currentStatus = (activeSession?.calculatedStatus as "active" | "delayed" | "offline") || status;
+
   // Convert active session to bus data for LiveMap
   const buses = activeSession?.currentLatitude && activeSession?.currentLongitude ? [
     {
       id: activeSession.id,
       name: busName,
-      status: activeSession.status === 'active' ? status : 'offline' as const,
+      status: currentStatus,
       lat: Number(activeSession.currentLatitude),
       lng: Number(activeSession.currentLongitude),
       eta: stops.find(s => s.isNext)?.eta || "N/A",
@@ -121,13 +124,13 @@ export function RiderTracker({
   };
 
   const getStatusBadge = () => {
-    switch (status) {
+    switch (currentStatus) {
       case "active":
-        return <Badge className="bg-bus-active text-white">On Time</Badge>;
+        return <Badge className="bg-bus-active text-white" data-testid="badge-bus-active">On Time</Badge>;
       case "delayed":
-        return <Badge className="bg-bus-delayed text-white">Delayed</Badge>;
+        return <Badge className="bg-bus-delayed text-white" data-testid="badge-bus-delayed">Delayed</Badge>;
       case "offline":
-        return <Badge className="bg-bus-offline text-white">Offline</Badge>;
+        return <Badge className="bg-bus-offline text-white" data-testid="badge-bus-offline">Offline</Badge>;
     }
   };
 
