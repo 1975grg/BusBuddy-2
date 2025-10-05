@@ -1105,12 +1105,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/rider-messages/:id/priority", async (req, res) => {
     try {
       const { id } = req.params;
-      const { priority } = req.body;
       
-      if (!priority || !['critical', 'high', 'normal'].includes(priority)) {
-        return res.status(400).json({ error: "Valid priority (critical, high, normal) is required" });
-      }
+      // Validate priority using Zod schema
+      const prioritySchema = z.object({
+        priority: z.enum(['critical', 'high', 'normal'])
+      });
       
+      const { priority } = prioritySchema.parse(req.body);
       const message = await storage.updateRiderMessagePriority(id, priority);
       
       if (!message) {
@@ -1119,6 +1120,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(message);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Invalid priority value", details: error.errors });
+      }
       console.error("Error updating rider message priority:", error);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -1260,12 +1264,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/driver-messages/:id/priority", async (req, res) => {
     try {
       const { id } = req.params;
-      const { priority } = req.body;
       
-      if (!priority || !['critical', 'high', 'normal'].includes(priority)) {
-        return res.status(400).json({ error: "Valid priority (critical, high, normal) is required" });
-      }
+      // Validate priority using Zod schema
+      const prioritySchema = z.object({
+        priority: z.enum(['critical', 'high', 'normal'])
+      });
       
+      const { priority } = prioritySchema.parse(req.body);
       const message = await storage.updateDriverMessagePriority(id, priority);
       
       if (!message) {
@@ -1274,6 +1279,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(message);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Invalid priority value", details: error.errors });
+      }
       console.error("Error updating driver message priority:", error);
       res.status(500).json({ error: "Internal server error" });
     }
