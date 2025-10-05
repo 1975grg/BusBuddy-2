@@ -1048,6 +1048,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/rider-messages/:id/archive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { archived_by_user_id } = req.body;
+      
+      if (!archived_by_user_id) {
+        return res.status(400).json({ error: "archived_by_user_id is required" });
+      }
+      
+      const message = await storage.archiveRiderMessage(id, archived_by_user_id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error archiving rider message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/rider-messages/:id/restore", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.restoreRiderMessage(id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error restoring rider message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/rider-messages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteRiderMessage(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting rider message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/rider-messages/:id/priority", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { priority } = req.body;
+      
+      if (!priority || !['critical', 'high', 'normal'].includes(priority)) {
+        return res.status(400).json({ error: "Valid priority (critical, high, normal) is required" });
+      }
+      
+      const message = await storage.updateRiderMessagePriority(id, priority);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error updating rider message priority:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Driver Message Routes (Drivers → Admin)
   app.post("/api/driver-messages", async (req, res) => {
     try {
@@ -1123,6 +1199,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response to driver message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/archive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { archived_by_user_id } = req.body;
+      
+      if (!archived_by_user_id) {
+        return res.status(400).json({ error: "archived_by_user_id is required" });
+      }
+      
+      const message = await storage.archiveDriverMessage(id, archived_by_user_id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error archiving driver message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/restore", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.restoreDriverMessage(id);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error restoring driver message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/driver-messages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteDriverMessage(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting driver message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/priority", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { priority } = req.body;
+      
+      if (!priority || !['critical', 'high', 'normal'].includes(priority)) {
+        return res.status(400).json({ error: "Valid priority (critical, high, normal) is required" });
+      }
+      
+      const message = await storage.updateDriverMessagePriority(id, priority);
+      
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Error updating driver message priority:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
