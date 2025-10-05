@@ -41,7 +41,7 @@ import {
   notificationLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -91,6 +91,10 @@ export interface IStorage {
   // Rider messages (Riders → Admin)  
   createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
   getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]>;
+  archiveRiderMessage(id: string, archivedByUserId: string): Promise<RiderMessage | undefined>;
+  restoreRiderMessage(id: string): Promise<RiderMessage | undefined>;
+  deleteRiderMessage(id: string): Promise<boolean>;
+  updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined>;
   
   // Driver messages (Drivers → Admin)
   createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage>;
@@ -98,6 +102,10 @@ export interface IStorage {
   getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]>;
   updateDriverMessageStatus(id: string, status: string): Promise<DriverMessage | undefined>;
   respondToDriverMessage(id: string, response: string, respondedByUserId: string): Promise<DriverMessage | undefined>;
+  archiveDriverMessage(id: string, archivedByUserId: string): Promise<DriverMessage | undefined>;
+  restoreDriverMessage(id: string): Promise<DriverMessage | undefined>;
+  deleteDriverMessage(id: string): Promise<boolean>;
+  updateDriverMessagePriority(id: string, priority: string): Promise<DriverMessage | undefined>;
   
   // Rider profiles management
   createRiderProfile(profile: InsertRiderProfile): Promise<RiderProfile>;
@@ -312,22 +320,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]> {
+    // Filter out archived messages and sort by: newest date first, critical priority first within same day
     return await db.select().from(riderMessages)
       .where(
         and(
           eq(riderMessages.routeId, routeId),
-          eq(riderMessages.isActive, true)
+          eq(riderMessages.isActive, true),
+          isNull(riderMessages.archivedAt)
         )
+      )
+      .orderBy(
+        desc(riderMessages.createdAt),
+        sql`CASE WHEN ${riderMessages.priority} = 'critical' THEN 1 WHEN ${riderMessages.priority} = 'high' THEN 2 ELSE 3 END`
       );
   }
 
   async getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]> {
+    // Filter out archived messages and sort by: newest date first, critical priority first within same day
     return await db.select().from(riderMessages)
       .where(
         and(
           eq(riderMessages.organizationId, organizationId),
-          eq(riderMessages.isActive, true)
+          eq(riderMessages.isActive, true),
+          isNull(riderMessages.archivedAt)
         )
+      )
+      .orderBy(
+        desc(riderMessages.createdAt),
+        sql`CASE WHEN ${riderMessages.priority} = 'critical' THEN 1 WHEN ${riderMessages.priority} = 'high' THEN 2 ELSE 3 END`
       );
   }
 
@@ -347,6 +367,41 @@ export class DatabaseStorage implements IStorage {
         respondedAt: new Date(),
         status: "responded"
       })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async archiveRiderMessage(id: string, archivedByUserId: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ 
+        archivedAt: new Date(),
+        archivedByUserId
+      })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async restoreRiderMessage(id: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ 
+        archivedAt: null,
+        archivedByUserId: null
+      })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async deleteRiderMessage(id: string): Promise<boolean> {
+    const result = await db.delete(riderMessages).where(eq(riderMessages.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ priority })
       .where(eq(riderMessages.id, id))
       .returning();
     return message || undefined;
