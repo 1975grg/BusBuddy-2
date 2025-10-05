@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { RiderMessage, DriverMessage, Route } from "@shared/schema";
 
 type Message = (RiderMessage | DriverMessage) & { messageType: 'rider' | 'driver' };
@@ -19,6 +20,7 @@ export default function SupportCenterPage() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [responseText, setResponseText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
 
@@ -67,13 +69,25 @@ export default function SupportCenterPage() {
   const allMessages: Message[] = [
     ...riderMessages.map(m => ({ ...m, messageType: 'rider' as const })),
     ...driverMessages.map(m => ({ ...m, messageType: 'driver' as const }))
-  ].sort((a, b) => {
+  ].filter(m => {
+    // Filter out archived messages unless showArchived is enabled
+    if (!showArchived && m.archivedAt) return false;
+    return true;
+  }).sort((a, b) => {
     const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return bTime - aTime;
+    
+    // Sort by date (newest first)
+    if (aTime !== bTime) return bTime - aTime;
+    
+    // If same date, sort by priority (critical first)
+    const priorityOrder = { critical: 0, high: 1, normal: 2 };
+    const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2;
+    const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2;
+    return aPriority - bPriority;
   });
 
-  // Filter messages
+  // Filter messages by status
   const filteredMessages = statusFilter === "all" 
     ? allMessages 
     : allMessages.filter(m => m.status === statusFilter);
@@ -118,6 +132,56 @@ export default function SupportCenterPage() {
     }
   });
 
+  // Archive message mutation
+  const archiveMutation = useMutation({
+    mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      const endpoint = messageType === 'rider'
+        ? `/api/rider-messages/${id}/archive`
+        : `/api/driver-messages/${id}/archive`;
+      
+      return await apiRequest("PATCH", endpoint, { archived_by_user_id: currentAdmin?.id || "" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      setSelectedMessage(null);
+      toast({ title: "Message archived successfully" });
+    }
+  });
+
+  // Restore message mutation
+  const restoreMutation = useMutation({
+    mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      const endpoint = messageType === 'rider'
+        ? `/api/rider-messages/${id}/restore`
+        : `/api/driver-messages/${id}/restore`;
+      
+      return await apiRequest("PATCH", endpoint, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      toast({ title: "Message restored successfully" });
+    }
+  });
+
+  // Delete message mutation
+  const deleteMutation = useMutation({
+    mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      const endpoint = messageType === 'rider'
+        ? `/api/rider-messages/${id}`
+        : `/api/driver-messages/${id}`;
+      
+      return await apiRequest("DELETE", endpoint, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      setSelectedMessage(null);
+      toast({ title: "Message deleted successfully" });
+    }
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "new":
@@ -128,6 +192,18 @@ export default function SupportCenterPage() {
         return <Badge className="bg-green-500 text-white">Resolved</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case "critical":
+        return <Badge className="bg-red-500 text-white" data-testid="badge-priority-critical"><AlertCircle className="w-3 h-3 mr-1" />Critical</Badge>;
+      case "high":
+        return <Badge className="bg-orange-500 text-white">High</Badge>;
+      case "normal":
+      default:
+        return null; // Don't show badge for normal priority
     }
   };
 
@@ -178,22 +254,35 @@ export default function SupportCenterPage() {
         <TabsContent value="inbox" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5" />
                   Message Inbox
                 </CardTitle>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40" data-testid="select-status-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Messages</SelectItem>
-                    <SelectItem value="new">New</SelectItem>
-                    <SelectItem value="read">Read</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="show-archived" 
+                      checked={showArchived}
+                      onCheckedChange={(checked) => setShowArchived(!!checked)}
+                      data-testid="checkbox-show-archived"
+                    />
+                    <label htmlFor="show-archived" className="text-sm cursor-pointer">
+                      Show archived
+                    </label>
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-status-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Messages</SelectItem>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="read">Read</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -223,7 +312,11 @@ export default function SupportCenterPage() {
                                     : `Driver`}
                                 </span>
                               </div>
-                              {getStatusBadge(message.status)}
+                              <div className="flex items-center gap-1">
+                                {message.priority && getPriorityBadge(message.priority)}
+                                {getStatusBadge(message.status)}
+                                {message.archivedAt && <Badge variant="secondary" className="text-xs"><Archive className="w-3 h-3 mr-1" />Archived</Badge>}
+                              </div>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">{message.message}</p>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -242,21 +335,64 @@ export default function SupportCenterPage() {
                   {selectedMessage ? (
                     <Card>
                       <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="flex items-center gap-2 text-lg">
-                            {getMessageTypeIcon(selectedMessage.messageType)}
-                            Message Details
-                          </CardTitle>
-                          {selectedMessage.status !== "resolved" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleMarkResolved(selectedMessage)}
-                              data-testid="button-mark-resolved"
-                            >
-                              Mark Resolved
-                            </Button>
-                          )}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                              {getMessageTypeIcon(selectedMessage.messageType)}
+                              Message Details
+                            </CardTitle>
+                            {selectedMessage.status !== "resolved" && !selectedMessage.archivedAt && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMarkResolved(selectedMessage)}
+                                data-testid="button-mark-resolved"
+                              >
+                                Mark Resolved
+                              </Button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {selectedMessage.archivedAt ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => restoreMutation.mutate({ id: selectedMessage.id, messageType: selectedMessage.messageType })}
+                                  disabled={restoreMutation.isPending}
+                                  data-testid="button-restore-message"
+                                >
+                                  <ArchiveRestore className="w-4 h-4 mr-2" />
+                                  Restore
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (confirm("Permanently delete this message?")) {
+                                      deleteMutation.mutate({ id: selectedMessage.id, messageType: selectedMessage.messageType });
+                                    }
+                                  }}
+                                  disabled={deleteMutation.isPending}
+                                  data-testid="button-delete-message"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => archiveMutation.mutate({ id: selectedMessage.id, messageType: selectedMessage.messageType })}
+                                disabled={archiveMutation.isPending}
+                                data-testid="button-archive-message"
+                              >
+                                <Archive className="w-4 h-4 mr-2" />
+                                Archive
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
