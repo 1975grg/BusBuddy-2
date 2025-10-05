@@ -56,6 +56,8 @@ export const routeStops = pgTable("route_stops", {
   // Geofencing radii for proximity notifications (in feet)
   approachingRadiusFt: integer("approaching_radius_ft").notNull().default(800), // Notify when bus is 800ft away
   arrivalRadiusFt: integer("arrival_radius_ft").notNull().default(250), // Notify when bus arrives (250ft)
+  // Scheduled arrival time in minutes from route start (e.g., 0, 5, 10, 15 for stops at 0min, 5min, 10min, 15min)
+  scheduledArrivalMinutes: integer("scheduled_arrival_minutes"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -383,6 +385,7 @@ export const insertRouteStopSchema = createInsertSchema(routeStops).pick({
   longitude: true,
   approachingRadiusFt: true,
   arrivalRadiusFt: true,
+  scheduledArrivalMinutes: true,
 });
 
 export const insertServiceAlertSchema = createInsertSchema(serviceAlerts).pick({
