@@ -29,6 +29,7 @@ import {
 import { qrService } from "./qr";
 import { smsService } from "./sms";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { calculateBusStatus } from "./busStatusCalculator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Organization Settings Routes
@@ -589,7 +590,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "No active session found for this route" });
       }
       
-      res.json(session);
+      const stops = await storage.getRouteStopsByRoute(routeId);
+      const { status, minutesBehindSchedule } = calculateBusStatus(session, stops);
+      
+      res.json({
+        ...session,
+        calculatedStatus: status,
+        minutesBehindSchedule
+      });
     } catch (error) {
       console.error("Error fetching active session:", error);
       res.status(500).json({ error: "Internal server error" });
