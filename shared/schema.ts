@@ -89,9 +89,12 @@ export const riderMessages = pgTable("rider_messages", {
   riderEmail: text("rider_email"), // Optional contact info
   userId: varchar("user_id").references(() => users.id), // For logged-in riders
   status: text("status").notNull().default("new"), // 'new', 'read', 'resolved'
+  priority: text("priority").notNull().default("normal"), // 'critical', 'high', 'normal'
   adminResponse: text("admin_response"), // Admin reply
   respondedByUserId: varchar("responded_by_user_id").references(() => users.id),
   respondedAt: timestamp("responded_at"),
+  archivedAt: timestamp("archived_at"),
+  archivedByUserId: varchar("archived_by_user_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -105,9 +108,12 @@ export const driverMessages = pgTable("driver_messages", {
   type: text("type").notNull(), // 'route_issue', 'vehicle_problem', 'schedule_change', 'general'
   message: text("message").notNull(),
   status: text("status").notNull().default("new"), // 'new', 'read', 'resolved'
+  priority: text("priority").notNull().default("normal"), // 'critical', 'high', 'normal'
   adminResponse: text("admin_response"), // Admin reply
   respondedByUserId: varchar("responded_by_user_id").references(() => users.id),
   respondedAt: timestamp("responded_at"),
+  archivedAt: timestamp("archived_at"),
+  archivedByUserId: varchar("archived_by_user_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -256,6 +262,10 @@ export const riderMessagesRelations = relations(riderMessages, ({ one }) => ({
     fields: [riderMessages.respondedByUserId],
     references: [users.id],
   }),
+  archivedBy: one(users, {
+    fields: [riderMessages.archivedByUserId],
+    references: [users.id],
+  }),
 }));
 
 export const driverMessagesRelations = relations(driverMessages, ({ one }) => ({
@@ -273,6 +283,10 @@ export const driverMessagesRelations = relations(driverMessages, ({ one }) => ({
   }),
   respondedBy: one(users, {
     fields: [driverMessages.respondedByUserId],
+    references: [users.id],
+  }),
+  archivedBy: one(users, {
+    fields: [driverMessages.archivedByUserId],
     references: [users.id],
   }),
 }));
@@ -471,6 +485,7 @@ export const alertTypeEnum = z.enum(["delayed", "bus_change", "cancelled", "gene
 export const alertSeverityEnum = z.enum(["info", "warning", "critical"]);
 export const messageTypeEnum = z.enum(["lost_items", "pickup_change", "general"]);
 export const messageStatusEnum = z.enum(["new", "read", "resolved"]);
+export const messagePriorityEnum = z.enum(["critical", "high", "normal"]);
 export const notificationMethodEnum = z.enum(["sms", "email", "both"]);
 export const notificationModeEnum = z.enum(["always", "manual"]);
 export const routeSessionStatusEnum = z.enum(["pending", "active", "completed", "cancelled"]);
@@ -515,6 +530,7 @@ export type AlertType = z.infer<typeof alertTypeEnum>;
 export type AlertSeverity = z.infer<typeof alertSeverityEnum>;
 export type MessageType = z.infer<typeof messageTypeEnum>;
 export type MessageStatus = z.infer<typeof messageStatusEnum>;
+export type MessagePriority = z.infer<typeof messagePriorityEnum>;
 export type NotificationMethod = z.infer<typeof notificationMethodEnum>;
 export type NotificationMode = z.infer<typeof notificationModeEnum>;
 export type RouteSessionStatus = z.infer<typeof routeSessionStatusEnum>;
