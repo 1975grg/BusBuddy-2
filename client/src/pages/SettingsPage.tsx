@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building, Palette, Shield, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import type { OrganizationType } from "@shared/schema";
 
 export default function SettingsPage() {
   const [orgLogo, setOrgLogo] = useState<string>("");
   const [orgName, setOrgName] = useState("");
+  const [orgType, setOrgType] = useState<OrganizationType>("school");
   const [primaryColor, setPrimaryColor] = useState("#0080FF");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -32,13 +35,14 @@ export default function SettingsPage() {
     if (organization) {
       setOrgName(organization.name || "");
       setOrgLogo(organization.logoUrl || "");
+      setOrgType(organization.type || "school");
       setPrimaryColor(organization.primaryColor || "#0080FF");
     }
   }, [organization]);
   
   // Save settings mutation
   const saveSettingsMutation = useMutation({
-    mutationFn: async (data: { name: string; logoUrl: string; primaryColor: string }) => {
+    mutationFn: async (data: { name: string; type: OrganizationType; logoUrl: string; primaryColor: string }) => {
       if (!organization?.id) throw new Error("Organization ID not found");
       
       const response = await fetch(`/api/organization/${organization.id}`, {
@@ -51,6 +55,7 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/system/organizations"] });
       toast({
         title: "Settings saved",
         description: "Organization settings have been updated successfully"
@@ -68,9 +73,21 @@ export default function SettingsPage() {
   const handleSaveSettings = () => {
     saveSettingsMutation.mutate({
       name: orgName,
+      type: orgType,
       logoUrl: orgLogo,
       primaryColor
     });
+  };
+
+  const getOrgTypeLabel = (type: OrganizationType) => {
+    const labels: Record<OrganizationType, string> = {
+      university: "University",
+      school: "School",
+      hospital: "Hospital",
+      airport: "Airport",
+      hotel: "Hotel"
+    };
+    return labels[type];
   };
 
   return (
@@ -105,6 +122,22 @@ export default function SettingsPage() {
                   placeholder="Enter organization name"
                   data-testid="input-org-name"
                 />
+              </div>
+              
+              <div>
+                <Label htmlFor="org-type">Organization Type</Label>
+                <Select value={orgType} onValueChange={(value) => setOrgType(value as OrganizationType)}>
+                  <SelectTrigger id="org-type" data-testid="select-org-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="school">School</SelectItem>
+                    <SelectItem value="university">University</SelectItem>
+                    <SelectItem value="hospital">Hospital</SelectItem>
+                    <SelectItem value="airport">Airport</SelectItem>
+                    <SelectItem value="hotel">Hotel</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div>
