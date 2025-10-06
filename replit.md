@@ -137,13 +137,17 @@ Preferred communication style: Simple, everyday language.
 - POST /api/driver-messages - Create driver message
 - GET /api/driver-messages?route_id=X or ?organization_id=X - List messages
 - PATCH /api/driver-messages/:id/status - Update message status
-- PATCH /api/driver-messages/:id/respond - Admin responds to driver
+- PATCH /api/driver-messages/:id/respond - Admin responds to driver (camelCase: adminResponse, respondedByUserId)
+- PATCH /api/driver-messages/:id/archive - Archive message (camelCase: archivedByUserId)
+- DELETE /api/driver-messages/:id - Delete message
 
 **Rider Messages:**
 - POST /api/rider-messages - Create rider message
 - GET /api/rider-messages?route_id=X or ?organization_id=X - List messages
 - PATCH /api/rider-messages/:id/status - Update message status
-- PATCH /api/rider-messages/:id/respond - Admin responds to rider
+- PATCH /api/rider-messages/:id/respond - Admin responds to rider (camelCase: adminResponse, respondedByUserId)
+- PATCH /api/rider-messages/:id/archive - Archive message (camelCase: archivedByUserId)
+- DELETE /api/rider-messages/:id - Delete message
 
 ### Database Schema
 **driver_messages table:**
@@ -158,6 +162,15 @@ Preferred communication style: Simple, everyday language.
 - riderName, riderEmail, userId (contact/identity)
 - status (new, read, resolved)
 - adminResponse, respondedByUserId (response tracking)
+
+### Message Management
+- **User Archive/Delete**: All users (riders, drivers, admins) can archive or delete their own sent messages
+- **Message History Display**: Shows all messages for a route/organization, but archive/delete buttons only appear for the user's own messages
+- **Ownership Verification**: Frontend checks userId/driverUserId fields to determine message ownership
+- **Admin Visibility Enhancements**:
+  - Sidebar "Support" link shows badge with count of new messages
+  - Admin Dashboard displays real message counts from API
+  - Support Center defaults to "new" status filter for immediate visibility
 
 ### MVP Limitations
 - Admin inbox uses first org admin lookup (not session-based auth)
