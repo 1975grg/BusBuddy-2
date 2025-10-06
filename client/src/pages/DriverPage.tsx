@@ -106,8 +106,8 @@ export default function DriverPage() {
     id: "current-bus", 
     name: currentRoute.vehicleNumber || "Unknown",
     status: "active" as const,
-    lat: activeSession.currentLatitude || 40.7128,
-    lng: activeSession.currentLongitude || -74.0060,
+    lat: activeSession.currentLatitude || 39.6567,
+    lng: activeSession.currentLongitude || -79.9481,
     eta: "N/A", // Would come from real GPS tracking
     nextStop: "Unknown" // Would come from route progress
   }] : [];
