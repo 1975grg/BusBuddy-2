@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export default function SystemAdminDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   // Fetch all organizations
   const { data: organizations, isLoading } = useQuery({
@@ -262,13 +264,6 @@ export default function SystemAdminDashboard() {
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      {org.logoUrl && (
-                        <img 
-                          src={org.logoUrl} 
-                          alt={`${org.name} logo`}
-                          className="w-6 h-6 rounded object-contain"
-                        />
-                      )}
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-3 h-3 rounded-full" 
@@ -292,11 +287,27 @@ export default function SystemAdminDashboard() {
                     <Separator />
                     
                     <div className="flex justify-between text-sm">
-                      <Button variant="outline" size="sm" data-testid={`button-manage-${org.id}`}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          localStorage.setItem("selected_org_id", org.id);
+                          setLocation("/admin");
+                        }}
+                        data-testid={`button-manage-${org.id}`}
+                      >
                         <Users className="w-3 h-3 mr-1" />
                         Manage
                       </Button>
-                      <Button variant="ghost" size="sm" data-testid={`button-settings-${org.id}`}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          localStorage.setItem("selected_org_id", org.id);
+                          setLocation("/admin/settings");
+                        }}
+                        data-testid={`button-settings-${org.id}`}
+                      >
                         <Settings className="w-3 h-3 mr-1" />
                         Settings
                       </Button>

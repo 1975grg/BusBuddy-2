@@ -258,9 +258,12 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <img 
-            src={orgSettings?.logoUrl || busIconUrl} 
-            alt={orgSettings?.logoUrl ? `${orgSettings.name} logo` : "Bus Buddy"} 
+            src={busIconUrl} 
+            alt="Bus Buddy" 
             className="w-8 h-8 rounded-lg object-contain" 
+            onError={(e) => {
+              e.currentTarget.src = busIconUrl;
+            }}
           />
           <div>
             <h2 className="font-bold text-lg">Bus Buddy</h2>
