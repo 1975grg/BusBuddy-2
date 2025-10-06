@@ -13,7 +13,7 @@ export default function AdminDashboardPage() {
 
   // Fetch first organization admin to get organization ID
   const { data: currentAdmin } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/users", "org_admin"],
     queryFn: async () => {
       const response = await fetch("/api/users?role=org_admin");
       const users = await response.json();

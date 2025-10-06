@@ -91,7 +91,7 @@ export function AppSidebar() {
 
   // Fetch first organization for admin users to get messages
   const { data: firstOrg } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/users", "org_admin_id"],
     queryFn: async () => {
       const response = await fetch("/api/users?role=org_admin");
       const users = await response.json();

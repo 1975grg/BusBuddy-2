@@ -21,7 +21,7 @@ export default function AdminMessagesPage() {
 
   // Fetch current admin user to get organization ID and user ID
   const { data: currentAdmin } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/users", "org_admin"],
     queryFn: async () => {
       const response = await fetch("/api/users?role=org_admin");
       const users = await response.json();
