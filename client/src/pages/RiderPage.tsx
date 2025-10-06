@@ -46,15 +46,16 @@ export default function RiderPage() {
     }
   ];
 
-  // Fetch route data if using a real route ID
+  // Always fetch real route data from database
   const { data: realRoute } = useQuery({
     queryKey: ["/api/routes", selectedRoute],
     queryFn: async () => {
       const response = await fetch("/api/routes");
       const routes = await response.json();
+      // Try to find by ID first, then by name slug
       return routes.find((r: any) => r.id === selectedRoute || r.name.toLowerCase().replace(/\s+/g, '-') === selectedRoute);
     },
-    enabled: !!selectedRoute && !mockSavedRoutes.find(r => r.id === selectedRoute), // Only fetch if route not in mock data
+    enabled: !!selectedRoute,
   });
   
   // Fetch active service alerts for the current route
@@ -65,19 +66,18 @@ export default function RiderPage() {
     enabled: !!selectedRoute, // Only fetch if we have a route ID
   });
 
-  // Use mock route data if available, otherwise create route data from real route
-  const currentRoute = mockSavedRoutes.find(r => r.id === selectedRoute) || 
-    (realRoute ? {
-      id: realRoute.id,
-      name: realRoute.name,
-      busName: realRoute.vehicleNumber || `${realRoute.type.toUpperCase()}-001`,
-      status: "active" as const,
-      isFavorite: false,
-      stops: [
-        { id: "1", name: "Main Entrance", eta: "5 min", isNext: true },
-        { id: "2", name: "Next Stop", eta: "10 min", isNext: false }
-      ]
-    } : null);
+  // Use real route data from database (ignore mock data to ensure consistency)
+  const currentRoute = realRoute ? {
+    id: realRoute.id,
+    name: realRoute.name,
+    busName: realRoute.vehicleNumber || `${realRoute.type.toUpperCase()}-001`,
+    status: "active" as const,
+    isFavorite: false,
+    stops: [
+      { id: "1", name: "Main Entrance", eta: "5 min", isNext: true },
+      { id: "2", name: "Next Stop", eta: "10 min", isNext: false }
+    ]
+  } : null;
 
 
   return (
