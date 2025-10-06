@@ -53,7 +53,7 @@ export function AdminDashboard({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Support Requests</CardTitle>
+            <CardTitle className="text-sm font-medium">New Messages</CardTitle>
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -105,15 +105,15 @@ export function AdminDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
-              Support
+              Messages
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
               View rider and driver messages, send alerts to routes.
             </p>
-            <Button className="w-full" variant="outline" onClick={onOpenSupport} data-testid="button-open-support">
-              Open Support
+            <Button className="w-full" variant="outline" onClick={onOpenSupport} data-testid="button-open-messages">
+              Open Messages
             </Button>
           </CardContent>
         </Card>

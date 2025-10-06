@@ -234,7 +234,7 @@ export default function SupportCenterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Support Center</h1>
+        <h1 className="text-2xl font-bold">Messages</h1>
         <p className="text-muted-foreground">Manage rider and driver communications</p>
       </div>
 
@@ -246,7 +246,7 @@ export default function SupportCenterPage() {
           </TabsTrigger>
           <TabsTrigger value="alerts" data-testid="tab-alerts">
             <Megaphone className="w-4 h-4 mr-2" />
-            Alerts
+            Send Alert
           </TabsTrigger>
         </TabsList>
 

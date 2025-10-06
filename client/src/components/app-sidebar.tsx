@@ -165,7 +165,7 @@ export function AppSidebar() {
       icon: Users,
     },
     {
-      title: "Support",
+      title: "Messages",
       url: "/admin/support",
       icon: MessageSquare,
       badge: newMessagesCount > 0 ? `${newMessagesCount} New` : undefined
