@@ -883,33 +883,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/service-alerts", async (req, res) => {
     try {
-      const { route_id } = req.query;
+      const { route_id, organization_id } = req.query;
       
-      if (!route_id || typeof route_id !== 'string') {
-        return res.status(400).json({ error: "route_id parameter is required" });
-      }
-      
-      let actualRouteId = route_id;
-      
-      // If route_id doesn't look like a UUID, try to find the route by name
-      if (!route_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        const routes = await storage.getAllRoutes(); // Search all routes instead of by org
-        const matchedRoute = routes.find(route => 
-          route.name.toLowerCase().replace(/\s+/g, '-') === route_id.toLowerCase() ||
-          route.name === route_id
-        );
+      // Support both route_id and organization_id filtering
+      if (route_id && typeof route_id === 'string') {
+        let actualRouteId = route_id;
         
-        if (matchedRoute) {
-          actualRouteId = matchedRoute.id;
-        } else {
-          return res.status(404).json({ error: "Route not found" });
+        // If route_id doesn't look like a UUID, try to find the route by name
+        if (!route_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          const routes = await storage.getAllRoutes(); // Search all routes instead of by org
+          const matchedRoute = routes.find(route => 
+            route.name.toLowerCase().replace(/\s+/g, '-') === route_id.toLowerCase() ||
+            route.name === route_id
+          );
+          
+          if (matchedRoute) {
+            actualRouteId = matchedRoute.id;
+          } else {
+            return res.status(404).json({ error: "Route not found" });
+          }
         }
+        
+        const alerts = await storage.getActiveServiceAlerts(actualRouteId);
+        return res.json(alerts);
       }
       
-      const alerts = await storage.getActiveServiceAlerts(actualRouteId);
-      res.json(alerts);
+      if (organization_id && typeof organization_id === 'string') {
+        const alerts = await storage.getServiceAlertsByOrganization(organization_id);
+        return res.json(alerts);
+      }
+      
+      return res.status(400).json({ error: "route_id or organization_id parameter is required" });
     } catch (error) {
       console.error("Error fetching service alerts:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Expire a service alert (admin)
+  app.patch("/api/service-alerts/:id/expire", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.expireServiceAlert(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error expiring service alert:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

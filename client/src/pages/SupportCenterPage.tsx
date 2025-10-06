@@ -6,12 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { RiderMessage, DriverMessage, Route } from "@shared/schema";
+import type { RiderMessage, DriverMessage, Route, ServiceAlert } from "@shared/schema";
 
 type Message = (RiderMessage | DriverMessage) & { messageType: 'rider' | 'driver' };
 
@@ -59,6 +59,18 @@ export default function SupportCenterPage() {
     queryFn: async () => {
       if (!currentAdmin?.organizationId) return [];
       const response = await fetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`);
+      return response.json();
+    },
+    enabled: !!currentAdmin?.organizationId,
+    refetchInterval: 10000,
+  });
+
+  // Fetch active service alerts
+  const { data: serviceAlerts = [] } = useQuery<ServiceAlert[]>({
+    queryKey: ["/api/service-alerts", currentAdmin?.organizationId],
+    queryFn: async () => {
+      if (!currentAdmin?.organizationId) return [];
+      const response = await fetch(`/api/service-alerts?organization_id=${currentAdmin.organizationId}`);
       return response.json();
     },
     enabled: !!currentAdmin?.organizationId,
@@ -182,6 +194,20 @@ export default function SupportCenterPage() {
     }
   });
 
+  // Expire alert mutation
+  const expireAlertMutation = useMutation({
+    mutationFn: async (alertId: string) => {
+      return await apiRequest("PATCH", `/api/service-alerts/${alertId}/expire`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", currentAdmin?.organizationId] });
+      toast({ title: "Alert expired successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to expire alert", variant: "destructive" });
+    }
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "new":
@@ -247,6 +273,10 @@ export default function SupportCenterPage() {
           <TabsTrigger value="alerts" data-testid="tab-alerts">
             <Megaphone className="w-4 h-4 mr-2" />
             Send Alert
+          </TabsTrigger>
+          <TabsTrigger value="active-alerts" data-testid="tab-active-alerts">
+            <Bell className="w-4 h-4 mr-2" />
+            Active Alerts
           </TabsTrigger>
         </TabsList>
 
@@ -490,6 +520,84 @@ export default function SupportCenterPage() {
                       </CardContent>
                     </Card>
                   ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Active Alerts Tab */}
+        <TabsContent value="active-alerts" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="w-5 h-5" />
+                Active Service Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Manage currently active alerts sent to riders
+              </p>
+              <div className="space-y-3">
+                {serviceAlerts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No active alerts</p>
+                ) : (
+                  serviceAlerts.map((alert) => {
+                      const route = routes.find(r => r.id === alert.routeId);
+                      const alertType = alert.type === "delayed" ? { icon: Clock, color: "bg-yellow-500" } :
+                                       alert.type === "bus_change" ? { icon: Bus, color: "bg-blue-500" } :
+                                       alert.type === "cancelled" ? { icon: XCircle, color: "bg-red-500" } :
+                                       { icon: AlertCircle, color: "bg-gray-500" };
+                      const Icon = alertType.icon;
+
+                      return (
+                        <Card key={alert.id} className="hover-elevate" data-testid={`active-alert-${alert.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className={`p-1.5 rounded-full ${alertType.color} flex-shrink-0`}>
+                                <Icon className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <h3 className="font-medium">{alert.title}</h3>
+                                    <p className="text-sm text-muted-foreground">{route?.name || "Unknown route"}</p>
+                                  </div>
+                                  <Badge variant={alert.severity === "critical" ? "destructive" : alert.severity === "warning" ? "default" : "secondary"}>
+                                    {alert.severity}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm">{alert.message}</p>
+                                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-4">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      Sent {alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "Unknown"}
+                                    </span>
+                                    {alert.activeUntil && (
+                                      <span>
+                                        Expires {new Date(alert.activeUntil).toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => expireAlertMutation.mutate(alert.id)}
+                                    disabled={expireAlertMutation.isPending}
+                                    data-testid={`button-expire-alert-${alert.id}`}
+                                  >
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    Expire Now
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
                 )}
               </div>
             </CardContent>

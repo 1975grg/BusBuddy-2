@@ -4,16 +4,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertCircle, Clock, Bus, XCircle } from "lucide-react";
+import { AlertCircle, Clock, Bus, XCircle, Calendar } from "lucide-react";
 import { insertServiceAlertSchema } from "@shared/schema";
 import type { Route } from "@shared/schema";
+import { useState } from "react";
 
 interface SendAlertDialogProps {
   open: boolean;
@@ -34,6 +35,50 @@ const severityLevels = [
   { value: "critical", label: "Critical", description: "Critical alerts requiring immediate attention" }
 ] as const;
 
+const expirationOptions = [
+  { value: "end-of-day", label: "End of Day", description: "Expires at 11:59 PM today" },
+  { value: "morning", label: "Morning Only", description: "Expires at 12:00 PM today" },
+  { value: "afternoon", label: "Afternoon Only", description: "Expires at 11:59 PM today" },
+  { value: "tomorrow", label: "Until Tomorrow", description: "Expires at 11:59 PM tomorrow" },
+  { value: "3-days", label: "Next 3 Days", description: "Expires in 3 days at 11:59 PM" },
+  { value: "custom", label: "Custom Date/Time", description: "Choose your own expiration" },
+  { value: "manual", label: "Until Manually Cleared", description: "No automatic expiration" }
+] as const;
+
+// Helper function to calculate expiration timestamp
+function calculateExpiration(option: string, customDate?: string): Date | null {
+  const now = new Date();
+  const result = new Date();
+  
+  switch (option) {
+    case "end-of-day":
+    case "afternoon":
+      result.setHours(23, 59, 59, 999);
+      return result;
+    
+    case "morning":
+      result.setHours(12, 0, 0, 0);
+      return result;
+    
+    case "tomorrow":
+      result.setDate(result.getDate() + 1);
+      result.setHours(23, 59, 59, 999);
+      return result;
+    
+    case "3-days":
+      result.setDate(result.getDate() + 3);
+      result.setHours(23, 59, 59, 999);
+      return result;
+    
+    case "custom":
+      return customDate ? new Date(customDate) : null;
+    
+    case "manual":
+    default:
+      return null;
+  }
+}
+
 // Client-side schema without server-controlled fields
 const clientAlertSchema = insertServiceAlertSchema.omit({ 
   createdByUserId: true, 
@@ -48,6 +93,8 @@ type ClientAlertData = z.infer<typeof clientAlertSchema>;
 export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [expirationOption, setExpirationOption] = useState("end-of-day");
+  const [customDateTime, setCustomDateTime] = useState("");
 
   const form = useForm<ClientAlertData>({
     resolver: zodResolver(clientAlertSchema),
@@ -66,7 +113,8 @@ export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogPr
       return await apiRequest("POST", "/api/service-alerts", alertData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
+      // Invalidate organization-specific query to refresh Active Alerts tab
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", route.organizationId] });
       toast({
         title: "Alert sent",
         description: "Service alert has been sent to all riders on this route.",
@@ -85,11 +133,18 @@ export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogPr
 
   const handleClose = () => {
     form.reset();
+    setExpirationOption("end-of-day");
+    setCustomDateTime("");
     onOpenChange(false);
   };
 
   const onSubmit = (data: ClientAlertData) => {
-    sendAlertMutation.mutate(data);
+    const expiration = calculateExpiration(expirationOption, customDateTime);
+    const alertData = {
+      ...data,
+      activeUntil: expiration,
+    };
+    sendAlertMutation.mutate(alertData);
   };
 
   const selectedAlertType = alertTypes.find(type => type.value === form.watch("type"));
@@ -173,6 +228,43 @@ export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogPr
                 </FormItem>
               )}
             />
+
+            {/* Expiration Option */}
+            <div>
+              <FormLabel>Alert Expiration</FormLabel>
+              <Select onValueChange={setExpirationOption} defaultValue={expirationOption}>
+                <SelectTrigger data-testid="select-expiration" className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {expirationOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="space-y-1">
+                        <div className="font-medium">{option.label}</div>
+                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription className="mt-2">
+                Choose when this alert should automatically expire
+              </FormDescription>
+            </div>
+
+            {/* Custom Date/Time Picker */}
+            {expirationOption === "custom" && (
+              <div>
+                <FormLabel>Expiration Date & Time</FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={customDateTime}
+                  onChange={(e) => setCustomDateTime(e.target.value)}
+                  className="mt-2"
+                  data-testid="input-custom-datetime"
+                />
+              </div>
+            )}
 
             {/* Alert Title */}
             <FormField

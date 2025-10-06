@@ -86,7 +86,9 @@ export interface IStorage {
   // Service alerts (Admin → Riders)
   createServiceAlert(alert: InsertServiceAlert): Promise<ServiceAlert>;
   getActiveServiceAlerts(routeId: string): Promise<ServiceAlert[]>;
+  getServiceAlertsByOrganization(organizationId: string): Promise<ServiceAlert[]>;
   deactivateServiceAlert(id: string): Promise<boolean>;
+  expireServiceAlert(id: string): Promise<boolean>;
   
   // Rider messages (Riders → Admin)  
   createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
@@ -310,6 +312,30 @@ export class DatabaseStorage implements IStorage {
   async deactivateServiceAlert(id: string): Promise<boolean> {
     const result = await db.update(serviceAlerts)
       .set({ isActive: false })
+      .where(eq(serviceAlerts.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getServiceAlertsByOrganization(organizationId: string): Promise<ServiceAlert[]> {
+    const now = new Date();
+    return await db.select().from(serviceAlerts)
+      .where(
+        and(
+          eq(serviceAlerts.organizationId, organizationId),
+          eq(serviceAlerts.isActive, true),
+          // Active from is in the past (or now)
+          sql`${serviceAlerts.activeFrom} <= ${now}`,
+          // Active until is null (no expiry) or in the future
+          sql`${serviceAlerts.activeUntil} IS NULL OR ${serviceAlerts.activeUntil} > ${now}`
+        )
+      )
+      .orderBy(desc(serviceAlerts.createdAt));
+  }
+
+  async expireServiceAlert(id: string): Promise<boolean> {
+    const now = new Date();
+    const result = await db.update(serviceAlerts)
+      .set({ isActive: false, activeUntil: now })
       .where(eq(serviceAlerts.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
@@ -1114,6 +1140,14 @@ export class MemStorage implements IStorage {
   }
 
   async deactivateServiceAlert(id: string): Promise<boolean> {
+    return false;
+  }
+
+  async getServiceAlertsByOrganization(organizationId: string): Promise<ServiceAlert[]> {
+    return [];
+  }
+
+  async expireServiceAlert(id: string): Promise<boolean> {
     return false;
   }
 
