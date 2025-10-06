@@ -35,6 +35,8 @@ Preferred communication style: Simple, everyday language.
 - **Role-based Access Control**: Three primary user roles (Admin, Driver, Rider) with different permission levels
 - **Access Methods**: QR codes, magic links, and password-based access for flexible rider onboarding
 - **Token Management**: Device token revocation and access reset capabilities
+- **Role Detection**: Current implementation detects user role from URL path (/admin, /driver, /track)
+- **Security Note**: Message filtering currently happens client-side for drivers/riders. In production, server-side filtering with proper authentication context is required to prevent unauthorized data exposure.
 
 ### Key Design Patterns
 - **Multi-organization Support**: Complete tenant isolation with customizable branding per organization
