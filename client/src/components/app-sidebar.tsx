@@ -257,14 +257,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <img 
-            src={busIconUrl} 
-            alt="Bus Buddy" 
-            className="w-8 h-8 rounded-lg object-contain" 
-            onError={(e) => {
-              e.currentTarget.src = busIconUrl;
-            }}
-          />
+          <div 
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+            style={{ backgroundColor: orgSettings?.primaryColor || "#0080FF" }}
+          >
+            UHS
+          </div>
           <div>
             <h2 className="font-bold text-lg">Bus Buddy</h2>
             <p className="text-sm text-muted-foreground">{orgSettings?.name || mockUser.organization}</p>
