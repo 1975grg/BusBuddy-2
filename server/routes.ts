@@ -1029,13 +1029,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/rider-messages/:id/respond", async (req, res) => {
     try {
       const { id } = req.params;
-      const { response, responded_by_user_id } = req.body;
+      const { adminResponse, respondedByUserId } = req.body;
       
-      if (!response || !responded_by_user_id) {
-        return res.status(400).json({ error: "response and responded_by_user_id are required" });
+      if (!adminResponse || !respondedByUserId) {
+        return res.status(400).json({ error: "adminResponse and respondedByUserId are required" });
       }
       
-      const message = await storage.addAdminResponse(id, response, responded_by_user_id);
+      const message = await storage.addAdminResponse(id, adminResponse, respondedByUserId);
       
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
@@ -1051,13 +1051,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/rider-messages/:id/archive", async (req, res) => {
     try {
       const { id } = req.params;
-      const { archived_by_user_id } = req.body;
+      const { archivedByUserId } = req.body;
       
-      if (!archived_by_user_id) {
-        return res.status(400).json({ error: "archived_by_user_id is required" });
+      if (!archivedByUserId) {
+        return res.status(400).json({ error: "archivedByUserId is required" });
       }
       
-      const message = await storage.archiveRiderMessage(id, archived_by_user_id);
+      const message = await storage.archiveRiderMessage(id, archivedByUserId);
       
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
@@ -1188,13 +1188,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/driver-messages/:id/respond", async (req, res) => {
     try {
       const { id } = req.params;
-      const { response, responded_by_user_id } = req.body;
+      const { adminResponse, respondedByUserId } = req.body;
       
-      if (!response || !responded_by_user_id) {
-        return res.status(400).json({ error: "response and responded_by_user_id are required" });
+      if (!adminResponse || !respondedByUserId) {
+        return res.status(400).json({ error: "adminResponse and respondedByUserId are required" });
       }
       
-      const message = await storage.respondToDriverMessage(id, response, responded_by_user_id);
+      const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
       
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
@@ -1210,13 +1210,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/driver-messages/:id/archive", async (req, res) => {
     try {
       const { id } = req.params;
-      const { archived_by_user_id } = req.body;
+      const { archivedByUserId } = req.body;
       
-      if (!archived_by_user_id) {
-        return res.status(400).json({ error: "archived_by_user_id is required" });
+      if (!archivedByUserId) {
+        return res.status(400).json({ error: "archivedByUserId is required" });
       }
       
-      const message = await storage.archiveDriverMessage(id, archived_by_user_id);
+      const message = await storage.archiveDriverMessage(id, archivedByUserId);
       
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
