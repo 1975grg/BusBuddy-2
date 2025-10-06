@@ -819,12 +819,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Service Alerts (Admin → Riders)
   app.post("/api/service-alerts", async (req, res) => {
     try {
+      // Convert activeUntil string to Date if present
+      const requestData = {
+        ...req.body,
+        activeUntil: req.body.activeUntil ? new Date(req.body.activeUntil) : null
+      };
+      
       // Validate client data (without server-controlled fields)
       const clientSchema = insertServiceAlertSchema.omit({ 
         createdByUserId: true, 
         organizationId: true 
       });
-      const clientData = clientSchema.parse(req.body);
+      const clientData = clientSchema.parse(requestData);
       
       // Verify route exists and get organization
       const route = await storage.getRoute(clientData.routeId);
