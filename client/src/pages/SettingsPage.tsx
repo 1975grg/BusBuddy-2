@@ -176,15 +176,22 @@ export default function SettingsPage() {
               <div className="p-4 border rounded-lg" style={{ borderColor: primaryColor + "40" }}>
                 <div className="flex items-center gap-3 mb-4">
                   {orgLogo ? (
-                    <img src={orgLogo} alt="Organization logo" className="w-8 h-8 object-contain" />
-                  ) : (
-                    <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      {orgName.split(' ').map(word => word[0]).join('').slice(0, 2)}
-                    </div>
-                  )}
+                    <img 
+                      src={orgLogo} 
+                      alt="Organization logo" 
+                      className="w-8 h-8 object-contain" 
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold ${orgLogo ? 'hidden' : ''}`}
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {orgName.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
                   <div>
                     <p className="font-bold">Bus Buddy</p>
                     <p className="text-sm text-muted-foreground">{orgName}</p>

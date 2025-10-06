@@ -86,6 +86,13 @@ export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: Logo
                   alt={`${organizationName} logo`}
                   className="max-w-full max-h-full object-contain rounded"
                   data-testid="img-uploaded-logo"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.innerHTML = '<div class="text-sm text-muted-foreground">Logo failed to load</div>';
+                    }
+                  }}
                 />
               </div>
               <Button
@@ -94,6 +101,7 @@ export function LogoUpload({ currentLogo, organizationName, onLogoUpdate }: Logo
                 className="absolute -top-2 -right-2 h-6 w-6"
                 onClick={removeLogo}
                 data-testid="button-remove-logo"
+                title="Remove logo"
               >
                 <X className="w-3 h-3" />
               </Button>
