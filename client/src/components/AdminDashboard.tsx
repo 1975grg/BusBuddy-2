@@ -5,7 +5,7 @@ import { Users, Route, MessageSquare, Plus } from "lucide-react";
 
 interface DashboardStats {
   activeRoutes: number;
-  supportRequests: number;
+  newMessages: number;
 }
 
 interface AdminDashboardProps {
@@ -57,9 +57,9 @@ export function AdminDashboard({
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.supportRequests}</div>
-            <Badge variant={stats.supportRequests > 0 ? "destructive" : "secondary"} className="mt-1">
-              {stats.supportRequests > 0 ? "Needs Attention" : "All Clear"}
+            <div className="text-2xl font-bold">{stats.newMessages}</div>
+            <Badge variant={stats.newMessages > 0 ? "destructive" : "secondary"} className="mt-1">
+              {stats.newMessages > 0 ? "Needs Attention" : "All Clear"}
             </Badge>
           </CardContent>
         </Card>

@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
 
   const stats = {
     activeRoutes: activeRoutesCount,
-    supportRequests: newMessagesCount
+    newMessages: newMessagesCount
   };
 
   const handleManageRoutes = () => {
