@@ -97,7 +97,55 @@ export function AppSidebar() {
     queryKey: ["/api/routes"],
   });
 
+  // Fetch first organization for admin users to get messages
+  const { data: firstOrg } = useQuery({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await fetch("/api/users?role=org_admin");
+      const users = await response.json();
+      return users[0]?.organizationId;
+    },
+    enabled: userRole === "admin",
+  });
+
+  // Fetch messages to get new count (only for admin)
+  const { data: riderMessages = [] } = useQuery({
+    queryKey: ["/api/rider-messages", firstOrg],
+    queryFn: async () => {
+      if (!firstOrg) return [];
+      const response = await fetch(`/api/rider-messages?organization_id=${firstOrg}`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error("Failed to fetch rider messages");
+      }
+      return response.json();
+    },
+    enabled: userRole === "admin" && !!firstOrg,
+    refetchInterval: 10000,
+  });
+
+  const { data: driverMessages = [] } = useQuery({
+    queryKey: ["/api/driver-messages", firstOrg],
+    queryFn: async () => {
+      if (!firstOrg) return [];
+      const response = await fetch(`/api/driver-messages?organization_id=${firstOrg}`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error("Failed to fetch driver messages");
+      }
+      return response.json();
+    },
+    enabled: userRole === "admin" && !!firstOrg,
+    refetchInterval: 10000,
+  });
+
   const activeRoutesCount = routes.filter(route => route.status === "active").length;
+  
+  // Count new messages (status = 'new')
+  const newMessagesCount = [
+    ...(Array.isArray(riderMessages) ? riderMessages : []),
+    ...(Array.isArray(driverMessages) ? driverMessages : [])
+  ].filter((msg: any) => msg.status === 'new').length;
 
   const adminItems: MenuItem[] = [
     {
@@ -120,6 +168,7 @@ export function AppSidebar() {
       title: "Support",
       url: "/admin/support",
       icon: MessageSquare,
+      badge: newMessagesCount > 0 ? `${newMessagesCount} New` : undefined
     },
     {
       title: "Settings",

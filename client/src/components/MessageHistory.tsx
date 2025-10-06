@@ -28,6 +28,8 @@ interface Message {
   createdAt: Date;
   riderName?: string | null;
   riderEmail?: string | null;
+  userId?: string | null;
+  driverUserId?: string | null;
 }
 
 interface MessageHistoryProps {
@@ -119,9 +121,18 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
     }
   };
 
-  const userMessages = userId 
-    ? messages.filter(m => userType === "driver" ? true : !m.riderName || m.riderName === userId)
-    : messages;
+  // Show all messages for the route
+  const userMessages = messages;
+  
+  // Helper function to check if current user owns the message
+  const isOwnMessage = (message: Message) => {
+    if (!userId) return false;
+    if (userType === "driver") {
+      return message.driverUserId === userId;
+    } else {
+      return message.userId === userId;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -190,26 +201,28 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
                     {format(new Date(message.createdAt), "MMM d, yyyy 'at' h:mm a")}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => archiveMutation.mutate(message.id)}
-                    disabled={archiveMutation.isPending}
-                    data-testid={`button-archive-${message.id}`}
-                  >
-                    <Archive className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDeleteClick(message.id)}
-                    disabled={deleteMutation.isPending}
-                    data-testid={`button-delete-${message.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {isOwnMessage(message) && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => archiveMutation.mutate(message.id)}
+                      disabled={archiveMutation.isPending}
+                      data-testid={`button-archive-${message.id}`}
+                    >
+                      <Archive className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteClick(message.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-${message.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
