@@ -286,6 +286,11 @@ export default function SupportCenterPage() {
       : <Truck className="w-4 h-4" />;
   };
 
+  const getRouteName = (routeId: string) => {
+    const route = routes.find(r => r.id === routeId);
+    return route?.name || "Unknown Route";
+  };
+
   const handleRespond = () => {
     if (!selectedMessage || !responseText.trim()) return;
     
@@ -396,9 +401,15 @@ export default function SupportCenterPage() {
                               </div>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">{message.message}</p>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              {message.createdAt ? new Date(message.createdAt).toLocaleString() : "Unknown"}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                {message.createdAt ? new Date(message.createdAt).toLocaleString() : "Unknown"}
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                <Bus className="w-3 h-3 mr-1" />
+                                {getRouteName(message.routeId)}
+                              </Badge>
                             </div>
                           </div>
                         </CardContent>
@@ -506,6 +517,13 @@ export default function SupportCenterPage() {
                               ? (selectedMessage as RiderMessage).riderName || "Anonymous Rider"
                               : "Driver"}
                           </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium mb-1">Route:</p>
+                          <Badge variant="outline" className="text-xs">
+                            <Bus className="w-3 h-3 mr-1" />
+                            {getRouteName(selectedMessage.routeId)}
+                          </Badge>
                         </div>
                         <div>
                           <p className="text-sm font-medium mb-1">Message:</p>
