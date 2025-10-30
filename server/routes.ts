@@ -1316,6 +1316,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Message Forwarding Routes
+  // Forward rider message to driver (creates driver message with forwarded content)
+  app.post("/api/rider-messages/:id/forward-to-driver", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { forwardedByUserId } = req.body;
+      
+      if (!forwardedByUserId) {
+        return res.status(400).json({ error: "forwardedByUserId is required" });
+      }
+      
+      // Get the original rider message
+      const riderMessage = await storage.getRiderMessage(id);
+      if (!riderMessage) {
+        return res.status(404).json({ error: "Rider message not found" });
+      }
+      
+      // Get the route to find driver
+      const route = await storage.getRoute(riderMessage.routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Get drivers for this route (MVP: use first available driver for the organization)
+      const users = await storage.getUsersByOrganization(riderMessage.organizationId);
+      const driver = users.find(u => u.role === 'driver');
+      
+      if (!driver) {
+        return res.status(404).json({ error: "No driver found for this route" });
+      }
+      
+      // Create driver message with forwarded content
+      const senderName = riderMessage.riderName || riderMessage.riderEmail || "Anonymous Rider";
+      const forwardedMessage = `Forwarded from rider ${senderName}: ${riderMessage.message}`;
+      
+      const driverMessageData = {
+        organizationId: riderMessage.organizationId,
+        routeId: riderMessage.routeId,
+        driverUserId: driver.id,
+        type: "general" as const,
+        message: forwardedMessage,
+      };
+      
+      const newDriverMessage = await storage.createDriverMessage(driverMessageData);
+      
+      res.status(201).json({ 
+        success: true, 
+        driverMessage: newDriverMessage,
+        message: "Message forwarded to driver successfully" 
+      });
+    } catch (error) {
+      console.error("Error forwarding rider message to driver:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Broadcast driver message as service alert (visible to all riders on route)
+  app.post("/api/driver-messages/:id/broadcast-as-alert", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { broadcastByUserId, severity = "warning" } = req.body;
+      
+      if (!broadcastByUserId) {
+        return res.status(400).json({ error: "broadcastByUserId is required" });
+      }
+      
+      // Get the original driver message
+      const driverMessage = await storage.getDriverMessage(id);
+      if (!driverMessage) {
+        return res.status(404).json({ error: "Driver message not found" });
+      }
+      
+      // Get driver info for attribution
+      const driver = await storage.getUser(driverMessage.driverUserId);
+      const driverName = driver?.name || "Driver";
+      
+      // Create service alert with forwarded content
+      const alertData = {
+        organizationId: driverMessage.organizationId,
+        routeId: driverMessage.routeId,
+        type: "general" as const,
+        title: `Message from ${driverName}`,
+        message: `Forwarded from driver ${driverName}: ${driverMessage.message}`,
+        severity: severity as "info" | "warning" | "critical",
+        createdByUserId: broadcastByUserId,
+        activeFrom: new Date(),
+        activeUntil: null, // Stays active until manually cleared
+        isActive: true,
+      };
+      
+      const alert = await storage.createServiceAlert(alertData);
+      
+      res.status(201).json({ 
+        success: true, 
+        alert,
+        message: "Driver message broadcasted as alert successfully" 
+      });
+    } catch (error) {
+      console.error("Error broadcasting driver message as alert:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Rider Profile Management Routes
   app.post("/api/rider-profiles", async (req, res) => {
     try {
