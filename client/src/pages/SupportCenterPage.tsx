@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Broadcast } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
@@ -191,6 +191,53 @@ export default function SupportCenterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
       setSelectedMessage(null);
       toast({ title: "Message deleted successfully" });
+    }
+  });
+
+  // Forward rider message to driver
+  const forwardToDriverMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      return await apiRequest("POST", `/api/rider-messages/${messageId}/forward-to-driver`, {
+        forwardedByUserId: currentAdmin?.id
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      toast({ 
+        title: "Message forwarded to driver",
+        description: "The driver will see this message in their app"
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Forward failed",
+        description: "Could not forward message to driver",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Broadcast driver message as service alert
+  const broadcastAsAlertMutation = useMutation({
+    mutationFn: async ({ messageId, severity }: { messageId: string, severity?: string }) => {
+      return await apiRequest("POST", `/api/driver-messages/${messageId}/broadcast-as-alert`, {
+        broadcastByUserId: currentAdmin?.id,
+        severity: severity || "warning"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
+      toast({ 
+        title: "Alert broadcast successfully",
+        description: "All riders on this route will see the alert"
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Broadcast failed",
+        description: "Could not broadcast message as alert",
+        variant: "destructive"
+      });
     }
   });
 
@@ -411,16 +458,42 @@ export default function SupportCenterPage() {
                                 </Button>
                               </>
                             ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => archiveMutation.mutate({ id: selectedMessage.id, messageType: selectedMessage.messageType })}
-                                disabled={archiveMutation.isPending}
-                                data-testid="button-archive-message"
-                              >
-                                <Archive className="w-4 h-4 mr-2" />
-                                Archive
-                              </Button>
+                              <>
+                                {selectedMessage.messageType === 'rider' && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => forwardToDriverMutation.mutate(selectedMessage.id)}
+                                    disabled={forwardToDriverMutation.isPending}
+                                    data-testid="button-forward-to-driver"
+                                  >
+                                    <Forward className="w-4 h-4 mr-2" />
+                                    {forwardToDriverMutation.isPending ? "Forwarding..." : "Forward to Driver"}
+                                  </Button>
+                                )}
+                                {selectedMessage.messageType === 'driver' && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => broadcastAsAlertMutation.mutate({ messageId: selectedMessage.id })}
+                                    disabled={broadcastAsAlertMutation.isPending}
+                                    data-testid="button-broadcast-alert"
+                                  >
+                                    <Broadcast className="w-4 h-4 mr-2" />
+                                    {broadcastAsAlertMutation.isPending ? "Broadcasting..." : "Broadcast as Alert"}
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => archiveMutation.mutate({ id: selectedMessage.id, messageType: selectedMessage.messageType })}
+                                  disabled={archiveMutation.isPending}
+                                  data-testid="button-archive-message"
+                                >
+                                  <Archive className="w-4 h-4 mr-2" />
+                                  Archive
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>

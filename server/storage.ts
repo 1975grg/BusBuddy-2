@@ -92,6 +92,7 @@ export interface IStorage {
   
   // Rider messages (Riders → Admin)  
   createRiderMessage(message: InsertRiderMessage): Promise<RiderMessage>;
+  getRiderMessage(id: string): Promise<RiderMessage | undefined>;
   getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]>;
   archiveRiderMessage(id: string, archivedByUserId: string): Promise<RiderMessage | undefined>;
   restoreRiderMessage(id: string): Promise<RiderMessage | undefined>;
@@ -100,6 +101,7 @@ export interface IStorage {
   
   // Driver messages (Drivers → Admin)
   createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage>;
+  getDriverMessage(id: string): Promise<DriverMessage | undefined>;
   getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]>;
   getDriverMessagesByOrganization(organizationId: string): Promise<DriverMessage[]>;
   updateDriverMessageStatus(id: string, status: string): Promise<DriverMessage | undefined>;
@@ -346,6 +348,11 @@ export class DatabaseStorage implements IStorage {
     return message;
   }
 
+  async getRiderMessage(id: string): Promise<RiderMessage | undefined> {
+    const result = await db.select().from(riderMessages).where(eq(riderMessages.id, id));
+    return result[0];
+  }
+
   async getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]> {
     // Filter out archived messages and sort by: newest date first, critical priority first within same day
     return await db.select().from(riderMessages)
@@ -438,6 +445,11 @@ export class DatabaseStorage implements IStorage {
   async createDriverMessage(insertMessage: InsertDriverMessage): Promise<DriverMessage> {
     const [message] = await db.insert(driverMessages).values(insertMessage).returning();
     return message;
+  }
+
+  async getDriverMessage(id: string): Promise<DriverMessage | undefined> {
+    const result = await db.select().from(driverMessages).where(eq(driverMessages.id, id));
+    return result[0];
   }
 
   async getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]> {
@@ -1156,6 +1168,10 @@ export class MemStorage implements IStorage {
     throw new Error("Rider messages not implemented in MemStorage");
   }
 
+  async getRiderMessage(id: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
   async getRiderMessagesByRoute(routeId: string): Promise<RiderMessage[]> {
     return [];
   }
@@ -1191,6 +1207,10 @@ export class MemStorage implements IStorage {
   // Driver messages (Drivers → Admin) - Stub implementations for MemStorage
   async createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage> {
     throw new Error("Driver messages not implemented in MemStorage");
+  }
+
+  async getDriverMessage(id: string): Promise<DriverMessage | undefined> {
+    return undefined;
   }
 
   async getDriverMessagesByRoute(routeId: string): Promise<DriverMessage[]> {
