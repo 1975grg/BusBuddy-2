@@ -191,8 +191,18 @@ export function RiderTracker({
                         <IconComponent className={`h-4 w-4 ${alertInfo.iconColor}`} />
                         <AlertDescription className={alertInfo.textColor}>
                           <div className="space-y-1">
-                            <p className="font-medium">{alertInfo.label}</p>
-                            <p>{alert.message}</p>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <p className="font-medium">{alertInfo.label}</p>
+                                <p>{alert.message}</p>
+                              </div>
+                              <Badge
+                                variant={alert.severity === "critical" ? "destructive" : alert.severity === "warning" ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {alert.severity}
+                              </Badge>
+                            </div>
                             {alert.activeFrom && (
                               <p className="text-xs opacity-75 flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
