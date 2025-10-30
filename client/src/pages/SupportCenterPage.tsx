@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Broadcast } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
@@ -479,7 +479,7 @@ export default function SupportCenterPage() {
                                     disabled={broadcastAsAlertMutation.isPending}
                                     data-testid="button-broadcast-alert"
                                   >
-                                    <Broadcast className="w-4 h-4 mr-2" />
+                                    <Radio className="w-4 h-4 mr-2" />
                                     {broadcastAsAlertMutation.isPending ? "Broadcasting..." : "Broadcast as Alert"}
                                   </Button>
                                 )}
