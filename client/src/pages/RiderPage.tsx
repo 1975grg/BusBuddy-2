@@ -15,7 +15,8 @@ export default function RiderPage() {
   const routeId = urlParams.get('route');
   
   // No route switching allowed - riders only see their assigned route
-  const selectedRoute = routeId || "main-campus-loop";
+  // Default to Cheat lake Test route for mock testing (matches driver route)
+  const selectedRoute = routeId || "4fde6b54-ff96-4aa8-bb26-7c80aaea7221";
   
   // TODO: remove mock functionality - replace with real rider data and preferences
   const mockSavedRoutes = [
