@@ -10,20 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Route, MapPin, Star, StarOff, Heart, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireRole } from "@/contexts/UserContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Route as RouteType, User, RouteSession } from "@shared/schema";
 import driverAvatarUrl from "@assets/generated_images/Bus_driver_avatar_a7c98208.png";
 
 export default function DriverPage() {
+  const { user: currentUser, isLoading: authLoading } = useRequireRole("driver");
   const [selectedRoute, setSelectedRoute] = useState<string>("");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  // Get current driver (mock for now)
-  const { data: currentUser } = useQuery({
-    queryKey: ["/api/dev/mock-user", "driver"],
-    select: (data: User) => data,
-  });
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   // Get active routes for the driver's organization
   const { data: routes = [], isLoading: routesLoading } = useQuery({

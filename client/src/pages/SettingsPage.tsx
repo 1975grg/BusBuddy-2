@@ -10,9 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building, Palette, Shield, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireRole } from "@/contexts/UserContext";
 import type { OrganizationType } from "@shared/schema";
 
 export default function SettingsPage() {
+  const { user, isLoading: authLoading } = useRequireRole("org_admin");
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   const [orgLogo, setOrgLogo] = useState<string>("");
   const [orgName, setOrgName] = useState("");
   const [orgType, setOrgType] = useState<OrganizationType>("school");

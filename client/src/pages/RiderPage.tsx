@@ -5,10 +5,16 @@ import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
+import { useRequireRole } from "@/contexts/UserContext";
 import type { ServiceAlert } from "@shared/schema";
 
 export default function RiderPage() {
+  const { user, isLoading: authLoading } = useRequireRole("rider");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   
   // Extract route ID from URL query parameter - riders are locked to their assigned route
   const urlParams = new URLSearchParams(window.location.search);

@@ -1,10 +1,16 @@
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { AdminDashboard } from "@/components/AdminDashboard";
+import { useRequireRole } from "@/contexts/UserContext";
 import type { Route } from "@shared/schema";
 
 export default function AdminDashboardPage() {
+  const { user, isLoading: authLoading } = useRequireRole("org_admin");
   const [, setLocation] = useLocation();
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   
   // Fetch routes to get active count
   const { data: routes = [] } = useQuery<Route[]>({

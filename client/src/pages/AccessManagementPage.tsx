@@ -6,9 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Shield, Trash2, RotateCcw, Bus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useRequireRole } from "@/contexts/UserContext";
 import type { Route } from "@shared/schema";
 
 export default function AccessManagementPage() {
+  const { user, isLoading: authLoading } = useRequireRole("org_admin");
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   // Fetch real routes from API
   const { data: routes = [], isLoading } = useQuery<Route[]>({
     queryKey: ["/api/routes"],

@@ -13,6 +13,7 @@ import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { QrCodeDialog } from "@/components/QrCodeDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireRole } from "@/contexts/UserContext";
 import { apiRequest } from "@/lib/queryClient";
 import type { Route, RouteStop, Organization } from "@shared/schema";
 
@@ -25,6 +26,7 @@ type SortOption = "name-asc" | "name-desc" | "status";
 type ViewMode = "cards" | "table";
 
 export default function RoutesPage() {
+  const { user, isLoading: authLoading } = useRequireRole("org_admin");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [sortOption, setSortOption] = useState<SortOption>("name-asc");
@@ -36,6 +38,10 @@ export default function RoutesPage() {
   const [qrRoute, setQrRoute] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   
   // Get the default organization for now - in a real app this would be from user context
   const { data: routes = [], isLoading, error } = useQuery<RouteWithStops[]>({

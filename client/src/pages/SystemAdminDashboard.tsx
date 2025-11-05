@@ -10,16 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireRole } from "@/contexts/UserContext";
 import { Building, Plus, Users, Activity, Settings } from "lucide-react";
 import type { Organization, OrganizationType } from "@shared/schema";
 
 export default function SystemAdminDashboard() {
+  const { user, isLoading: authLoading } = useRequireRole("system_admin");
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgType, setNewOrgType] = useState<OrganizationType>("university");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   // Fetch all organizations
   const { data: organizations, isLoading } = useQuery({

@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { RoleToggle } from "@/components/RoleToggle";
+import { UserMenu } from "@/components/UserMenu";
 import { UserProvider } from "@/contexts/UserContext";
 
 // Pages
@@ -82,8 +82,8 @@ export default function App() {
                 <div className="flex flex-col flex-1">
                   <header className="flex items-center justify-between p-4 border-b">
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex items-center gap-4">
-                      <RoleToggle />
+                    <div className="flex items-center gap-2">
+                      <UserMenu />
                       <ThemeToggle />
                     </div>
                   </header>

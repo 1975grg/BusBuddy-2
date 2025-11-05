@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireRole } from "@/contexts/UserContext";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { RiderMessage, DriverMessage, Route, ServiceAlert } from "@shared/schema";
@@ -16,6 +17,7 @@ import type { RiderMessage, DriverMessage, Route, ServiceAlert } from "@shared/s
 type Message = (RiderMessage | DriverMessage) & { messageType: 'rider' | 'driver' };
 
 export default function SupportCenterPage() {
+  const { user, isLoading: authLoading } = useRequireRole("org_admin");
   const { toast } = useToast();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [responseText, setResponseText] = useState("");
@@ -23,6 +25,10 @@ export default function SupportCenterPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   // Fetch current admin user to get organization ID
   const { data: currentAdmin } = useQuery({
