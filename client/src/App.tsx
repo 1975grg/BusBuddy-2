@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RoleToggle } from "@/components/RoleToggle";
+import { UserProvider } from "@/contexts/UserContext";
 
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
@@ -20,6 +21,7 @@ import RiderPage from "@/pages/RiderPage";
 import RiderOnboardingPage from "@/pages/RiderOnboardingPage";
 import AccessPage from "@/pages/AccessPage";
 import SettingsPage from "@/pages/SettingsPage";
+import LoginPage from "@/pages/LoginPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -49,6 +51,11 @@ function Router() {
       {/* Public Rider Onboarding (QR Code Access) */}
       <Route path="/ride/:organizationId/:routeId" component={RiderOnboardingPage} />
       
+      {/* Authentication */}
+      <Route path="/login" component={LoginPage} />
+      <Route path="/auth/verify" component={LoginPage} />
+      <Route path="/auth/invite/:token" component={LoginPage} />
+      
       {/* Public Access */}
       <Route path="/" component={AccessPage} />
       
@@ -66,28 +73,30 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1">
-                <header className="flex items-center justify-between p-4 border-b">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <div className="flex items-center gap-4">
-                    <RoleToggle />
-                    <ThemeToggle />
-                  </div>
-                </header>
-                <main className="flex-1 overflow-auto p-6">
-                  <Router />
-                </main>
+      <UserProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <SidebarProvider style={style as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <div className="flex flex-col flex-1">
+                  <header className="flex items-center justify-between p-4 border-b">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    <div className="flex items-center gap-4">
+                      <RoleToggle />
+                      <ThemeToggle />
+                    </div>
+                  </header>
+                  <main className="flex-1 overflow-auto p-6">
+                    <Router />
+                  </main>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </ThemeProvider>
+      </UserProvider>
     </QueryClientProvider>
   );
 }

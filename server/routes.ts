@@ -30,8 +30,349 @@ import { qrService } from "./qr";
 import { smsService } from "./sms";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { calculateBusStatus } from "./busStatusCalculator";
+import { 
+  authenticateUser, 
+  optionalAuth,
+  requireRole, 
+  requireOrganization,
+  requireRouteAccess,
+  generateSessionToken,
+  generateInviteToken,
+  getSessionExpirationDate,
+  type AuthUser
+} from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ==================== AUTHENTICATION ROUTES ====================
+  
+  // Get current authenticated user
+  app.get("/api/me", authenticateUser, async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Request magic link (for drivers/riders)
+  app.post("/api/auth/magic-link/request", async (req, res) => {
+    try {
+      const { email, phoneNumber } = req.body;
+      
+      if (!email && !phoneNumber) {
+        return res.status(400).json({ error: "Email or phone number required" });
+      }
+
+      // Find user by email or phone
+      const user = email 
+        ? await storage.getUserByEmail(email)
+        : await storage.getUserByPhone(phoneNumber);
+
+      if (!user) {
+        // Don't reveal if user exists or not (security)
+        return res.json({ success: true, message: "If an account exists, a magic link has been sent" });
+      }
+
+      // Generate magic link token
+      const token = generateInviteToken();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Create invite token
+      await storage.createInviteToken({
+        token,
+        userId: user.id,
+        email: user.email,
+        phoneNumber: user.phoneNumber || undefined,
+        role: user.role,
+        organizationId: user.organizationId!,
+        routeId: user.favoriteRouteId || undefined,
+        expiresAt,
+        createdByUserId: user.id, // Self-generated
+      });
+
+      // TODO: Send magic link via email or SMS
+      // For now, we'll just return the token in development
+      const magicLink = `${req.protocol}://${req.get('host')}/auth/verify?token=${token}`;
+      
+      // In production, send via email/SMS instead of returning
+      res.json({ 
+        success: true, 
+        message: "Magic link sent",
+        // Remove this in production:
+        magicLink: process.env.NODE_ENV === 'development' ? magicLink : undefined
+      });
+    } catch (error) {
+      console.error("Error requesting magic link:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Verify magic link and create session
+  app.post("/api/auth/magic-link/verify", async (req, res) => {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ error: "Token required" });
+      }
+
+      // Get and validate invite token
+      const inviteToken = await storage.getInviteToken(token);
+
+      if (!inviteToken) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+
+      // Validate token hasn't been claimed, is active, and hasn't expired
+      if (inviteToken.claimedAt) {
+        return res.status(401).json({ error: "Token has already been used" });
+      }
+
+      if (!inviteToken.isActive) {
+        return res.status(401).json({ error: "Token has been revoked" });
+      }
+
+      if (new Date(inviteToken.expiresAt) < new Date()) {
+        return res.status(401).json({ error: "Token has expired" });
+      }
+
+      // Mark token as claimed
+      await storage.claimInviteToken(token);
+
+      // Get or create user
+      let user = inviteToken.userId 
+        ? await storage.getUser(inviteToken.userId)
+        : await storage.getUserByEmail(inviteToken.email!);
+
+      if (!user) {
+        // Create new user if they don't exist
+        user = await storage.createUser({
+          email: inviteToken.email!,
+          name: inviteToken.email!.split('@')[0], // Temp name
+          phoneNumber: inviteToken.phoneNumber,
+          role: inviteToken.role,
+          organizationId: inviteToken.organizationId,
+        });
+
+        // Create route assignment if specified
+        if (inviteToken.routeId) {
+          await storage.createUserRouteAssignment({
+            userId: user.id,
+            routeId: inviteToken.routeId,
+            assignedByUserId: inviteToken.createdByUserId,
+            isDefault: true,
+          });
+        }
+      }
+
+      // Generate session token
+      const sessionToken = generateSessionToken();
+      const sessionExpiresAt = getSessionExpirationDate();
+
+      // Set user session
+      await storage.setUserSession(user.id, sessionToken, sessionExpiresAt);
+
+      // Set session cookie (HttpOnly for security)
+      res.cookie("sessionToken", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+      });
+
+      // Return session info
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          organizationId: user.organizationId,
+        }
+      });
+    } catch (error) {
+      console.error("Error verifying magic link:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", authenticateUser, async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      await storage.clearUserSession(user.id);
+      
+      // Clear session cookie
+      res.clearCookie("sessionToken");
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error logging out:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ==================== INVITE MANAGEMENT ROUTES ====================
+  
+  // Create invite for driver or rider (org admins only)
+  app.post("/api/invites", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { email, phoneNumber, role, routeId } = req.body;
+
+      if (!email && !phoneNumber) {
+        return res.status(400).json({ error: "Email or phone number required" });
+      }
+
+      if (!["driver", "rider"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be driver or rider" });
+      }
+
+      // Generate invite token
+      const token = generateInviteToken();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      // Create invite
+      const invite = await storage.createInviteToken({
+        token,
+        email,
+        phoneNumber,
+        role,
+        organizationId: user.organizationId!,
+        routeId,
+        expiresAt,
+        createdByUserId: user.id,
+      });
+
+      // Generate invite link
+      const inviteLink = `${req.protocol}://${req.get('host')}/auth/invite/${token}`;
+
+      // Generate QR code
+      const qrCode = await qrService.generateQRCode(inviteLink);
+
+      res.json({
+        success: true,
+        invite: {
+          id: invite.id,
+          email,
+          phoneNumber,
+          role,
+          routeId,
+          expiresAt,
+        },
+        inviteLink,
+        qrCode,
+      });
+    } catch (error) {
+      console.error("Error creating invite:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get active invites for organization
+  app.get("/api/invites", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const invites = await storage.getActiveInvitesByOrganization(user.organizationId!);
+      res.json(invites);
+    } catch (error) {
+      console.error("Error fetching invites:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Expire/revoke invite
+  app.delete("/api/invites/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.expireInviteToken(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error expiring invite:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ==================== ROUTE ASSIGNMENT ROUTES ====================
+  
+  // Get user's route assignments
+  app.get("/api/route-assignments/:userId", authenticateUser, async (req, res) => {
+    try {
+      const requestingUser = (req as any).user as AuthUser;
+      const { userId } = req.params;
+
+      // Users can view their own assignments, org admins can view anyone's in their org
+      if (requestingUser.id !== userId && requestingUser.role !== "org_admin" && requestingUser.role !== "system_admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const assignments = await storage.getUserRouteAssignments(userId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching route assignments:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Create route assignment (org admins only)
+  app.post("/api/route-assignments", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const requestingUser = (req as any).user as AuthUser;
+      const { userId, routeId, isDefault } = req.body;
+
+      const assignment = await storage.createUserRouteAssignment({
+        userId,
+        routeId,
+        assignedByUserId: requestingUser.id,
+        isDefault: isDefault || false,
+      });
+
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error creating route assignment:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Set default route for user
+  app.put("/api/route-assignments/:userId/default", authenticateUser, async (req, res) => {
+    try {
+      const requestingUser = (req as any).user as AuthUser;
+      const { userId } = req.params;
+      const { routeId } = req.body;
+
+      // Users can set their own default, org admins can set for their org
+      if (requestingUser.id !== userId && requestingUser.role !== "org_admin" && requestingUser.role !== "system_admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const assignment = await storage.setDefaultRoute(userId, routeId);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error setting default route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Revoke route assignment (org admins only)
+  app.delete("/api/route-assignments/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const requestingUser = (req as any).user as AuthUser;
+      const { id } = req.params;
+
+      const assignment = await storage.revokeRouteAssignment(id, requestingUser.id);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error revoking route assignment:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ==================== EXISTING ROUTES BELOW ====================
+  
   // Organization Settings Routes
   app.get("/api/org-settings", async (req, res) => {
     try {

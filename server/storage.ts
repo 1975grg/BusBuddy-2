@@ -26,6 +26,10 @@ import {
   type InsertRouteSession,
   type NotificationLog,
   type InsertNotificationLog,
+  type InviteToken,
+  type InsertInviteToken,
+  type UserRouteAssignment,
+  type InsertUserRouteAssignment,
   users,
   organizations,
   organizationSettings,
@@ -38,7 +42,9 @@ import {
   routeSubscriptions,
   stopPreferences,
   routeSessions,
-  notificationLog
+  notificationLog,
+  inviteTokens,
+  userRouteAssignments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
@@ -51,10 +57,32 @@ export interface IStorage {
   // User management
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phoneNumber: string): Promise<User | undefined>;
+  getUserBySessionToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   getUsersByRole(role: UserRole): Promise<User[]>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
   setUserFavoriteRoute(userId: string, routeId: string | null): Promise<User | undefined>;
+  setUserSession(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
+  clearUserSession(userId: string): Promise<User | undefined>;
+  deactivateUser(userId: string): Promise<User | undefined>;
+  
+  // Invite tokens for magic link authentication
+  createInviteToken(token: InsertInviteToken): Promise<InviteToken>;
+  getInviteToken(token: string): Promise<InviteToken | undefined>;
+  getInviteTokenById(id: string): Promise<InviteToken | undefined>;
+  claimInviteToken(token: string): Promise<InviteToken | undefined>;
+  getActiveInvitesByOrganization(organizationId: string): Promise<InviteToken[]>;
+  expireInviteToken(id: string): Promise<boolean>;
+  
+  // User route assignments (for multi-route users)
+  createUserRouteAssignment(assignment: InsertUserRouteAssignment): Promise<UserRouteAssignment>;
+  getUserRouteAssignments(userId: string): Promise<UserRouteAssignment[]>;
+  getRouteAssignmentsByRoute(routeId: string): Promise<UserRouteAssignment[]>;
+  setDefaultRoute(userId: string, routeId: string): Promise<UserRouteAssignment | undefined>;
+  revokeRouteAssignment(assignmentId: string, revokedByUserId: string): Promise<UserRouteAssignment | undefined>;
+  deleteRouteAssignment(assignmentId: string): Promise<boolean>;
   
   // Organization management
   getOrganization(id: string): Promise<Organization | undefined>;
@@ -180,6 +208,157 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;
+  }
+
+  async getUserByPhone(phoneNumber: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phoneNumber, phoneNumber));
+    return user || undefined;
+  }
+
+  async getUserBySessionToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users)
+      .where(and(
+        eq(users.sessionToken, token),
+        sql`${users.sessionExpiresAt} > NOW()`
+      ));
+    return user || undefined;
+  }
+
+  async updateUser(id: string, updateUser: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set(updateUser)
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async setUserSession(userId: string, token: string, expiresAt: Date): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ sessionToken: token, sessionExpiresAt: expiresAt })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async clearUserSession(userId: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ sessionToken: null, sessionExpiresAt: null })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async deactivateUser(userId: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ isActive: false })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  // Invite tokens management
+  async createInviteToken(insertToken: InsertInviteToken): Promise<InviteToken> {
+    const [token] = await db.insert(inviteTokens).values(insertToken).returning();
+    return token;
+  }
+
+  async getInviteToken(token: string): Promise<InviteToken | undefined> {
+    const [inviteToken] = await db.select().from(inviteTokens)
+      .where(and(
+        eq(inviteTokens.token, token),
+        eq(inviteTokens.isActive, true),
+        isNull(inviteTokens.claimedAt),
+        sql`${inviteTokens.expiresAt} > NOW()`
+      ));
+    return inviteToken || undefined;
+  }
+
+  async getInviteTokenById(id: string): Promise<InviteToken | undefined> {
+    const [token] = await db.select().from(inviteTokens).where(eq(inviteTokens.id, id));
+    return token || undefined;
+  }
+
+  async claimInviteToken(token: string): Promise<InviteToken | undefined> {
+    const [inviteToken] = await db.update(inviteTokens)
+      .set({ claimedAt: new Date() })
+      .where(eq(inviteTokens.token, token))
+      .returning();
+    return inviteToken || undefined;
+  }
+
+  async getActiveInvitesByOrganization(organizationId: string): Promise<InviteToken[]> {
+    return await db.select().from(inviteTokens)
+      .where(and(
+        eq(inviteTokens.organizationId, organizationId),
+        eq(inviteTokens.isActive, true),
+        isNull(inviteTokens.claimedAt)
+      ));
+  }
+
+  async expireInviteToken(id: string): Promise<boolean> {
+    const result = await db.update(inviteTokens)
+      .set({ isActive: false })
+      .where(eq(inviteTokens.id, id));
+    return true;
+  }
+
+  // User route assignments management
+  async createUserRouteAssignment(insertAssignment: InsertUserRouteAssignment): Promise<UserRouteAssignment> {
+    const [assignment] = await db.insert(userRouteAssignments).values(insertAssignment).returning();
+    return assignment;
+  }
+
+  async getUserRouteAssignments(userId: string): Promise<UserRouteAssignment[]> {
+    return await db.select().from(userRouteAssignments)
+      .where(and(
+        eq(userRouteAssignments.userId, userId),
+        eq(userRouteAssignments.isActive, true),
+        isNull(userRouteAssignments.revokedAt)
+      ));
+  }
+
+  async getRouteAssignmentsByRoute(routeId: string): Promise<UserRouteAssignment[]> {
+    return await db.select().from(userRouteAssignments)
+      .where(and(
+        eq(userRouteAssignments.routeId, routeId),
+        eq(userRouteAssignments.isActive, true),
+        isNull(userRouteAssignments.revokedAt)
+      ));
+  }
+
+  async setDefaultRoute(userId: string, routeId: string): Promise<UserRouteAssignment | undefined> {
+    // First, clear all default flags for this user
+    await db.update(userRouteAssignments)
+      .set({ isDefault: false })
+      .where(eq(userRouteAssignments.userId, userId));
+    
+    // Then set the new default
+    const [assignment] = await db.update(userRouteAssignments)
+      .set({ isDefault: true })
+      .where(and(
+        eq(userRouteAssignments.userId, userId),
+        eq(userRouteAssignments.routeId, routeId),
+        eq(userRouteAssignments.isActive, true)
+      ))
+      .returning();
+    return assignment || undefined;
+  }
+
+  async revokeRouteAssignment(assignmentId: string, revokedByUserId: string): Promise<UserRouteAssignment | undefined> {
+    const [assignment] = await db.update(userRouteAssignments)
+      .set({ 
+        isActive: false,
+        revokedAt: new Date(),
+        revokedByUserId: revokedByUserId
+      })
+      .where(eq(userRouteAssignments.id, assignmentId))
+      .returning();
+    return assignment || undefined;
+  }
+
+  async deleteRouteAssignment(assignmentId: string): Promise<boolean> {
+    await db.delete(userRouteAssignments).where(eq(userRouteAssignments.id, assignmentId));
+    return true;
   }
 
   // Organization management

@@ -18,11 +18,45 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  phoneNumber: text("phone_number"), // For SMS magic links
   role: text("role").notNull(), // 'system_admin', 'org_admin', 'driver', 'rider'
   organizationId: varchar("organization_id").references(() => organizations.id),
   favoriteRouteId: varchar("favorite_route_id").references(() => routes.id),
+  defaultRouteId: varchar("default_route_id").references(() => routes.id), // For multi-route riders
+  sessionToken: text("session_token"), // For persistent 90-day login
+  sessionExpiresAt: timestamp("session_expires_at"), // Session expiration
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Invite tokens for magic link authentication and QR code access
+export const inviteTokens = pgTable("invite_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: text("token").notNull().unique(), // Unique token for the invite
+  userId: varchar("user_id").references(() => users.id), // For existing user invites
+  email: text("email"), // For new user invites
+  phoneNumber: text("phone_number"), // For SMS-based magic links
+  role: text("role").notNull(), // Role to assign when claimed
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  routeId: varchar("route_id").references(() => routes.id), // Optional route assignment
+  expiresAt: timestamp("expires_at").notNull(), // Token expiration
+  claimedAt: timestamp("claimed_at"), // When the invite was used
+  createdByUserId: varchar("created_by_user_id").notNull().references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Route assignments for authenticated users (drivers and riders)
+export const userRouteAssignments = pgTable("user_route_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  assignedByUserId: varchar("assigned_by_user_id").notNull().references(() => users.id),
+  isDefault: boolean("is_default").notNull().default(false), // Is this the user's default route?
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  revokedAt: timestamp("revoked_at"), // When access was revoked
+  revokedByUserId: varchar("revoked_by_user_id").references(() => users.id),
 });
 
 // Keep organizationSettings for backward compatibility with existing branding system
@@ -201,7 +235,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   routes: many(routes),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [users.organizationId],
     references: [organizations.id],
@@ -210,6 +244,11 @@ export const usersRelations = relations(users, ({ one }) => ({
     fields: [users.favoriteRouteId],
     references: [routes.id],
   }),
+  defaultRoute: one(routes, {
+    fields: [users.defaultRouteId],
+    references: [routes.id],
+  }),
+  routeAssignments: many(userRouteAssignments),
 }));
 
 export const routesRelations = relations(routes, ({ one, many }) => ({
@@ -361,6 +400,44 @@ export const notificationLogRelations = relations(notificationLog, ({ one }) => 
   }),
 }));
 
+export const inviteTokensRelations = relations(inviteTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [inviteTokens.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [inviteTokens.organizationId],
+    references: [organizations.id],
+  }),
+  route: one(routes, {
+    fields: [inviteTokens.routeId],
+    references: [routes.id],
+  }),
+  createdBy: one(users, {
+    fields: [inviteTokens.createdByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const userRouteAssignmentsRelations = relations(userRouteAssignments, ({ one }) => ({
+  user: one(users, {
+    fields: [userRouteAssignments.userId],
+    references: [users.id],
+  }),
+  route: one(routes, {
+    fields: [userRouteAssignments.routeId],
+    references: [routes.id],
+  }),
+  assignedBy: one(users, {
+    fields: [userRouteAssignments.assignedByUserId],
+    references: [users.id],
+  }),
+  revokedBy: one(users, {
+    fields: [userRouteAssignments.revokedByUserId],
+    references: [users.id],
+  }),
+}));
+
 export const insertOrganizationSchema = createInsertSchema(organizations).pick({
   name: true,
   type: true,
@@ -371,8 +448,11 @@ export const insertOrganizationSchema = createInsertSchema(organizations).pick({
 export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
+  phoneNumber: true,
   role: true,
   organizationId: true,
+  favoriteRouteId: true,
+  defaultRouteId: true,
 });
 
 export const insertOrgSettingsSchema = createInsertSchema(organizationSettings).pick({
@@ -477,6 +557,25 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLog).p
   message: true,
 });
 
+export const insertInviteTokenSchema = createInsertSchema(inviteTokens).pick({
+  token: true,
+  userId: true,
+  email: true,
+  phoneNumber: true,
+  role: true,
+  organizationId: true,
+  routeId: true,
+  expiresAt: true,
+  createdByUserId: true,
+});
+
+export const insertUserRouteAssignmentSchema = createInsertSchema(userRouteAssignments).pick({
+  userId: true,
+  routeId: true,
+  assignedByUserId: true,
+  isDefault: true,
+});
+
 export const roleEnum = z.enum(["system_admin", "org_admin", "driver", "rider"]);
 export const orgTypeEnum = z.enum(["university", "school", "hospital", "airport", "hotel"]);
 export const routeTypeEnum = z.enum(["shuttle", "bus"]);
@@ -522,6 +621,10 @@ export type InsertDriverSchedule = z.infer<typeof insertDriverScheduleSchema>;
 export type DriverSchedule = typeof driverSchedules.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLog = typeof notificationLog.$inferSelect;
+export type InsertInviteToken = z.infer<typeof insertInviteTokenSchema>;
+export type InviteToken = typeof inviteTokens.$inferSelect;
+export type InsertUserRouteAssignment = z.infer<typeof insertUserRouteAssignmentSchema>;
+export type UserRouteAssignment = typeof userRouteAssignments.$inferSelect;
 export type UserRole = z.infer<typeof roleEnum>;
 export type OrganizationType = z.infer<typeof orgTypeEnum>;
 export type RouteType = z.infer<typeof routeTypeEnum>;
