@@ -647,9 +647,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/routes", async (req, res) => {
+  app.post("/api/routes", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
-      const validatedData = insertRouteSchema.parse(req.body);
+      const user = (req as any).user as AuthUser;
+      
+      // Org admins can only create routes in their own organization
+      // Never trust client-provided organizationId for org admins
+      const organizationId = user.role === "org_admin" 
+        ? user.organizationId 
+        : req.body.organizationId;
+      
+      const validatedData = insertRouteSchema.parse({ 
+        ...req.body, 
+        organizationId 
+      });
+      
       const route = await storage.createRoute(validatedData);
       res.status(201).json(route);
     } catch (error) {
@@ -678,15 +690,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/routes/:id", async (req, res) => {
+  app.put("/api/routes/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const validatedData = insertRouteSchema.partial().parse(req.body);
-      const updated = await storage.updateRoute(id, validatedData);
+      const user = (req as any).user as AuthUser;
       
-      if (!updated) {
+      // Verify route exists and get its organization
+      const route = await storage.getRoute(id);
+      if (!route) {
         return res.status(404).json({ error: "Route not found" });
       }
+      
+      // Org admins can only update routes in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only update routes in your organization" });
+      }
+      
+      // Don't allow changing organizationId
+      const { organizationId, ...updateData } = req.body;
+      const validatedData = insertRouteSchema.partial().parse(updateData);
+      const updated = await storage.updateRoute(id, validatedData);
       
       const stops = await storage.getRouteStopsByRoute(id);
       res.json({ ...updated, stops });

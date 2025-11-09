@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, Navigation } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 interface AddressSuggestion {
   id: string;
@@ -55,6 +57,9 @@ export function AddressAutocomplete({
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
   
   const debouncedQuery = useDebounce(inputValue, 300);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +136,39 @@ export function AddressAutocomplete({
     }
   };
 
+  const handleManualCoordinates = () => {
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      return; // Invalid coordinates
+    }
+    
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return; // Out of range
+    }
+    
+    const coordinateAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const addressData: AddressData = {
+      address: coordinateAddress,
+      placeId: `manual-${lat}-${lng}`,
+      latitude: lat,
+      longitude: lng,
+    };
+    
+    setInputValue(coordinateAddress);
+    setManualMode(false);
+    setIsOpen(false);
+    onChange?.(addressData);
+    onNameGenerated?.(`Custom Location`);
+  };
+
+  const toggleManualMode = () => {
+    setManualMode(!manualMode);
+    setManualLat("");
+    setManualLng("");
+  };
+
   return (
     <div className="relative">
       <div className="relative">
@@ -168,7 +206,7 @@ export function AddressAutocomplete({
                     <CommandItem
                       key={suggestion.id}
                       onSelect={() => handleSelectAddress(suggestion)}
-                      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-accent"
+                      className="flex items-start gap-3 p-4 cursor-pointer hover-elevate"
                       data-testid={`address-suggestion-${suggestion.id}`}
                     >
                       <MapPin className="w-5 h-5 mt-0.5 text-muted-foreground flex-shrink-0" />
@@ -189,8 +227,84 @@ export function AddressAutocomplete({
                   No addresses found
                 </div>
               )}
+              
+              {/* Manual coordinate entry option */}
+              {!manualMode && (
+                <div className="border-t p-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleManualMode}
+                    className="w-full justify-start gap-2"
+                    data-testid="button-manual-coordinates"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Enter coordinates manually
+                  </Button>
+                </div>
+              )}
             </CommandList>
           </Command>
+        </div>
+      )}
+      
+      {/* Manual coordinate entry form */}
+      {manualMode && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-96 max-w-[90vw] bg-popover border rounded-md shadow-md p-4">
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="manual-lat" className="text-sm font-medium">
+                Latitude
+              </Label>
+              <Input
+                id="manual-lat"
+                type="number"
+                step="any"
+                placeholder="e.g., 37.7749"
+                value={manualLat}
+                onChange={(e) => setManualLat(e.target.value)}
+                data-testid="input-manual-latitude"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="manual-lng" className="text-sm font-medium">
+                Longitude
+              </Label>
+              <Input
+                id="manual-lng"
+                type="number"
+                step="any"
+                placeholder="e.g., -122.4194"
+                value={manualLng}
+                onChange={(e) => setManualLng(e.target.value)}
+                data-testid="input-manual-longitude"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleManualCoordinates}
+                disabled={!manualLat || !manualLng}
+                size="sm"
+                className="flex-1"
+                data-testid="button-apply-coordinates"
+              >
+                Apply
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={toggleManualMode}
+                size="sm"
+                data-testid="button-cancel-manual"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
