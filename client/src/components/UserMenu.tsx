@@ -12,11 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { User, LogOut } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export function UserMenu() {
-  const { user, refetchUser } = useUser();
+  const { user } = useUser();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -25,7 +25,10 @@ export function UserMenu() {
       return apiRequest("POST", "/api/auth/logout", {});
     },
     onSuccess: () => {
-      refetchUser();
+      // Invalidate all queries to clear the cache
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      queryClient.clear();
+      
       setLocation("/login");
       toast({
         title: "Logged out",

@@ -73,7 +73,8 @@ export default function LoginPage() {
         description: "Welcome back",
       });
 
-      // Refetch user data
+      // Invalidate and refetch user data to clear old cache
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       refetchUser();
 
       // Redirect based on role
