@@ -63,7 +63,8 @@ export default function LoginPage() {
   // Verify magic link token from URL
   const verifyTokenMutation = useMutation({
     mutationFn: async (token: string) => {
-      return apiRequest("POST", "/api/auth/magic-link/verify", { token });
+      const response = await apiRequest("POST", "/api/auth/magic-link/verify", { token });
+      return response.json();
     },
     onSuccess: (data: any) => {
       // Session is now stored in HTTP-only cookie
