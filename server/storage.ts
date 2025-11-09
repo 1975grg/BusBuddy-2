@@ -147,6 +147,7 @@ export interface IStorage {
   updateRiderProfile(id: string, profile: Partial<InsertRiderProfile>): Promise<RiderProfile | undefined>;
   getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>>;
   deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }>;
+  getDriversForRoute(routeId: string): Promise<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null; organizationId: string }>>;
   
   // Route subscriptions management
   createRouteSubscription(subscription: InsertRouteSubscription): Promise<RouteSubscription>;
@@ -964,6 +965,26 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
+  async getDriversForRoute(routeId: string): Promise<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null; organizationId: string }>> {
+    const results = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      phoneNumber: users.phoneNumber,
+      organizationId: users.organizationId
+    })
+    .from(users)
+    .innerJoin(userRouteAssignments, eq(users.id, userRouteAssignments.userId))
+    .where(and(
+      eq(userRouteAssignments.routeId, routeId),
+      eq(userRouteAssignments.isActive, true),
+      eq(users.isActive, true),
+      eq(users.role, 'driver')
+    ));
+    
+    return results;
+  }
+
   async deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }> {
     try {
       // Get rider profile and subscription details before deletion
@@ -1560,6 +1581,10 @@ export class MemStorage implements IStorage {
 
   async deleteRiderFromRoute(riderProfileId: string, routeId: string): Promise<{ success: boolean; deletedSubscription?: RouteSubscription; riderProfile?: RiderProfile }> {
     return { success: false };
+  }
+
+  async getDriversForRoute(routeId: string): Promise<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null; organizationId: string }>> {
+    return [];
   }
 
   // Route subscription management implementation

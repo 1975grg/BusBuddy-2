@@ -34,28 +34,19 @@ export function ArchiveRouteDialog({ route, open, onOpenChange, onSuccess }: Arc
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { data: riders = [], isLoading: loadingRiders, isError: ridersError, error: ridersErrorObj } = useQuery<RiderInfo[]>({
+  const { data: riders = [], isLoading: loadingRiders, isError: ridersError } = useQuery<RiderInfo[]>({
     queryKey: ["/api/routes", route.id, "riders"],
     enabled: open && !!route.id,
     retry: false,
     staleTime: 0,
   });
 
-  const { data: drivers = [], isLoading: loadingDrivers, isError: driversError, error: driversErrorObj } = useQuery<DriverInfo[]>({
+  const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery<DriverInfo[]>({
     queryKey: ["/api/routes", route.id, "drivers"],
     enabled: open && !!route.id,
     retry: false,
     staleTime: 0,
   });
-
-  // Debug logging
-  if (open && (ridersError || driversError)) {
-    console.error("Query errors:", {
-      ridersError: ridersError ? ridersErrorObj : null,
-      driversError: driversError ? driversErrorObj : null,
-      routeId: route.id,
-    });
-  }
 
   const isLoading = loadingRiders || loadingDrivers;
   const hasDataError = ridersError || driversError;

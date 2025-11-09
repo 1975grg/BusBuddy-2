@@ -2046,7 +2046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Rider Management Routes
-  app.get("/api/routes/:routeId/riders", async (req, res) => {
+  app.get("/api/routes/:routeId/riders", authenticateUser, requireRouteAccess(), async (req, res) => {
     try {
       const { routeId } = req.params;
       console.log("Fetching riders for route:", routeId);
@@ -2056,6 +2056,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching riders for route:", error);
       console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Route Driver Management Routes
+  app.get("/api/routes/:routeId/drivers", authenticateUser, requireRouteAccess(), async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const drivers = await storage.getDriversForRoute(routeId);
+      res.json(drivers);
+    } catch (error) {
+      console.error("Error fetching drivers for route:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
