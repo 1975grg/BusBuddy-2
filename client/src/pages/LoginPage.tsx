@@ -20,23 +20,34 @@ export default function LoginPage() {
   // Request magic link mutation
   const requestMagicLinkMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/auth/magic-link/request", {
+      const response = await apiRequest("POST", "/api/auth/magic-link/request", {
         email: usePhone ? undefined : email,
         phoneNumber: usePhone ? phoneNumber : undefined,
       });
+      return response.json();
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Magic link sent!",
-        description: data.message || "Check your email/SMS for the login link",
-      });
-
-      // In development, show the magic link
+      // In development, auto-login with the token
       if (data.magicLink) {
+        const url = new URL(data.magicLink);
+        const token = url.searchParams.get('token');
+        
         toast({
-          title: "Development Mode",
-          description: `Click here to login: ${data.magicLink}`,
-          duration: 10000,
+          title: "🔗 Development Mode",
+          description: "Logging you in automatically...",
+          duration: 3000,
+        });
+        
+        // Auto-login after a short delay
+        if (token) {
+          setTimeout(() => {
+            verifyTokenMutation.mutate(token);
+          }, 500);
+        }
+      } else {
+        toast({
+          title: "Magic link sent!",
+          description: data.message || "Check your email/SMS for the login link",
         });
       }
     },
