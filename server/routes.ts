@@ -689,18 +689,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/routes/:id", async (req, res) => {
+  app.delete("/api/routes/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const deleted = await storage.deleteRoute(id);
+      const user = (req as any).user as AuthUser;
       
-      if (!deleted) {
+      // Verify route exists and get its organization
+      const route = await storage.getRoute(id);
+      if (!route) {
         return res.status(404).json({ error: "Route not found" });
       }
       
-      res.status(204).send();
+      // Org admins can only archive routes in their organization
+      // System admins can archive any route
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only archive routes in your organization" });
+      }
+      
+      // Archive the route with safety checks
+      const result = await storage.archiveRoute(id, user.id);
+      
+      if (!result.success) {
+        // Check if it's an active trips conflict
+        if (result.error?.includes("active trips")) {
+          return res.status(409).json({ 
+            error: result.error,
+            code: "ACTIVE_TRIPS_EXIST"
+          });
+        }
+        return res.status(400).json({ error: result.error });
+      }
+      
+      // Log archive action for audit trail
+      console.log(`Route archived: ${id} by user ${user.id} (${user.role}). Affected: ${result.affectedRiders} riders, ${result.affectedDrivers} drivers`);
+      
+      res.json({ 
+        success: true,
+        message: "Route archived successfully",
+        affectedRiders: result.affectedRiders,
+        affectedDrivers: result.affectedDrivers
+      });
     } catch (error) {
-      console.error("Error deleting route:", error);
+      console.error("Error archiving route:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

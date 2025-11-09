@@ -103,6 +103,7 @@ export interface IStorage {
   createRoute(route: InsertRoute): Promise<Route>;
   updateRoute(id: string, route: Partial<InsertRoute>): Promise<Route | undefined>;
   deleteRoute(id: string): Promise<boolean>;
+  archiveRoute(id: string, archivedByUserId: string): Promise<{ success: boolean; error?: string; affectedRiders?: number; affectedDrivers?: number }>;
   
   // Route stops management
   getRouteStop(id: string): Promise<RouteStop | undefined>;
@@ -438,6 +439,101 @@ export class DatabaseStorage implements IStorage {
   async deleteRoute(id: string): Promise<boolean> {
     const result = await db.delete(routes).where(eq(routes.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async archiveRoute(id: string, archivedByUserId: string): Promise<{ success: boolean; error?: string; affectedRiders?: number; affectedDrivers?: number }> {
+    try {
+      // Check if route exists and isn't already archived
+      const [route] = await db.select().from(routes).where(eq(routes.id, id));
+      if (!route) {
+        return { success: false, error: "Route not found" };
+      }
+      if (route.archivedAt) {
+        return { success: false, error: "Route is already archived" };
+      }
+
+      // Check for active route sessions - block if found
+      const activeSessions = await db.select().from(routeSessions)
+        .where(and(
+          eq(routeSessions.routeId, id),
+          sql`${routeSessions.status} IN ('pending', 'active')`
+        ));
+      
+      if (activeSessions.length > 0) {
+        return { 
+          success: false, 
+          error: "Cannot archive route with active trips. Please end all active trips first." 
+        };
+      }
+
+      // Count affected riders and drivers by joining with users table
+      const assignments = await db.select({
+        assignmentId: userRouteAssignments.id,
+        userId: userRouteAssignments.userId,
+        userRole: users.role
+      })
+        .from(userRouteAssignments)
+        .innerJoin(users, eq(users.id, userRouteAssignments.userId))
+        .where(and(
+          eq(userRouteAssignments.routeId, id),
+          eq(userRouteAssignments.isActive, true)
+        ));
+
+      const affectedDrivers = assignments.filter(a => a.userRole === 'driver').length;
+      const affectedRiders = assignments.filter(a => a.userRole === 'rider').length;
+
+      // Use transaction to ensure all-or-nothing update
+      await db.transaction(async (tx) => {
+        // 1. Revoke all active route assignments
+        await tx.update(userRouteAssignments)
+          .set({ 
+            isActive: false, 
+            revokedAt: new Date(), 
+            revokedByUserId: archivedByUserId 
+          })
+          .where(and(
+            eq(userRouteAssignments.routeId, id),
+            eq(userRouteAssignments.isActive, true)
+          ));
+
+        // 2. Deactivate all rider subscriptions (for QR code/anonymous riders)
+        await tx.update(routeSubscriptions)
+          .set({ isActive: false })
+          .where(eq(routeSubscriptions.routeId, id));
+
+        // 3. Mark all service alerts inactive
+        await tx.update(serviceAlerts)
+          .set({ isActive: false })
+          .where(eq(serviceAlerts.routeId, id));
+
+        // 4. Mark all route stops inactive
+        await tx.update(routeStops)
+          .set({ isActive: false })
+          .where(eq(routeStops.routeId, id));
+
+        // 5. Archive the route
+        await tx.update(routes)
+          .set({ 
+            status: 'inactive',
+            isActive: false,
+            archivedAt: new Date(),
+            archivedByUserId: archivedByUserId
+          })
+          .where(eq(routes.id, id));
+      });
+
+      return { 
+        success: true, 
+        affectedRiders, 
+        affectedDrivers 
+      };
+    } catch (error) {
+      console.error("Error archiving route:", error);
+      return { 
+        success: false, 
+        error: "Failed to archive route" 
+      };
+    }
   }
 
   // Route stops management
@@ -1269,6 +1365,23 @@ export class MemStorage implements IStorage {
     }
     
     return true;
+  }
+
+  async archiveRoute(id: string, archivedByUserId: string): Promise<{ success: boolean; error?: string; affectedRiders?: number; affectedDrivers?: number }> {
+    const existing = this.routes.get(id);
+    if (!existing) {
+      return { success: false, error: "Route not found" };
+    }
+    
+    // For MemStorage, just mark as inactive (simplified archival)
+    const updated: Route = { ...existing, isActive: false, status: 'inactive' };
+    this.routes.set(id, updated);
+    
+    return { 
+      success: true, 
+      affectedRiders: 0, 
+      affectedDrivers: 0 
+    };
   }
   
   // Route stops management

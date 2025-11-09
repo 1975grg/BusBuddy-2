@@ -76,6 +76,8 @@ export const routes = pgTable("routes", {
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  archivedAt: timestamp("archived_at"), // Soft delete timestamp
+  archivedByUserId: varchar("archived_by_user_id").references(() => users.id),
 });
 
 export const routeStops = pgTable("route_stops", {
