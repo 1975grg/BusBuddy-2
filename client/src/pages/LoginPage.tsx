@@ -75,18 +75,17 @@ export default function LoginPage() {
 
       // Invalidate and refetch user data to clear old cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
-      refetchUser();
-
-      // Redirect based on role
+      
+      // Redirect based on role - use window.location to force full page reload
       const role = data.user.role;
       if (role === "system_admin") {
-        setLocation("/system");
+        window.location.href = "/system";
       } else if (role === "org_admin") {
-        setLocation("/admin");
+        window.location.href = "/admin";
       } else if (role === "driver") {
-        setLocation("/driver");
+        window.location.href = "/driver";
       } else if (role === "rider") {
-        setLocation("/rider");
+        window.location.href = "/rider";
       }
     },
     onError: (error: any) => {

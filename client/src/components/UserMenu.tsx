@@ -29,11 +29,8 @@ export function UserMenu() {
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       queryClient.clear();
       
-      setLocation("/login");
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out",
-      });
+      // Use window.location to force full page reload and clear all React state
+      window.location.href = "/login";
     },
     onError: () => {
       toast({
