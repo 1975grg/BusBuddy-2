@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -24,7 +24,8 @@ import {
   messageTypeEnum,
   notificationMethodEnum,
   notificationModeEnum,
-  stopPreferences
+  stopPreferences,
+  routeStops
 } from "@shared/schema";
 import { qrService } from "./qr";
 import { smsService } from "./sms";
@@ -760,9 +761,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Stops Management Routes
-  app.get("/api/routes/:routeId/stops", async (req, res) => {
+  app.get("/api/routes/:routeId/stops", authenticateUser, requireRouteAccess(), async (req, res) => {
     try {
       const { routeId } = req.params;
+      
       const stops = await storage.getRouteStopsByRoute(routeId);
       res.json(stops);
     } catch (error) {
@@ -771,9 +773,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/routes/:routeId/stops", async (req, res) => {
+  app.post("/api/routes/:routeId/stops", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { routeId } = req.params;
+      const user = (req as any).user as AuthUser;
+      
+      // Verify route exists and user has access
+      const route = await storage.getRoute(routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Org admins can only add stops to routes in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only add stops to routes in your organization" });
+      }
+      
       const validatedData = insertRouteStopSchema.parse({ ...req.body, routeId });
       const stop = await storage.createRouteStop(validatedData);
       res.status(201).json(stop);
@@ -786,15 +801,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/stops/:id", async (req, res) => {
+  app.put("/api/stops/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const validatedData = insertRouteStopSchema.partial().parse(req.body);
-      const updated = await storage.updateRouteStop(id, validatedData);
+      const user = (req as any).user as AuthUser;
       
-      if (!updated) {
+      // Get the stop to verify it exists and check its route's organization
+      const stop = await storage.getRouteStop(id);
+      if (!stop) {
         return res.status(404).json({ error: "Route stop not found" });
       }
+      
+      // Get the route to check organization
+      const route = await storage.getRoute(stop.routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Org admins can only update stops in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only update stops in your organization" });
+      }
+      
+      const validatedData = insertRouteStopSchema.partial().parse(req.body);
+      const updated = await storage.updateRouteStop(id, validatedData);
       
       res.json(updated);
     } catch (error) {
@@ -806,15 +836,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/stops/:id", async (req, res) => {
+  app.delete("/api/stops/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const deleted = await storage.deleteRouteStop(id);
+      const user = (req as any).user as AuthUser;
       
-      if (!deleted) {
+      // Get the stop to verify it exists and check its route's organization
+      const stop = await storage.getRouteStop(id);
+      if (!stop) {
         return res.status(404).json({ error: "Route stop not found" });
       }
       
+      // Get the route to check organization
+      const route = await storage.getRoute(stop.routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Org admins can only delete stops in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only delete stops in your organization" });
+      }
+      
+      // Check if any riders have this stop as their home stop preference
+      const dependentPreferences = await db.select()
+        .from(stopPreferences)
+        .where(eq(stopPreferences.stopId, id));
+      
+      if (dependentPreferences.length > 0) {
+        return res.status(409).json({
+          error: "Cannot delete stop. Riders have selected this as their home stop.",
+          code: "STOP_IN_USE",
+          affectedRiders: dependentPreferences.length
+        });
+      }
+      
+      const deleted = await storage.deleteRouteStop(id);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting route stop:", error);
@@ -822,10 +879,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete all stops for a route
-  app.delete("/api/routes/:id/stops", async (req, res) => {
+  // Reorder route stops (for drag-and-drop UI)
+  app.patch("/api/routes/:routeId/stops/reorder", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const { routeId } = req.params;
+      const user = (req as any).user as AuthUser;
+      const { stops } = req.body; // Array of { stopId, orderIndex }
+      
+      // Verify route exists and check organization ownership
+      const route = await storage.getRoute(routeId);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Org admins can only reorder stops in their organization
+      // System admins can reorder stops in any organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only reorder stops in your organization" });
+      }
+      
+      // Validate request body
+      if (!Array.isArray(stops) || stops.length === 0) {
+        return res.status(400).json({ error: "Invalid request. Expected array of stops." });
+      }
+      
+      // Load current stops for this route to validate the submitted list
+      const currentStops = await storage.getRouteStopsByRoute(routeId);
+      const currentStopIds = new Set(currentStops.map(s => s.id));
+      const submittedStopIds = new Set(stops.map(s => s.stopId));
+      
+      // Verify the submitted list contains exactly the same stops (no missing, no extra, no foreign)
+      if (currentStopIds.size !== submittedStopIds.size) {
+        return res.status(400).json({ 
+          error: "Invalid stops list. Must include all stops for this route (no more, no less)." 
+        });
+      }
+      
+      for (const stopId of submittedStopIds) {
+        if (!currentStopIds.has(stopId)) {
+          return res.status(400).json({ 
+            error: "Invalid stop ID. All stops must belong to this route." 
+          });
+        }
+      }
+      
+      // Validate that indices are contiguous (0, 1, 2, 3...)
+      const indices = stops.map(s => s.orderIndex).sort((a, b) => a - b);
+      for (let i = 0; i < indices.length; i++) {
+        if (indices[i] !== i) {
+          return res.status(400).json({ 
+            error: "Invalid order indices. Must be contiguous starting from 0." 
+          });
+        }
+      }
+      
+      // Update all stops in a transaction (safe now - verified all stops belong to route)
+      await db.transaction(async (tx) => {
+        for (const stop of stops) {
+          await tx.update(routeStops)
+            .set({ orderIndex: stop.orderIndex })
+            .where(eq(routeStops.id, stop.stopId));
+        }
+      });
+      
+      // Fetch and return updated stops
+      const updatedStops = await storage.getRouteStopsByRoute(routeId);
+      res.json(updatedStops);
+    } catch (error) {
+      console.error("Error reordering route stops:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Delete all stops for a route (DANGEROUS - use with caution)
+  app.delete("/api/routes/:id/stops", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
+      const user = (req as any).user as AuthUser;
       
       // First check if route exists
       const route = await storage.getRoute(id);
@@ -833,24 +963,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Route not found" });
       }
       
+      // Org admins can only delete stops in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only delete stops in your organization" });
+      }
+      
       // Get all stops for this route
       const stops = await storage.getRouteStopsByRoute(id);
       
-      // First delete all stop preferences that reference these stops
-      for (const stop of stops) {
-        if (stop.id) {
-          // Delete stop preferences for this stop
-          await db.delete(stopPreferences)
-            .where(eq(stopPreferences.stopId, stop.id));
+      // Check if any riders depend on these stops
+      const stopIds = stops.map(s => s.id).filter(Boolean);
+      if (stopIds.length > 0) {
+        const dependentPreferences = await db.select()
+          .from(stopPreferences)
+          .where(sql`${stopPreferences.stopId} IN (${sql.join(stopIds.map(id => sql`${id}`), sql`, `)})`);
+        
+        if (dependentPreferences.length > 0) {
+          return res.status(409).json({
+            error: "Cannot delete all stops. Some riders have selected these as their home stops.",
+            code: "STOPS_IN_USE",
+            affectedRiders: dependentPreferences.length
+          });
         }
       }
       
-      // Then delete all stops for this route
-      for (const stop of stops) {
-        if (stop.id) {
-          await storage.deleteRouteStop(stop.id);
+      // Delete all stops for this route in a transaction (all-or-nothing)
+      // Use hard delete since we've already verified no dependent riders exist
+      await db.transaction(async (tx) => {
+        for (const stop of stops) {
+          if (stop.id) {
+            await tx.delete(routeStops)
+              .where(eq(routeStops.id, stop.id));
+          }
         }
-      }
+      });
       
       res.status(204).send();
     } catch (error) {
