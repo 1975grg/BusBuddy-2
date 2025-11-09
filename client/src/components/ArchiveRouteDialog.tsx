@@ -54,8 +54,8 @@ export function ArchiveRouteDialog({ route, open, onOpenChange, onSuccess }: Arc
 
   const archiveMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}/archive`, {
-        method: "POST",
+      const response = await fetch(`/api/routes/${route.id}`, {
+        method: "DELETE",
         credentials: "include",
       });
       
