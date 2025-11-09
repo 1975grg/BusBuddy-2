@@ -37,7 +37,7 @@ export const inviteTokens = pgTable("invite_tokens", {
   email: text("email"), // For new user invites
   phoneNumber: text("phone_number"), // For SMS-based magic links
   role: text("role").notNull(), // Role to assign when claimed
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // Nullable for system admins
   routeId: varchar("route_id").references(() => routes.id), // Optional route assignment
   expiresAt: timestamp("expires_at").notNull(), // Token expiration
   claimedAt: timestamp("claimed_at"), // When the invite was used

@@ -86,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email,
         phoneNumber: user.phoneNumber || undefined,
         role: user.role,
-        organizationId: user.organizationId!,
+        organizationId: user.organizationId || undefined, // Nullable for system admins
         routeId: user.favoriteRouteId || undefined,
         expiresAt,
         createdByUserId: user.id, // Self-generated
