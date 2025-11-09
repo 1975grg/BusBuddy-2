@@ -2046,9 +2046,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Rider Management Routes
-  app.get("/api/routes/:routeId/riders", authenticateUser, requireRouteAccess(), async (req, res) => {
+  app.get("/api/routes/:routeId/riders", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { routeId } = req.params;
+      const user = (req as any).user as AuthUser;
+      
+      // Verify route belongs to user's organization (unless system admin)
+      if (user.role !== "system_admin") {
+        const route = await storage.getRoute(routeId);
+        if (!route) {
+          return res.status(404).json({ error: "Route not found" });
+        }
+        if (route.organizationId !== user.organizationId) {
+          return res.status(403).json({ error: "Access to this route denied" });
+        }
+      }
+      
       console.log("Fetching riders for route:", routeId);
       const riders = await storage.getRidersForRoute(routeId);
       console.log("Found riders:", riders.length, riders);
@@ -2061,9 +2074,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Driver Management Routes
-  app.get("/api/routes/:routeId/drivers", authenticateUser, requireRouteAccess(), async (req, res) => {
+  app.get("/api/routes/:routeId/drivers", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const { routeId } = req.params;
+      const user = (req as any).user as AuthUser;
+      
+      // Verify route belongs to user's organization (unless system admin)
+      if (user.role !== "system_admin") {
+        const route = await storage.getRoute(routeId);
+        if (!route) {
+          return res.status(404).json({ error: "Route not found" });
+        }
+        if (route.organizationId !== user.organizationId) {
+          return res.status(403).json({ error: "Access to this route denied" });
+        }
+      }
+      
       const drivers = await storage.getDriversForRoute(routeId);
       res.json(drivers);
     } catch (error) {
