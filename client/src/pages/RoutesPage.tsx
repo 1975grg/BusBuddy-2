@@ -5,12 +5,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode } from "lucide-react";
+import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode, Archive } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
 import { EditRouteDialog } from "@/components/EditRouteDialog";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { QrCodeDialog } from "@/components/QrCodeDialog";
+import { ArchiveRouteDialog } from "@/components/ArchiveRouteDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -21,7 +22,7 @@ interface RouteWithStops extends Route {
   stops: RouteStop[];
 }
 
-type StatusFilter = "all" | "active" | "inactive";
+type StatusFilter = "all" | "active" | "inactive" | "archived";
 type SortOption = "name-asc" | "name-desc" | "status";
 type ViewMode = "cards" | "table";
 
@@ -36,6 +37,8 @@ export default function RoutesPage() {
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [qrRoute, setQrRoute] = useState<{ id: string; name: string } | null>(null);
+  const [archiveRoute, setArchiveRoute] = useState<Route | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -56,7 +59,14 @@ export default function RoutesPage() {
         route.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase());
       
       // Filter by status
-      const matchesStatus = statusFilter === "all" || route.status === statusFilter;
+      let matchesStatus = false;
+      if (statusFilter === "all") {
+        matchesStatus = !route.archivedAt; // Exclude archived from "all"
+      } else if (statusFilter === "archived") {
+        matchesStatus = !!route.archivedAt;
+      } else {
+        matchesStatus = route.status === statusFilter && !route.archivedAt;
+      }
       
       return matchesSearch && matchesStatus;
     })
@@ -128,6 +138,14 @@ export default function RoutesPage() {
     setQrRoute({ id: routeId, name: routeName });
   };
 
+  const handleArchiveRoute = (routeId: string) => {
+    const route = routes.find(r => r.id === routeId);
+    if (route) {
+      setArchiveRoute(route);
+      setArchiveDialogOpen(true);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -168,6 +186,9 @@ export default function RoutesPage() {
           </ToggleGroupItem>
           <ToggleGroupItem value="inactive" data-testid="toggle-inactive">
             Inactive
+          </ToggleGroupItem>
+          <ToggleGroupItem value="archived" data-testid="toggle-archived">
+            Archived
           </ToggleGroupItem>
         </ToggleGroup>
 
@@ -233,10 +254,12 @@ export default function RoutesPage() {
                     vehicleNumber={route.vehicleNumber || undefined}
                     stops={transformedStops}
                     ridersCount={0} // TODO: Add riders count to API
+                    isArchived={!!route.archivedAt}
                     onEdit={() => handleEditRoute(route.id)}
                     onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
                     onSendAlert={() => handleSendAlert(route)}
                     onShowQr={() => handleShowQr(route.id, route.name)}
+                    onArchive={() => handleArchiveRoute(route.id)}
                   />
                 );
               })}
@@ -274,31 +297,48 @@ export default function RoutesPage() {
                       <TableCell>{route.stops.length} stops</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleShowQr(route.id, route.name)}
-                            title="Show QR Code"
-                            data-testid={`button-show-qr-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditRoute(route.id)}
-                            data-testid={`button-edit-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                          >
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSendAlert(route)}
-                            data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
+                          {!route.archivedAt ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleShowQr(route.id, route.name)}
+                                title="Show QR Code"
+                                data-testid={`button-show-qr-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <QrCode className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditRoute(route.id)}
+                                title="Edit Route"
+                                data-testid={`button-edit-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <Settings className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleSendAlert(route)}
+                                title="Send Alert"
+                                data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleArchiveRoute(route.id)}
+                                title="Archive Route"
+                                data-testid={`button-archive-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <Archive className="w-4 h-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Badge variant="secondary">Archived</Badge>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -366,6 +406,24 @@ export default function RoutesPage() {
             if (!open) {
               setQrRoute(null);
             }
+          }}
+        />
+      )}
+
+      {/* Archive Route Dialog */}
+      {archiveRoute && (
+        <ArchiveRouteDialog
+          route={archiveRoute}
+          open={archiveDialogOpen}
+          onOpenChange={(open) => {
+            setArchiveDialogOpen(open);
+            if (!open) {
+              setArchiveRoute(null);
+            }
+          }}
+          onSuccess={() => {
+            setArchiveRoute(null);
+            setArchiveDialogOpen(false);
           }}
         />
       )}

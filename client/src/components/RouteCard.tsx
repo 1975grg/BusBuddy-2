@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Users, Settings, MessageSquare, QrCode } from "lucide-react";
+import { MapPin, Clock, Users, Settings, MessageSquare, QrCode, Archive } from "lucide-react";
 
 interface Stop {
   id: string;
@@ -17,10 +17,12 @@ interface RouteCardProps {
   vehicleNumber?: string;
   stops: Stop[];
   ridersCount?: number;
+  isArchived?: boolean;
   onEdit?: () => void;
   onToggleStatus?: () => void;
   onSendAlert?: () => void;
   onShowQr?: () => void;
+  onArchive?: () => void;
 }
 
 export function RouteCard({ 
@@ -30,10 +32,12 @@ export function RouteCard({
   vehicleNumber, 
   stops, 
   ridersCount,
+  isArchived,
   onEdit,
   onToggleStatus,
   onSendAlert,
-  onShowQr
+  onShowQr,
+  onArchive
 }: RouteCardProps) {
   return (
     <Card className="hover-elevate">
@@ -46,19 +50,24 @@ export function RouteCard({
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            {status === "active" ? (
+            {isArchived ? (
+              <Badge variant="secondary">Archived</Badge>
+            ) : status === "active" ? (
               <Badge className="bg-bus-active text-white">Active</Badge>
             ) : (
               <Badge variant="secondary">Inactive</Badge>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onEdit}
-              data-testid={`button-edit-route-${name.toLowerCase().replace(/\s+/g, '-')}`}
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
+            {!isArchived && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onEdit}
+                title="Edit Route"
+                data-testid={`button-edit-route-${name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -103,36 +112,53 @@ export function RouteCard({
           </div>
         )}
         
-        <div className="flex gap-2 pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onShowQr}
-            data-testid={`button-show-qr-${name.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            <QrCode className="w-4 h-4 mr-2" />
-            QR Code
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onToggleStatus}
-            data-testid={`button-toggle-status-${name.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            {status === "active" ? "Deactivate" : "Activate"}
-          </Button>
-          {status === "active" && onSendAlert && (
+        {!isArchived ? (
+          <div className="flex gap-2 pt-2 flex-wrap">
             <Button 
-              variant="default" 
+              variant="outline" 
               size="sm" 
-              onClick={onSendAlert}
-              data-testid={`button-send-alert-${name.toLowerCase().replace(/\s+/g, '-')}`}
+              onClick={onShowQr}
+              data-testid={`button-show-qr-${name.toLowerCase().replace(/\s+/g, '-')}`}
             >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Send Alert
+              <QrCode className="w-4 h-4 mr-2" />
+              QR Code
             </Button>
-          )}
-        </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onToggleStatus}
+              data-testid={`button-toggle-status-${name.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              {status === "active" ? "Deactivate" : "Activate"}
+            </Button>
+            {status === "active" && onSendAlert && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={onSendAlert}
+                data-testid={`button-send-alert-${name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Send Alert
+              </Button>
+            )}
+            {onArchive && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onArchive}
+                data-testid={`button-archive-route-${name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <Archive className="w-4 h-4 mr-2" />
+                Archive
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="pt-2 text-sm text-muted-foreground">
+            This route has been archived. Contact your administrator to restore it.
+          </div>
+        )}
       </CardContent>
     </Card>
   );
