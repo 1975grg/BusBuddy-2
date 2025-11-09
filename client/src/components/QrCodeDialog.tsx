@@ -13,11 +13,18 @@ interface QrCodeDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface QrCodeData {
+  qrCodeDataUrl: string;
+  url: string;
+  routeName: string;
+  organizationName: string;
+}
+
 export function QrCodeDialog({ routeId, routeName, open, onOpenChange }: QrCodeDialogProps) {
   const { toast } = useToast();
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  const { data: qrData, isLoading, error } = useQuery({
+  const { data: qrData, isLoading, error } = useQuery<QrCodeData>({
     queryKey: [`/api/routes/${routeId}/qr`],
     enabled: open && !!routeId,
   });

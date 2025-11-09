@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +33,14 @@ export default function RiderOnboardingPage() {
     enabled: !!routeId,
   });
 
+  // Auto-select all stops when route loads
+  useEffect(() => {
+    if (route?.stops && route.stops.length > 0 && selectedStops.size === 0) {
+      const allStopIds = new Set(route.stops.map(stop => stop.id));
+      setSelectedStops(allStopIds);
+    }
+  }, [route]);
+
   // Get organization information
   const { data: organizations } = useQuery<Organization[]>({
     queryKey: [`/api/system/organizations`],
@@ -47,44 +55,68 @@ export default function RiderOnboardingPage() {
       // Ensure phone number is sent as string (remove non-digits but keep as string)
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
 
-      // Create rider profile
-      const riderProfileResponse = await apiRequest("POST", "/api/rider-profiles", {
-        phoneNumber: cleanPhoneNumber, // Send as string, not number
-        name: name || undefined,
-        organizationId,
-        notificationMethod: "sms",
-        smsConsent: smsConsent,
-        // smsConsentDate will be set automatically on backend when smsConsent is true
-      });
+      let riderProfile: any = null;
+      let subscription: any = null;
 
-      const riderProfile = await riderProfileResponse.json();
+      try {
+        // Create rider profile
+        const riderProfileResponse = await apiRequest("POST", "/api/rider-profiles", {
+          phoneNumber: cleanPhoneNumber,
+          name: name || undefined,
+          organizationId,
+          notificationMethod: "sms",
+          smsConsent: smsConsent,
+        });
 
-      // Create route subscription
+        riderProfile = await riderProfileResponse.json();
 
-      const subscriptionResponse = await apiRequest("POST", "/api/route-subscriptions", {
-        routeId,
-        riderProfileId: riderProfile.id,
-        notificationMode,
-      });
+        // Create route subscription
+        const subscriptionResponse = await apiRequest("POST", "/api/route-subscriptions", {
+          routeId,
+          riderProfileId: riderProfile.id,
+          notificationMode,
+        });
 
-      const subscription = await subscriptionResponse.json();
+        subscription = await subscriptionResponse.json();
 
-      // Create stop preferences for selected stops
-      if (selectedStops.size > 0) {
-        await Promise.all(
-          Array.from(selectedStops).map(async (stopId) => {
-            const preferenceResponse = await apiRequest("POST", "/api/stop-preferences", {
-              subscriptionId: subscription.id,
-              stopId,
-              notifyOnApproaching: true,
-              notifyOnArrival: true,
-            });
-            return await preferenceResponse.json();
-          })
-        );
+        // Create stop preferences for selected stops
+        if (selectedStops.size > 0) {
+          const stopPreferenceErrors: string[] = [];
+          
+          await Promise.all(
+            Array.from(selectedStops).map(async (stopId) => {
+              try {
+                const preferenceResponse = await apiRequest("POST", "/api/stop-preferences", {
+                  subscriptionId: subscription.id,
+                  stopId,
+                  notifyOnApproaching: true,
+                  notifyOnArrival: true,
+                });
+                return await preferenceResponse.json();
+              } catch (error) {
+                console.error(`Failed to create preference for stop ${stopId}:`, error);
+                stopPreferenceErrors.push(stopId);
+                return null;
+              }
+            })
+          );
+
+          // If some stop preferences failed, warn but don't fail the whole signup
+          if (stopPreferenceErrors.length > 0) {
+            console.warn(`Failed to create ${stopPreferenceErrors.length} stop preferences`);
+          }
+        }
+
+        return { riderProfile, subscription };
+      } catch (error) {
+        // If subscription creation failed but rider profile was created,
+        // log it for admin cleanup but still throw to show error to user
+        if (riderProfile && !subscription) {
+          console.error("Orphaned rider profile created:", riderProfile.id);
+          console.error("Admin should clean up this rider profile manually");
+        }
+        throw error;
       }
-
-      return { riderProfile, subscription };
     },
     onSuccess: () => {
       setIsSubscribed(true);
@@ -97,7 +129,7 @@ export default function RiderOnboardingPage() {
       console.error("Error subscribing to route:", error);
       toast({
         title: "Subscription failed",
-        description: "Please check your phone number and try again.",
+        description: "Please check your information and try again. If the problem persists, contact support.",
         variant: "destructive",
       });
     },
