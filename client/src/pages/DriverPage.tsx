@@ -21,10 +21,6 @@ export default function DriverPage() {
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
   // Get active routes for the driver's organization
   const { data: routes = [], isLoading: routesLoading } = useQuery({
     queryKey: ["/api/routes"],
@@ -36,8 +32,12 @@ export default function DriverPage() {
         route.organizationId === currentUser?.organizationId
       );
     },
-    enabled: !!currentUser?.organizationId,
+    enabled: !!currentUser?.organizationId && !authLoading,
   });
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   // Find user's favorite route if they have one
   const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
