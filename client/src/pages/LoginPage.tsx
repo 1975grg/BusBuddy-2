@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -98,14 +98,14 @@ export default function LoginPage() {
     },
   });
 
-  // Check for token in URL on mount
-  useState(() => {
+  // Check for token in URL on mount - use useEffect to avoid double execution
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     if (token) {
       verifyTokenMutation.mutate(token);
     }
-  });
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

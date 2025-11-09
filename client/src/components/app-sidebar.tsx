@@ -84,96 +84,77 @@ export function AppSidebar() {
   // Fetch routes to get active count (only for admin)
   const { data: routes = [] } = useQuery<Route[]>({
     queryKey: ["/api/routes"],
-    enabled: userRole === "admin",
+    enabled: userRole === "admin" && !!authenticatedUser,
   });
 
-  // Fetch current user for drivers/riders
-  const { data: currentDriver } = useQuery<{ id: string; organizationId: string }>({
-    queryKey: ["/api/dev/mock-user/driver"],
-    enabled: userRole === "driver",
-  });
+  // Use authenticated user's organization ID instead of mock endpoints
+  const userOrgId = authenticatedUser?.organizationId;
 
-  const { data: currentRider } = useQuery<{ id: string; organizationId: string }>({
-    queryKey: ["/api/dev/mock-user/rider"],
-    enabled: userRole === "rider",
-  });
-
-  // Fetch first organization for admin users to get messages
-  const { data: firstOrg } = useQuery({
-    queryKey: ["/api/users", "org_admin_id"],
-    queryFn: async () => {
-      const response = await fetch("/api/users?role=org_admin");
-      const users = await response.json();
-      return users[0]?.organizationId;
-    },
-    enabled: userRole === "admin",
-  });
-
-  // Fetch messages based on user role
+  // Fetch messages based on user role using real authenticated user's org
   // Admin: all organization messages
   const { data: adminRiderMessages = [] } = useQuery({
-    queryKey: ["/api/rider-messages", "admin", firstOrg],
+    queryKey: ["/api/rider-messages", "admin", userOrgId],
     queryFn: async () => {
-      if (!firstOrg) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${firstOrg}`);
+      if (!userOrgId) return [];
+      const response = await fetch(`/api/rider-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch rider messages");
       }
       return response.json();
     },
-    enabled: userRole === "admin" && !!firstOrg,
+    enabled: userRole === "admin" && !!userOrgId,
     refetchInterval: 10000,
   });
 
   const { data: adminDriverMessages = [] } = useQuery({
-    queryKey: ["/api/driver-messages", "admin", firstOrg],
+    queryKey: ["/api/driver-messages", "admin", userOrgId],
     queryFn: async () => {
-      if (!firstOrg) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${firstOrg}`);
+      if (!userOrgId) return [];
+      const response = await fetch(`/api/driver-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch driver messages");
       }
       return response.json();
     },
-    enabled: userRole === "admin" && !!firstOrg,
+    enabled: userRole === "admin" && !!userOrgId,
     refetchInterval: 10000,
   });
 
-  // Driver: only their own messages
+  // Driver: only their own messages - using authenticated user
   const { data: driverOwnMessages = [] } = useQuery({
-    queryKey: ["/api/driver-messages", "driver", currentDriver?.id],
+    queryKey: ["/api/driver-messages", "driver", authenticatedUser?.id],
     queryFn: async () => {
-      if (!currentDriver?.id) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${currentDriver.organizationId}`);
+      if (!authenticatedUser?.id || !userOrgId) return [];
+      const response = await fetch(`/api/driver-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch driver messages");
       }
       const allMessages = await response.json();
       // Filter to only show this driver's messages
-      return allMessages.filter((msg: any) => msg.driverUserId === currentDriver.id);
+      return allMessages.filter((msg: any) => msg.driverUserId === authenticatedUser.id);
     },
-    enabled: userRole === "driver" && !!currentDriver,
+    enabled: userRole === "driver" && !!authenticatedUser && !!userOrgId,
     refetchInterval: 10000,
   });
 
-  // Rider: only their own messages
+  // Rider: only their own messages - using authenticated user
   const { data: riderOwnMessages = [] } = useQuery({
-    queryKey: ["/api/rider-messages", "rider", currentRider?.id],
+    queryKey: ["/api/rider-messages", "rider", authenticatedUser?.id],
     queryFn: async () => {
-      if (!currentRider?.id) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${currentRider.organizationId}`);
+      if (!authenticatedUser?.id || !userOrgId) return [];
+      const response = await fetch(`/api/rider-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch rider messages");
       }
       const allMessages = await response.json();
       // Filter to only show this rider's messages
-      return allMessages.filter((msg: any) => msg.userId === currentRider.id);
+      return allMessages.filter((msg: any) => msg.userId === authenticatedUser.id);
     },
-    enabled: userRole === "rider" && !!currentRider,
+    enabled: userRole === "rider" && !!authenticatedUser && !!userOrgId,
     refetchInterval: 10000,
   });
 
