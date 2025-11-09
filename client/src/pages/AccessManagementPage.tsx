@@ -4,13 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Shield, Trash2, RotateCcw, Bus } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import type { Route } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import type { Route, RiderProfile } from "@shared/schema";
+
+interface RiderWithSubscription extends RiderProfile {
+  subscriptionId: string;
+  notificationMode: string;
+}
+
+interface RemovalDialogState {
+  open: boolean;
+  type: "rider" | "driver" | null;
+  id: string | null;
+  name: string | null;
+}
 
 export default function AccessManagementPage() {
   const { user, isLoading: authLoading } = useRequireRole("org_admin");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -22,10 +39,16 @@ export default function AccessManagementPage() {
 
   // Filter to only show active routes and sort alphabetically (same as Routes page default)
   const activeRoutes = routes
-    .filter(route => route.status === "active")
+    .filter(route => route.status === "active" && !route.archivedAt)
     .sort((a, b) => a.name.localeCompare(b.name));
   
   const [selectedRoute, setSelectedRoute] = useState<string>("");
+  const [removalDialog, setRemovalDialog] = useState<RemovalDialogState>({
+    open: false,
+    type: null,
+    id: null,
+    name: null,
+  });
   
   // Set first route as selected when routes load (useEffect to avoid render issues)
   useEffect(() => {
@@ -44,13 +67,46 @@ export default function AccessManagementPage() {
     }
   });
 
-  const mockActiveTokens = [
-    { id: "1", device: "iPhone 14", lastAccess: "2 hours ago", location: "Main Entrance" },
-    { id: "2", device: "Samsung Galaxy", lastAccess: "5 minutes ago", location: "Library" },
-    { id: "3", device: "iPad", lastAccess: "1 day ago", location: "Student Center" }
-  ];
+  // Fetch riders for selected route
+  const { data: riders = [], isLoading: ridersLoading } = useQuery<RiderWithSubscription[]>({
+    queryKey: ["/api/routes", selectedRoute, "riders"],
+    queryFn: async () => {
+      const response = await fetch(`/api/routes/${selectedRoute}/riders`);
+      if (!response.ok) throw new Error("Failed to fetch riders");
+      return response.json();
+    },
+    enabled: !!selectedRoute,
+  });
 
   const selectedRouteData = activeRoutes.find(r => r.id === selectedRoute);
+
+  // Remove rider mutation
+  const removeMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      return await apiRequest("DELETE", `/api/routes/${selectedRoute}/riders/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute, "riders"] });
+      toast({
+        title: "Access removed",
+        description: "Rider has been removed from this route.",
+      });
+      setRemovalDialog({ open: false, type: null, id: null, name: null });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove access. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRemove = () => {
+    if (removalDialog.id) {
+      removeMutation.mutate({ id: removalDialog.id });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -148,39 +204,100 @@ export default function AccessManagementPage() {
               </Card>
             </div>
 
-            {/* Active devices section - hidden when 0 tokens */}
-            {false && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Active Devices</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {mockActiveTokens.map((token) => (
-                      <div key={token.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{token.device}</p>
+            {/* Riders Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Riders
+                  </div>
+                  <Badge variant="outline">{riders.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {ridersLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : riders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No riders assigned to this route yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {riders.map((rider) => (
+                      <div 
+                        key={rider.id} 
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">{rider.name || "Unnamed Rider"}</p>
                           <p className="text-sm text-muted-foreground">
-                            Last seen: {token.lastAccess} at {token.location}
+                            {rider.phoneNumber}
+                            {rider.notificationMode && (
+                              <Badge variant="outline" className="ml-2">
+                                {rider.notificationMode}
+                              </Badge>
+                            )}
                           </p>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => console.log(`Revoke token ${token.id}`)}
-                          data-testid={`button-revoke-${token.id}`}
+                          onClick={() => setRemovalDialog({
+                            open: true,
+                            type: "rider",
+                            id: rider.id,
+                            name: rider.name || "Unnamed Rider",
+                          })}
+                          data-testid={`button-remove-rider-${rider.id}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <UserX className="w-4 h-4" />
                         </Button>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+              </CardContent>
+            </Card>
           </div>
         )
       ))}
+
+      {/* Removal Confirmation Dialog */}
+      <AlertDialog open={removalDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setRemovalDialog({ open: false, type: null, id: null, name: null });
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Rider Access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <span className="font-semibold">{removalDialog.name}</span> from this route?
+              <br /><br />
+              This will deactivate their SMS subscription and remove their access to track this route.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={removeMutation.isPending}
+              data-testid="button-cancel-removal"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemove}
+              disabled={removeMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-removal"
+            >
+              {removeMutation.isPending ? "Removing..." : "Remove Access"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
