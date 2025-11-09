@@ -16,19 +16,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@/contexts/UserContext";
 import type { Route } from "@shared/schema";
 import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
 import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
 import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
 import riderIconUrl from "@assets/generated_images/Rider_GPS_pin_icon_48a84853.png";
-
-// TODO: remove mock functionality - replace with real user data
-const mockUser = {
-  name: "Sarah Johnson",
-  role: "Organization Admin", 
-  organization: "Springfield University",
-  avatar: adminIconUrl
-};
 
 const getRoleIcon = (role: "admin" | "driver" | "rider") => {
   switch (role) {
@@ -51,12 +44,28 @@ interface MenuItem {
 // Driver and rider items will be created dynamically inside the component
 // to include the message count badge
 
+const getRoleLabel = (role: string) => {
+  switch (role) {
+    case "system_admin":
+      return "System Admin";
+    case "org_admin":
+      return "Org Admin";
+    case "driver":
+      return "Driver";
+    case "rider":
+      return "Rider";
+    default:
+      return role;
+  }
+};
+
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user: authenticatedUser } = useUser();
   
   // Detect user role from URL path
   const userRole = useMemo<"admin" | "driver" | "rider">(() => {
-    if (location.startsWith("/admin")) return "admin";
+    if (location.startsWith("/admin") || location.startsWith("/system")) return "admin";
     if (location.startsWith("/driver")) return "driver";
     if (location.startsWith("/track") || location.startsWith("/rider")) return "rider";
     return "admin"; // default fallback
@@ -265,7 +274,7 @@ export function AppSidebar() {
           </div>
           <div>
             <h2 className="font-bold text-lg">Bus Buddy</h2>
-            <p className="text-sm text-muted-foreground">{orgSettings?.name || mockUser.organization}</p>
+            <p className="text-sm text-muted-foreground">{orgSettings?.name || "Bus Tracking"}</p>
           </div>
         </div>
       </SidebarHeader>
@@ -313,8 +322,10 @@ export function AppSidebar() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{mockUser.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{mockUser.role}</p>
+            <p className="text-sm font-medium truncate">{authenticatedUser?.name || "Guest"}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {authenticatedUser ? getRoleLabel(authenticatedUser.role) : "Not logged in"}
+            </p>
           </div>
         </div>
       </SidebarFooter>
