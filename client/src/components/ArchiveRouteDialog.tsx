@@ -117,54 +117,55 @@ export function ArchiveRouteDialog({ route, open, onOpenChange, onSuccess }: Arc
             <Trash2 className="w-5 h-5 text-destructive" />
             Archive Route?
           </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-3">
-            <p>
-              Are you sure you want to archive <span className="font-semibold">{route.name}</span>?
-            </p>
-            
-            {isLoading ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Loading affected users...
-              </div>
-            ) : hasDataError ? (
-              <Alert variant="destructive">
-                <AlertCircle className="w-4 h-4" />
-                <AlertDescription>
-                  Unable to load affected users. Please try again or contact support if the problem persists.
-                </AlertDescription>
-              </Alert>
-            ) : totalAffected > 0 ? (
-              <Alert>
-                <Users className="w-4 h-4" />
-                <AlertDescription>
-                  <span className="font-semibold">{totalAffected} {totalAffected === 1 ? 'person' : 'people'}</span> will be affected:
-                  {riders.length > 0 && <span className="ml-1">{riders.length} rider{riders.length > 1 ? 's' : ''}</span>}
-                  {riders.length > 0 && drivers.length > 0 && <span>, </span>}
-                  {drivers.length > 0 && <span>{drivers.length} driver{drivers.length > 1 ? 's' : ''}</span>}
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No riders or drivers are currently assigned to this route.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <p className="text-sm">
-              Archiving will temporarily deactivate this route without deleting any data:
-            </p>
-            <ul className="text-sm space-y-1 list-disc list-inside ml-2">
+          <AlertDialogDescription>
+            Are you sure you want to archive <span className="font-semibold">{route.name}</span>?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading affected users...
+            </div>
+          ) : hasDataError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="w-4 h-4" />
+              <AlertDescription>
+                Unable to load affected users. Please try again or contact support if the problem persists.
+              </AlertDescription>
+            </Alert>
+          ) : totalAffected > 0 ? (
+            <Alert>
+              <Users className="w-4 h-4" />
+              <AlertDescription>
+                <span className="font-semibold">{totalAffected} {totalAffected === 1 ? 'person' : 'people'}</span> will be affected:
+                {riders.length > 0 && <span className="ml-1">{riders.length} rider{riders.length > 1 ? 's' : ''}</span>}
+                {riders.length > 0 && drivers.length > 0 && <span>, </span>}
+                {drivers.length > 0 && <span>{drivers.length} driver{drivers.length > 1 ? 's' : ''}</span>}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                No riders or drivers are currently assigned to this route.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="text-sm text-muted-foreground">
+            Archiving will temporarily deactivate this route without deleting any data:
+            <ul className="mt-2 space-y-1 list-disc list-inside ml-2">
               <li>All riders and drivers will lose access to this route</li>
               <li>SMS subscriptions and alerts will be deactivated</li>
               <li>Route stops will be deactivated</li>
             </ul>
-            <p className="text-sm font-medium text-muted-foreground">
-              You can restore this route later to resume service.
-            </p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </div>
+          
+          <p className="text-sm font-medium text-muted-foreground">
+            You can restore this route later to resume service.
+          </p>
+        </div>
 
         {errorMessage && (
           <Alert variant="destructive">
