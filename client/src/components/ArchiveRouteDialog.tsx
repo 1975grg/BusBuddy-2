@@ -34,24 +34,18 @@ export function ArchiveRouteDialog({ route, open, onOpenChange, onSuccess }: Arc
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { data: riders = [], isLoading: loadingRiders, isError: ridersError } = useQuery<RiderInfo[]>({
+  const { data: riders = [], isLoading: loadingRiders, isError: ridersError, error: ridersErrorObj } = useQuery<RiderInfo[]>({
     queryKey: ["/api/routes", route.id, "riders"],
-    queryFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}/riders`);
-      if (!response.ok) throw new Error("Failed to fetch riders");
-      return response.json();
-    },
     enabled: open && !!route.id,
+    retry: 1,
+    staleTime: 0,
   });
 
-  const { data: drivers = [], isLoading: loadingDrivers, isError: driversError } = useQuery<DriverInfo[]>({
+  const { data: drivers = [], isLoading: loadingDrivers, isError: driversError, error: driversErrorObj } = useQuery<DriverInfo[]>({
     queryKey: ["/api/routes", route.id, "drivers"],
-    queryFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}/drivers`);
-      if (!response.ok) throw new Error("Failed to fetch drivers");
-      return response.json();
-    },
     enabled: open && !!route.id,
+    retry: 1,
+    staleTime: 0,
   });
 
   const isLoading = loadingRiders || loadingDrivers;
