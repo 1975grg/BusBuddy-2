@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-import { UserProvider } from "@/contexts/UserContext";
+import { UserProvider, useUser } from "@/contexts/UserContext";
 
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
@@ -65,6 +65,28 @@ function Router() {
   );
 }
 
+function AppContent() {
+  const { user } = useUser();
+  
+  return (
+    <div className="flex h-screen w-full">
+      <AppSidebar />
+      <div className="flex flex-col flex-1">
+        <header className="flex items-center justify-between p-4 border-b">
+          <SidebarTrigger data-testid="button-sidebar-toggle" />
+          <div className="flex items-center gap-2">
+            <UserMenu />
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto p-6" key={user?.id || 'anonymous'}>
+          <Router />
+        </main>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const style = {
     "--sidebar-width": "20rem",
@@ -77,21 +99,7 @@ export default function App() {
         <ThemeProvider>
           <TooltipProvider>
             <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1">
-                  <header className="flex items-center justify-between p-4 border-b">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex items-center gap-2">
-                      <UserMenu />
-                      <ThemeToggle />
-                    </div>
-                  </header>
-                  <main className="flex-1 overflow-auto p-6">
-                    <Router />
-                  </main>
-                </div>
-              </div>
+              <AppContent />
             </SidebarProvider>
             <Toaster />
           </TooltipProvider>
