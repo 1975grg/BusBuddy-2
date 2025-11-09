@@ -12,10 +12,6 @@ export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-  
   // Extract route ID from URL query parameter - riders are locked to their assigned route
   const urlParams = new URLSearchParams(window.location.search);
   const routeId = urlParams.get('route');
@@ -23,36 +19,8 @@ export default function RiderPage() {
   // No route switching allowed - riders only see their assigned route
   // Default to Cheat lake Test route for mock testing (matches driver route)
   const selectedRoute = routeId || "4fde6b54-ff96-4aa8-bb26-7c80aaea7221";
-  
-  // TODO: remove mock functionality - replace with real rider data and preferences
-  const mockSavedRoutes = [
-    {
-      id: "main-campus-loop",
-      name: "Main Campus Shuttle",
-      busName: "Shuttle A",
-      status: "active" as const,
-      isFavorite: true,
-      stops: [
-        { id: "1", name: "Main Entrance", eta: "3 min", isNext: true },
-        { id: "2", name: "Student Center", eta: "7 min", isNext: false },
-        { id: "3", name: "Library", eta: "12 min", isNext: false },
-        { id: "4", name: "Cafeteria", eta: "15 min", isNext: false }
-      ]
-    },
-    {
-      id: "west-campus",
-      name: "West Campus Express",
-      busName: "Bus 105", 
-      status: "delayed" as const,
-      isFavorite: false,
-      stops: [
-        { id: "5", name: "West Gate", eta: "8 min", isNext: true },
-        { id: "6", name: "Engineering Building", eta: "12 min", isNext: false },
-        { id: "7", name: "Research Center", eta: "18 min", isNext: false }
-      ]
-    }
-  ];
 
+  // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Always fetch real route data from database
   const { data: realRoute } = useQuery({
     queryKey: ["/api/routes", selectedRoute],
@@ -62,7 +30,7 @@ export default function RiderPage() {
       // Try to find by ID first, then by name slug
       return routes.find((r: any) => r.id === selectedRoute || r.name.toLowerCase().replace(/\s+/g, '-') === selectedRoute);
     },
-    enabled: !!selectedRoute,
+    enabled: !!selectedRoute && !authLoading,
   });
   
   // Fetch active service alerts for the current route
@@ -70,8 +38,13 @@ export default function RiderPage() {
     queryKey: ["/api/service-alerts", selectedRoute],
     queryFn: () => fetch(`/api/service-alerts?route_id=${selectedRoute}`).then(res => res.json()),
     refetchInterval: 30000, // Refresh every 30 seconds
-    enabled: !!selectedRoute, // Only fetch if we have a route ID
+    enabled: !!selectedRoute && !authLoading, // Only fetch if we have a route ID
   });
+
+  // Early return AFTER all hooks
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   // Use real route data from database (ignore mock data to ensure consistency)
   const currentRoute = realRoute ? {

@@ -8,13 +8,11 @@ export default function AdminDashboardPage() {
   const { user, isLoading: authLoading } = useRequireRole("org_admin");
   const [, setLocation] = useLocation();
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-  
+  // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Fetch routes to get active count
   const { data: routes = [] } = useQuery<Route[]>({
     queryKey: ["/api/routes"],
+    enabled: !authLoading,
   });
 
   // Fetch first organization admin to get organization ID
@@ -25,6 +23,7 @@ export default function AdminDashboardPage() {
       const users = await response.json();
       return users[0];
     },
+    enabled: !authLoading,
   });
 
   // Fetch organization settings for name
@@ -34,7 +33,8 @@ export default function AdminDashboardPage() {
       const response = await fetch("/api/org-settings");
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
-    }
+    },
+    enabled: !authLoading,
   });
 
   // Fetch messages to get new count
@@ -90,6 +90,11 @@ export default function AdminDashboardPage() {
   const handleOpenSupport = () => {
     setLocation('/admin/support');
   };
+
+  // Early return AFTER all hooks
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   return (
     <AdminDashboard

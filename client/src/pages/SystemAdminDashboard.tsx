@@ -23,10 +23,7 @@ export default function SystemAdminDashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
+  // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Fetch all organizations
   const { data: organizations, isLoading } = useQuery({
     queryKey: ["/api/system/organizations"],
@@ -34,7 +31,8 @@ export default function SystemAdminDashboard() {
       const response = await fetch("/api/system/organizations");
       if (!response.ok) throw new Error("Failed to fetch organizations");
       return response.json() as Promise<Organization[]>;
-    }
+    },
+    enabled: !authLoading,
   });
 
   // Create organization mutation
@@ -105,7 +103,8 @@ export default function SystemAdminDashboard() {
     return colors[type];
   };
 
-  if (isLoading) {
+  // Early returns AFTER all hooks
+  if (authLoading || isLoading) {
     return (
       <div className="space-y-6">
         <div>
