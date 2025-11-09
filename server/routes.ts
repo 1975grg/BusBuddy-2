@@ -612,17 +612,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Management Routes
-  app.get("/api/routes", async (req, res) => {
+  app.get("/api/routes", authenticateUser, async (req, res) => {
     try {
-      const { organizationId } = req.query;
-      
+      const user = (req as any).user as AuthUser;
       let routes;
-      if (organizationId && typeof organizationId === "string") {
-        // Organization-specific routes (for org admins)
-        routes = await storage.getRoutesByOrganization(organizationId);
+      
+      if (user.role === "system_admin") {
+        // System admins can optionally filter by organizationId or see all routes
+        const { organizationId } = req.query;
+        if (organizationId && typeof organizationId === "string") {
+          routes = await storage.getRoutesByOrganization(organizationId);
+        } else {
+          routes = await storage.getAllRoutes();
+        }
+      } else if (user.role === "org_admin") {
+        // Org admins can ONLY see routes from their own organization
+        // Never trust client-provided organizationId
+        routes = await storage.getRoutesByOrganization(user.organizationId);
       } else {
-        // All routes (for system admins)
-        routes = await storage.getAllRoutes();
+        // Drivers and riders should not access this endpoint
+        return res.status(403).json({ error: "Access denied" });
       }
       
       // Get route stops for each route
