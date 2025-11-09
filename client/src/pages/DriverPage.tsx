@@ -35,19 +35,7 @@ export default function DriverPage() {
     enabled: !!currentUser?.organizationId && !authLoading,
   });
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  // Find user's favorite route if they have one
-  const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
-  
-  // Set initial selected route to favorite if available
-  if (!selectedRoute && favoriteRoute) {
-    setSelectedRoute(favoriteRoute.id);
-  }
-
-  // Mutation to set/unset favorite route
+  // Mutation to set/unset favorite route - MUST be before early returns
   const favoriteRouteMutation = useMutation({
     mutationFn: async ({ routeId }: { routeId: string | null }) => {
       if (!currentUser) throw new Error("User not found");
@@ -55,7 +43,7 @@ export default function DriverPage() {
       return apiRequest("PATCH", `/api/users/${currentUser.id}/favorite-route`, { routeId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dev/mock-user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       toast({ description: "Favorite route updated!" });
     },
     onError: (error: any) => {
@@ -66,16 +54,7 @@ export default function DriverPage() {
     },
   });
 
-  const handleFavoriteToggle = (routeId: string) => {
-    const isFavorite = currentUser?.favoriteRouteId === routeId;
-    favoriteRouteMutation.mutate({ 
-      routeId: isFavorite ? null : routeId 
-    });
-  };
-
-  const currentRoute = routes.find(r => r.id === selectedRoute);
-
-  // Query for active session when route is selected
+  // Query for active session when route is selected - MUST be before early returns
   const { data: activeSession, isLoading: sessionLoading } = useQuery({
     queryKey: ["/api/route-sessions/active", selectedRoute],
     queryFn: async () => {
@@ -96,9 +75,31 @@ export default function DriverPage() {
         return null;
       }
     },
-    enabled: !!selectedRoute,
+    enabled: !!selectedRoute && !authLoading,
     refetchInterval: 10000, // Refetch every 10 seconds to stay in sync
   });
+
+  // Early returns AFTER all hooks
+  if (authLoading || routesLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  // Find user's favorite route if they have one
+  const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
+  
+  // Set initial selected route to favorite if available
+  if (!selectedRoute && favoriteRoute) {
+    setSelectedRoute(favoriteRoute.id);
+  }
+
+  const handleFavoriteToggle = (routeId: string) => {
+    const isFavorite = currentUser?.favoriteRouteId === routeId;
+    favoriteRouteMutation.mutate({ 
+      routeId: isFavorite ? null : routeId 
+    });
+  };
+
+  const currentRoute = routes.find(r => r.id === selectedRoute);
   
   // Bus data for the map - uses real GPS from active session
   const buses = currentRoute && activeSession ? [{
@@ -110,10 +111,6 @@ export default function DriverPage() {
     eta: "N/A", // Would come from real GPS tracking
     nextStop: "Unknown" // Would come from route progress
   }] : [];
-
-  if (routesLoading) {
-    return <div className="flex justify-center p-8">Loading routes...</div>;
-  }
 
   return (
     <div className="space-y-6">
