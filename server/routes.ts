@@ -458,15 +458,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Organization Management (for org admins)
-  app.get("/api/organization", async (req, res) => {
+  app.get("/api/organization", authenticateUser, async (req, res) => {
     try {
-      // MVP: Get first organization (single-org deployment)
-      const organizations = await storage.getAllOrganizations();
-      const organization = organizations[0];
+      const user = (req as any).user as AuthUser;
+      
+      // Get the logged-in user's organization
+      if (!user.organizationId) {
+        return res.status(400).json({ error: "User not associated with an organization" });
+      }
+      
+      const organization = await storage.getOrganization(user.organizationId);
       
       if (!organization) {
         return res.status(404).json({ error: "Organization not found" });
       }
+      
       res.json(organization);
     } catch (error) {
       console.error("Error fetching organization:", error);
