@@ -1417,23 +1417,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send SMS notifications to all riders on this route with SMS consent
       try {
+        console.log(`📱 Fetching riders for route: ${clientData.routeId}`);
         const riders = await storage.getRidersForRoute(clientData.routeId);
+        console.log(`📱 Found ${riders.length} riders:`, riders.map(r => ({ name: r.name, phone: r.phone, smsConsent: r.smsConsent })));
+        
         const ridersWithSms = riders.filter((rider: any) => rider.smsConsent);
+        console.log(`📱 ${ridersWithSms.length} riders have SMS consent`);
         
         // Send SMS to each rider with consent
         for (const rider of ridersWithSms) {
           if (rider.phone) {
-            await smsService.sendServiceAlertNotification(
+            console.log(`📱 Sending SMS to ${rider.name} (${rider.phone})...`);
+            const result = await smsService.sendServiceAlertNotification(
               rider.phone,
               route.name,
               clientData.title,
               clientData.message
             );
+            console.log(`📱 SMS result for ${rider.name}:`, result);
           }
         }
       } catch (smsError) {
         // Log SMS error but don't fail the request - alert was still created
-        console.error("Error sending SMS notifications for service alert:", smsError);
+        console.error("❌ Error sending SMS notifications for service alert:", smsError);
       }
       
       res.status(201).json(alert);
