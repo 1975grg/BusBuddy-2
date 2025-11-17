@@ -7,9 +7,39 @@ export class SmsService {
 
   constructor() {
     // Initialize Twilio client if credentials are available
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-      this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    // Support both Auth Token and API Key authentication methods
+    try {
+      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_PHONE_NUMBER) {
+        if (process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET) {
+          // Use API Key authentication (recommended for production)
+          console.log('Initializing Twilio with API Key authentication...');
+          this.client = twilio(
+            process.env.TWILIO_API_KEY_SID,
+            process.env.TWILIO_API_KEY_SECRET,
+            { accountSid: process.env.TWILIO_ACCOUNT_SID }
+          );
+          console.log('✅ Twilio SMS service initialized successfully with API Key');
+        } else if (process.env.TWILIO_AUTH_TOKEN) {
+          // Fall back to Auth Token authentication
+          console.log('Initializing Twilio with Auth Token authentication...');
+          this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+          console.log('✅ Twilio SMS service initialized successfully with Auth Token');
+        }
+        
+        if (this.client) {
+          this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+        }
+      } else {
+        console.warn('⚠️ Twilio credentials not found. SMS notifications will be disabled.');
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize Twilio client:', error instanceof Error ? error.message : error);
+      console.error('SMS notifications will be disabled. Please check your Twilio credentials:');
+      console.error('- TWILIO_ACCOUNT_SID should start with "AC"');
+      console.error('- TWILIO_API_KEY_SID or TWILIO_AUTH_TOKEN must be provided');
+      console.error('- TWILIO_PHONE_NUMBER should be in E.164 format (e.g., +1234567890)');
+      this.client = null;
+      this.fromNumber = null;
     }
   }
 
