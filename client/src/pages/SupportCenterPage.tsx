@@ -52,11 +52,15 @@ export default function SupportCenterPage() {
     queryKey: ["/api/rider-messages", currentAdmin?.organizationId],
     queryFn: async () => {
       if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${currentAdmin.organizationId}`);
+      const response = await fetch(`/api/rider-messages?organization_id=${currentAdmin.organizationId}`, {
+        cache: 'no-cache' // Force fresh data, bypass HTTP cache
+      });
       return response.json();
     },
     enabled: !!currentAdmin?.organizationId,
     refetchInterval: 10000,
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Always refetch when component mounts
   });
 
   // Fetch driver messages
@@ -64,11 +68,15 @@ export default function SupportCenterPage() {
     queryKey: ["/api/driver-messages", currentAdmin?.organizationId],
     queryFn: async () => {
       if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`);
+      const response = await fetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`, {
+        cache: 'no-cache' // Force fresh data, bypass HTTP cache
+      });
       return response.json();
     },
     enabled: !!currentAdmin?.organizationId,
     refetchInterval: 10000,
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: true, // Always refetch when component mounts
   });
 
   // Fetch active service alerts
