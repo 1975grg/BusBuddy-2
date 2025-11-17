@@ -1442,6 +1442,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               clientData.message
             );
             console.log(`📱 SMS result for ${rider.name}:`, result);
+            
+            // Log notification
+            try {
+              await storage.createNotificationLog({
+                organizationId: route.organizationId,
+                routeId: clientData.routeId,
+                userId: null, // Riders are in rider_profiles, not users table
+                recipientName: rider.name,
+                recipientPhone: rider.phone,
+                notificationType: "service_alert",
+                deliveryMethod: "sms",
+                message: `${clientData.title}: ${clientData.message}`,
+                status: result.success ? "sent" : "failed",
+                errorMessage: result.error || null,
+                sentAt: new Date(),
+              });
+            } catch (logError) {
+              console.error("Failed to log notification:", logError);
+            }
           }
         }
       } catch (smsError) {
@@ -2143,6 +2162,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } else {
               console.log("Welcome SMS sent successfully:", smsResult.messageId);
             }
+            
+            // Log notification
+            try {
+              await storage.createNotificationLog({
+                organizationId: route.organizationId,
+                routeId: route.id,
+                userId: null, // Riders are in rider_profiles, not users table
+                recipientName: riderProfile.name,
+                recipientPhone: riderProfile.phoneNumber,
+                notificationType: "welcome",
+                deliveryMethod: "sms",
+                message: `Welcome to ${organization.name}! You're now subscribed to notifications for the ${route.name} route.`,
+                status: smsResult.success ? "sent" : "failed",
+                errorMessage: smsResult.error || null,
+                sentAt: new Date(),
+              });
+            } catch (logError) {
+              console.error("Failed to log notification:", logError);
+            }
           } else {
             console.log("SMS not sent - rider has not given SMS consent");
           }
@@ -2260,6 +2298,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.error("Failed to send deletion SMS:", smsResult.error);
               } else {
                 console.log("Deletion SMS sent successfully:", smsResult.messageId);
+              }
+              
+              // Log notification
+              try {
+                await storage.createNotificationLog({
+                  organizationId: route.organizationId,
+                  routeId: route.id,
+                  userId: null, // Riders are in rider_profiles, not users table
+                  recipientName: result.riderProfile.name,
+                  recipientPhone: result.riderProfile.phoneNumber,
+                  notificationType: "rider_removed",
+                  deliveryMethod: "sms",
+                  message: `${organization.name}: You've been removed from ${route.name} route notifications.`,
+                  status: smsResult.success ? "sent" : "failed",
+                  errorMessage: smsResult.error || null,
+                  sentAt: new Date(),
+                });
+              } catch (logError) {
+                console.error("Failed to log notification:", logError);
               }
             }
           } else {

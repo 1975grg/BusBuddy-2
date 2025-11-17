@@ -579,6 +579,8 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLogs).
   id: true,
   createdAt: true,
   sentAt: true,
+}).extend({
+  userId: z.string().nullable().optional(), // Allow null for notifications to riders (who are in rider_profiles, not users)
 });
 
 export const insertInviteTokenSchema = createInsertSchema(inviteTokens).pick({
