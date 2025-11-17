@@ -29,6 +29,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Push notification device tokens for native mobile apps
+export const pushTokens = pgTable("push_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(), // Device-specific push token
+  platform: text("platform").notNull(), // 'ios' or 'android'
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastUsedAt: timestamp("last_used_at").defaultNow(),
+});
+
 // Invite tokens for magic link authentication and QR code access
 export const inviteTokens = pgTable("invite_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -457,6 +468,12 @@ export const insertUserSchema = createInsertSchema(users).pick({
   defaultRouteId: true,
 });
 
+export const insertPushTokenSchema = createInsertSchema(pushTokens).pick({
+  userId: true,
+  token: true,
+  platform: true,
+});
+
 export const insertOrgSettingsSchema = createInsertSchema(organizationSettings).pick({
   name: true,
   logoUrl: true,
@@ -599,6 +616,8 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizations.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type InsertPushToken = z.infer<typeof insertPushTokenSchema>;
+export type PushToken = typeof pushTokens.$inferSelect;
 export type InsertOrgSettings = z.infer<typeof insertOrgSettingsSchema>;
 export type OrgSettings = typeof organizationSettings.$inferSelect;
 export type InsertRoute = z.infer<typeof insertRouteSchema>;

@@ -30,6 +30,8 @@ import {
   type InsertInviteToken,
   type UserRouteAssignment,
   type InsertUserRouteAssignment,
+  type PushToken,
+  type InsertPushToken,
   users,
   organizations,
   organizationSettings,
@@ -44,7 +46,8 @@ import {
   routeSessions,
   notificationLog,
   inviteTokens,
-  userRouteAssignments
+  userRouteAssignments,
+  pushTokens
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
@@ -67,6 +70,11 @@ export interface IStorage {
   setUserSession(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
   clearUserSession(userId: string): Promise<User | undefined>;
   deactivateUser(userId: string): Promise<User | undefined>;
+  
+  // Push notification tokens
+  registerPushToken(token: InsertPushToken): Promise<PushToken>;
+  getPushTokensByUser(userId: string): Promise<PushToken[]>;
+  deactivatePushToken(token: string): Promise<boolean>;
   
   // Invite tokens for magic link authentication
   createInviteToken(token: InsertInviteToken): Promise<InviteToken>;
@@ -256,6 +264,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;
+  }
+
+  // Push notification tokens
+  async registerPushToken(insertToken: InsertPushToken): Promise<PushToken> {
+    // Check if token already exists
+    const existing = await db.select()
+      .from(pushTokens)
+      .where(eq(pushTokens.token, insertToken.token))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Reactivate existing token and update timestamp
+      const [updated] = await db.update(pushTokens)
+        .set({ 
+          isActive: true, 
+          lastUsedAt: new Date(),
+          userId: insertToken.userId // Update userId in case it changed
+        })
+        .where(eq(pushTokens.token, insertToken.token))
+        .returning();
+      return updated;
+    }
+    
+    // Insert new token if it doesn't exist
+    const [token] = await db.insert(pushTokens).values(insertToken).returning();
+    return token;
+  }
+
+  async getPushTokensByUser(userId: string): Promise<PushToken[]> {
+    return await db.select()
+      .from(pushTokens)
+      .where(and(
+        eq(pushTokens.userId, userId),
+        eq(pushTokens.isActive, true)
+      ));
+  }
+
+  async deactivatePushToken(token: string): Promise<boolean> {
+    const [updated] = await db.update(pushTokens)
+      .set({ isActive: false })
+      .where(eq(pushTokens.token, token))
+      .returning();
+    return !!updated;
   }
 
   // Invite tokens management

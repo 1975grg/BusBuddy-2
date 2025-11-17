@@ -17,6 +17,7 @@ import {
   insertRouteSubscriptionSchema,
   insertStopPreferenceSchema,
   insertRouteSessionSchema,
+  insertPushTokenSchema,
   roleEnum,
   orgTypeEnum,
   alertTypeEnum,
@@ -2307,6 +2308,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const result = await smsService.sendSms(phone, message);
     console.log("Debug SMS test result:", result);
     res.json(result);
+  });
+
+  // Push Notification Routes
+  app.post("/api/push-tokens", authenticateUser, async (req, res) => {
+    try {
+      // Validate request body with Zod schema
+      const validatedData = insertPushTokenSchema.parse(req.body);
+      
+      // Verify user is registering their own token
+      const authUser = (req as any).user as AuthUser;
+      if (authUser.id !== validatedData.userId) {
+        return res.status(403).json({ error: "Cannot register token for another user" });
+      }
+      
+      const pushToken = await storage.registerPushToken(validatedData);
+      
+      res.status(201).json(pushToken);
+    } catch (error) {
+      console.error("Error registering push token:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid push token data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   const httpServer = createServer(app);
