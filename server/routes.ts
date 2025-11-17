@@ -1598,6 +1598,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "route_id or organization_id parameter is required" });
       }
       
+      // Prevent HTTP caching for real-time message updates
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       res.json(messages);
     } catch (error) {
       console.error("Error fetching rider messages:", error);
@@ -1756,6 +1763,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         return res.status(400).json({ error: "route_id or organization_id is required" });
       }
+      
+      // Prevent HTTP caching for real-time message updates
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       
       res.json(messages);
     } catch (error) {
