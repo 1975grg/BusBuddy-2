@@ -165,6 +165,25 @@ export const driverMessages = pgTable("driver_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Notification logs for tracking all notifications sent (SMS and push)
+export const notificationLogs = pgTable("notification_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  routeId: varchar("route_id").references(() => routes.id), // Optional - some notifications aren't route-specific
+  userId: varchar("user_id").references(() => users.id), // Recipient (rider or driver)
+  recipientPhone: text("recipient_phone"), // For SMS notifications
+  recipientName: text("recipient_name"), // For display in logs
+  notificationType: text("notification_type").notNull(), // 'route_started', 'approaching_stop', 'arrived_at_stop', 'service_alert', 'welcome', 'rider_removed'
+  deliveryMethod: text("delivery_method").notNull(), // 'sms', 'push'
+  title: text("title"), // Push notification title
+  message: text("message").notNull(), // Notification content
+  status: text("status").notNull().default("sent"), // 'sent', 'failed', 'delivered'
+  externalMessageId: text("external_message_id"), // Twilio message SID or push notification ID
+  errorMessage: text("error_message"), // If failed, why
+  sentAt: timestamp("sent_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Rider profiles for QR code access (anonymous riders)
 export const riderProfiles = pgTable("rider_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -228,19 +247,6 @@ export const driverSchedules = pgTable("driver_schedules", {
 });
 
 // Notification log for tracking sent messages
-export const notificationLog = pgTable("notification_log", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  riderProfileId: varchar("rider_profile_id").references(() => riderProfiles.id),
-  routeSessionId: varchar("route_session_id").references(() => routeSessions.id),
-  type: text("type").notNull(), // 'route_started', 'approaching_stop', 'arrived_at_stop', 'service_alert'
-  method: text("method").notNull(), // 'sms', 'email', 'push'
-  recipient: text("recipient").notNull(), // phone number or email
-  message: text("message").notNull(),
-  status: text("status").notNull().default("pending"), // 'pending', 'sent', 'failed'
-  externalId: text("external_id"), // SMS service message ID
-  sentAt: timestamp("sent_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
 
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -402,14 +408,18 @@ export const driverSchedulesRelations = relations(driverSchedules, ({ one }) => 
   }),
 }));
 
-export const notificationLogRelations = relations(notificationLog, ({ one }) => ({
-  riderProfile: one(riderProfiles, {
-    fields: [notificationLog.riderProfileId],
-    references: [riderProfiles.id],
+export const notificationLogsRelations = relations(notificationLogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [notificationLogs.organizationId],
+    references: [organizations.id],
   }),
-  routeSession: one(routeSessions, {
-    fields: [notificationLog.routeSessionId],
-    references: [routeSessions.id],
+  route: one(routes, {
+    fields: [notificationLogs.routeId],
+    references: [routes.id],
+  }),
+  user: one(users, {
+    fields: [notificationLogs.userId],
+    references: [users.id],
   }),
 }));
 
@@ -567,13 +577,10 @@ export const insertDriverScheduleSchema = createInsertSchema(driverSchedules).pi
   vacationWeeks: true,
 });
 
-export const insertNotificationLogSchema = createInsertSchema(notificationLog).pick({
-  riderProfileId: true,
-  routeSessionId: true,
-  type: true,
-  method: true,
-  recipient: true,
-  message: true,
+export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
 });
 
 export const insertInviteTokenSchema = createInsertSchema(inviteTokens).pick({
@@ -641,7 +648,7 @@ export type RouteSession = typeof routeSessions.$inferSelect;
 export type InsertDriverSchedule = z.infer<typeof insertDriverScheduleSchema>;
 export type DriverSchedule = typeof driverSchedules.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
-export type NotificationLog = typeof notificationLog.$inferSelect;
+export type NotificationLog = typeof notificationLogs.$inferSelect;
 export type InsertInviteToken = z.infer<typeof insertInviteTokenSchema>;
 export type InviteToken = typeof inviteTokens.$inferSelect;
 export type InsertUserRouteAssignment = z.infer<typeof insertUserRouteAssignmentSchema>;
