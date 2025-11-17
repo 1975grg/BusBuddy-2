@@ -26,19 +26,12 @@ export default function SupportCenterPage() {
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  // Fetch current admin user to get organization ID
-  const { data: currentAdmin } = useQuery({
-    queryKey: ["/api/users", "org_admin"],
-    queryFn: async () => {
-      const response = await fetch("/api/users?role=org_admin");
-      const users = await response.json();
-      return users[0];
-    },
-  });
+  // Use authenticated user's organization ID directly
+  const currentAdmin = user;
 
   // Fetch active routes for alerts tab
   const { data: routes = [] } = useQuery<Route[]>({
