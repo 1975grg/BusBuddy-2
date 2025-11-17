@@ -13,6 +13,7 @@ import { UserProvider, useUser } from "@/contexts/UserContext";
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
 import SupportCenterPage from "@/pages/SupportCenterPage";
+import NotificationLogsPage from "@/pages/NotificationLogsPage";
 import SystemAdminDashboard from "@/pages/SystemAdminDashboard";
 import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/admin/access" component={AccessManagementPage} />
       <Route path="/admin/support" component={SupportCenterPage} />
       <Route path="/admin/messages" component={SupportCenterPage} />
+      <Route path="/admin/notifications" component={NotificationLogsPage} />
       <Route path="/admin/settings" component={SettingsPage} />
       
       {/* Driver Routes */}

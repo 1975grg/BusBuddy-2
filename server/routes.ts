@@ -1531,6 +1531,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification Logs (Admin only)
+  app.get("/api/notification-logs", async (req, res) => {
+    try {
+      const { organization_id, route_id, notification_type, start_date, end_date, search, limit, offset } = req.query;
+      
+      if (!organization_id || typeof organization_id !== 'string') {
+        return res.status(400).json({ error: "organization_id parameter is required" });
+      }
+
+      const params: any = {
+        organizationId: organization_id,
+      };
+
+      if (route_id && typeof route_id === 'string') {
+        params.routeId = route_id;
+      }
+
+      if (notification_type && typeof notification_type === 'string') {
+        params.notificationType = notification_type;
+      }
+
+      if (start_date && typeof start_date === 'string') {
+        params.startDate = new Date(start_date);
+      }
+
+      if (end_date && typeof end_date === 'string') {
+        params.endDate = new Date(end_date);
+      }
+
+      if (search && typeof search === 'string') {
+        params.searchText = search;
+      }
+
+      if (limit && typeof limit === 'string') {
+        params.limit = parseInt(limit, 10);
+      }
+
+      if (offset && typeof offset === 'string') {
+        params.offset = parseInt(offset, 10);
+      }
+
+      const logs = await storage.getNotificationLogs(params);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching notification logs:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/notification-logs/count", async (req, res) => {
+    try {
+      const { organization_id } = req.query;
+      
+      if (!organization_id || typeof organization_id !== 'string') {
+        return res.status(400).json({ error: "organization_id parameter is required" });
+      }
+
+      const count = await storage.getNotificationLogCount(organization_id);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching notification log count:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Rider Messages (Riders → Admin)
   app.post("/api/rider-messages", async (req, res) => {
     try {

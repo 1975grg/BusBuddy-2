@@ -355,7 +355,6 @@ export const riderProfilesRelations = relations(riderProfiles, ({ one, many }) =
     references: [organizations.id],
   }),
   subscriptions: many(routeSubscriptions),
-  notifications: many(notificationLog),
 }));
 
 export const routeSubscriptionsRelations = relations(routeSubscriptions, ({ one, many }) => ({
@@ -394,7 +393,6 @@ export const routeSessionsRelations = relations(routeSessions, ({ one, many }) =
     fields: [routeSessions.currentStopId],
     references: [routeStops.id],
   }),
-  notifications: many(notificationLog),
 }));
 
 export const driverSchedulesRelations = relations(driverSchedules, ({ one }) => ({

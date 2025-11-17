@@ -44,7 +44,7 @@ import {
   routeSubscriptions,
   stopPreferences,
   routeSessions,
-  notificationLog,
+  notificationLogs,
   inviteTokens,
   userRouteAssignments,
   pushTokens
@@ -175,8 +175,19 @@ export interface IStorage {
   updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined>;
   updateRouteSessionLocation(sessionId: string, latitude: string, longitude: string): Promise<RouteSession | undefined>;
   
-  // Notification log
+  // Notification logs
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  getNotificationLogs(params: {
+    organizationId: string;
+    routeId?: string;
+    notificationType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    searchText?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<NotificationLog[]>;
+  getNotificationLogCount(organizationId: string): Promise<number>;
   
   // Additional route methods
   getRouteById(id: string): Promise<Route | undefined>;
@@ -981,8 +992,79 @@ export class DatabaseStorage implements IStorage {
 
   // Notification log
   async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
-    const [notification] = await db.insert(notificationLog).values(log).returning();
+    const [notification] = await db.insert(notificationLogs).values(log).returning();
     return notification;
+  }
+
+  async getNotificationLogs(params: {
+    organizationId: string;
+    routeId?: string;
+    notificationType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    searchText?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<NotificationLog[]> {
+    const {
+      organizationId,
+      routeId,
+      notificationType,
+      startDate,
+      endDate,
+      searchText,
+      limit = 50,
+      offset = 0
+    } = params;
+
+    let query = db
+      .select()
+      .from(notificationLogs)
+      .where(eq(notificationLogs.organizationId, organizationId));
+
+    // Apply filters
+    const conditions = [eq(notificationLogs.organizationId, organizationId)];
+    
+    if (routeId) {
+      conditions.push(eq(notificationLogs.routeId, routeId));
+    }
+    
+    if (notificationType) {
+      conditions.push(eq(notificationLogs.notificationType, notificationType));
+    }
+    
+    if (startDate) {
+      conditions.push(sql`${notificationLogs.sentAt} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${notificationLogs.sentAt} <= ${endDate}`);
+    }
+    
+    if (searchText) {
+      conditions.push(
+        sql`(${notificationLogs.recipientName} ILIKE ${`%${searchText}%`} OR ${notificationLogs.recipientPhone} ILIKE ${`%${searchText}%`} OR ${notificationLogs.message} ILIKE ${`%${searchText}%`})`
+      );
+    }
+
+    const results = await db
+      .select()
+      .from(notificationLogs)
+      .where(and(...conditions))
+      .orderBy(desc(notificationLogs.sentAt))
+      .limit(limit)
+      .offset(offset);
+
+    return results;
+  }
+
+  async getNotificationLogCount(organizationId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(notificationLogs)
+      .where(eq(notificationLogs.organizationId, organizationId));
+    
+    return result?.count || 0;
   }
 
   // Additional route methods
@@ -1091,6 +1173,7 @@ export class MemStorage implements IStorage {
   private routes: Map<string, Route>;
   private routeStops: Map<string, RouteStop>;
   private routeSessions: Map<string, RouteSession>;
+  private notificationLogs: Map<string, NotificationLog>;
   private defaultOrgId: string;
   private defaultOrgSettingsId: string;
 
@@ -1101,6 +1184,7 @@ export class MemStorage implements IStorage {
     this.routes = new Map();
     this.routeStops = new Map();
     this.routeSessions = new Map();
+    this.notificationLogs = new Map();
     
     // Create default organization
     this.defaultOrgId = randomUUID();
@@ -1743,20 +1827,91 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  // Notification log implementation
+  // Notification logs implementation
   async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
     const id = randomUUID();
     const notification: NotificationLog = {
       id,
       ...log,
-      riderProfileId: log.riderProfileId ?? null,
-      routeSessionId: log.routeSessionId ?? null,
-      status: 'pending',
-      externalId: null,
-      sentAt: null,
+      routeId: log.routeId ?? null,
+      userId: log.userId ?? null,
+      recipientPhone: log.recipientPhone ?? null,
+      recipientName: log.recipientName ?? null,
+      title: log.title ?? null,
+      externalMessageId: log.externalMessageId ?? null,
+      errorMessage: log.errorMessage ?? null,
+      sentAt: new Date(),
       createdAt: new Date(),
     };
+    this.notificationLogs.set(id, notification);
     return notification;
+  }
+
+  async getNotificationLogs(params: {
+    organizationId: string;
+    routeId?: string;
+    notificationType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    searchText?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<NotificationLog[]> {
+    const {
+      organizationId,
+      routeId,
+      notificationType,
+      startDate,
+      endDate,
+      searchText,
+      limit = 50,
+      offset = 0
+    } = params;
+
+    let results = Array.from(this.notificationLogs.values()).filter(
+      log => log.organizationId === organizationId
+    );
+
+    if (routeId) {
+      results = results.filter(log => log.routeId === routeId);
+    }
+
+    if (notificationType) {
+      results = results.filter(log => log.notificationType === notificationType);
+    }
+
+    if (startDate) {
+      results = results.filter(log => log.sentAt && log.sentAt >= startDate);
+    }
+
+    if (endDate) {
+      results = results.filter(log => log.sentAt && log.sentAt <= endDate);
+    }
+
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      results = results.filter(log =>
+        (log.recipientName?.toLowerCase().includes(search)) ||
+        (log.recipientPhone?.toLowerCase().includes(search)) ||
+        (log.message?.toLowerCase().includes(search))
+      );
+    }
+
+    // Sort by sentAt descending
+    results.sort((a, b) => {
+      const aTime = a.sentAt?.getTime() || 0;
+      const bTime = b.sentAt?.getTime() || 0;
+      return bTime - aTime;
+    });
+
+    // Apply pagination
+    return results.slice(offset, offset + limit);
+  }
+
+  async getNotificationLogCount(organizationId: string): Promise<number> {
+    return Array.from(this.notificationLogs.values()).filter(
+      log => log.organizationId === organizationId
+    ).length;
   }
 
   // Additional helper methods
