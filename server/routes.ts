@@ -1755,14 +1755,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { route_id, organization_id } = req.query;
       
+      // DEBUG: Log parameters to identify the query issue
+      console.log("🔍 GET /api/driver-messages - route_id:", route_id, "organization_id:", organization_id);
+      
       let messages;
       if (route_id && typeof route_id === "string") {
+        console.log("  → Fetching by route_id:", route_id);
         messages = await storage.getDriverMessagesByRoute(route_id);
       } else if (organization_id && typeof organization_id === "string") {
+        console.log("  → Fetching by organization_id:", organization_id);
         messages = await storage.getDriverMessagesByOrganization(organization_id);
       } else {
         return res.status(400).json({ error: "route_id or organization_id is required" });
       }
+      console.log("  ← Returned", messages.length, "messages");
       
       // Prevent HTTP caching for real-time message updates
       res.set({
