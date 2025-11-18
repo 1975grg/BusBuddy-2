@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -321,19 +322,26 @@ export default function AccessManagementPage() {
                             )}
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setRemovalDialog({
-                            open: true,
-                            type: "rider",
-                            id: rider.id,
-                            name: rider.name || "Unnamed Rider",
-                          })}
-                          data-testid={`button-remove-rider-${rider.id}`}
-                        >
-                          <UserX className="w-4 h-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setRemovalDialog({
+                                open: true,
+                                type: "rider",
+                                id: rider.id,
+                                name: rider.name || "Unnamed Rider",
+                              })}
+                              data-testid={`button-remove-rider-${rider.id}`}
+                            >
+                              <UserX className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Remove access from this rider</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                         ))}
                       </div>
