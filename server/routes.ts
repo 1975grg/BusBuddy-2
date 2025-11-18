@@ -2573,7 +2573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // Log notification
               try {
-                const firstName = result.riderProfile.name ? result.riderProfile.name.split(' ')[0] : '';
+                const firstName = result.riderProfile.name ? result.riderProfile.name.trim().split(' ')[0] : '';
                 const greeting = firstName ? `Hey ${firstName}, ` : '';
                 
                 await storage.createNotificationLog({

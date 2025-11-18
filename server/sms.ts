@@ -119,7 +119,8 @@ export class SmsService {
    */
   async sendRiderRemovedMessage(to: string, routeName: string, organizationName: string, riderName?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // Extract first name from full name (e.g., "Emma Johnson" -> "Emma")
-    const firstName = riderName ? riderName.split(' ')[0] : '';
+    // Trim to handle any leading/trailing whitespace
+    const firstName = riderName ? riderName.trim().split(' ')[0] : '';
     const greeting = firstName ? `Hey ${firstName}, ` : '';
     
     const message = `${greeting}just to let you know - you're no longer receiving notifications for the ${routeName} route. Thanks for using ${organizationName}! If this was a mistake, please contact support.`;

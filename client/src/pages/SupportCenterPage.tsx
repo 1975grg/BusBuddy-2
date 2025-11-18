@@ -61,10 +61,9 @@ export default function SupportCenterPage() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchText, setSearchText] = useState("");
   
-  // Get today's date in YYYY-MM-DD format for default date filters
+  // Get today's date in YYYY-MM-DD format for default date filters (using local time)
   const getTodayDateString = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return format(new Date(), 'yyyy-MM-dd');
   };
   
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
