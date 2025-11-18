@@ -79,9 +79,10 @@ export default function SupportCenterPage() {
   });
   
   // Handle tab parameter from URL for dropdown menu navigation
+  // Note: wouter's useLocation doesn't include query params, so we use window.location.search
   const [location] = useLocation();
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    const searchParams = new URLSearchParams(window.location.search);
     const tabParam = searchParams.get('tab');
     const validTabs = ['messages', 'service-alerts', 'notification-logs'];
     
