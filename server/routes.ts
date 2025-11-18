@@ -1550,6 +1550,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Broadcast alert to all active routes in organization
+  app.post("/api/service-alerts/broadcast-all", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { organization_id, type, title, message, severity, activeUntil } = req.body;
+      
+      // Verify user has access to this organization (unless system admin)
+      if (user.role !== "system_admin" && user.organizationId !== organization_id) {
+        return res.status(403).json({ error: "You don't have permission to broadcast to this organization" });
+      }
+      
+      if (!organization_id || !type || !title || !message) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Get admin user for this organization
+      const adminUsers = await storage.getUsersByOrganization(organization_id);
+      const adminUser = adminUsers.find(u => u.role === "org_admin");
+      
+      if (!adminUser) {
+        return res.status(500).json({ error: "No admin user found for organization" });
+      }
+
+      // Get all active routes for this organization
+      const allRoutes = await storage.getRoutesByOrganization(organization_id);
+      const activeRoutes = allRoutes.filter(r => !r.archivedAt);
+
+      if (activeRoutes.length === 0) {
+        return res.status(400).json({ error: "No active routes found for this organization" });
+      }
+
+      const createdAlerts = [];
+      let totalNotificationsSent = 0;
+
+      // Create alert for each active route
+      for (const route of activeRoutes) {
+        const alertData = {
+          routeId: route.id,
+          organizationId: organization_id,
+          type: type as "delayed" | "bus_change" | "cancelled" | "general",
+          title,
+          message,
+          severity: severity as "info" | "warning" | "critical" || "warning",
+          createdByUserId: adminUser.id,
+          activeFrom: new Date(),
+          activeUntil: activeUntil ? new Date(activeUntil) : null,
+          isActive: true,
+        };
+
+        const alert = await storage.createServiceAlert(alertData);
+        createdAlerts.push(alert);
+
+        // Send SMS notifications to riders on this route
+        try {
+          const riders = await storage.getRidersForRoute(route.id);
+          const ridersWithSms = riders.filter((rider: any) => rider.smsConsent);
+          
+          for (const rider of ridersWithSms) {
+            if (rider.phoneNumber) {
+              const result = await smsService.sendServiceAlertNotification(
+                rider.phoneNumber,
+                route.name,
+                title,
+                message
+              );
+              
+              totalNotificationsSent++;
+              
+              // Log notification
+              try {
+                await storage.createNotificationLog({
+                  organizationId: organization_id,
+                  routeId: route.id,
+                  userId: null,
+                  recipientName: rider.name,
+                  recipientPhone: rider.phoneNumber,
+                  notificationType: "service_alert",
+                  deliveryMethod: "sms",
+                  message: `${title}: ${message}`,
+                  status: result.success ? "sent" : "failed",
+                  errorMessage: result.error || null,
+                  sentAt: new Date(),
+                });
+              } catch (logError) {
+                console.error("Failed to log notification:", logError);
+              }
+            }
+          }
+        } catch (smsError) {
+          console.error(`Error sending SMS for route ${route.name}:`, smsError);
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        alertsCreated: createdAlerts.length,
+        routesNotified: activeRoutes.length,
+        notificationsSent: totalNotificationsSent,
+        alerts: createdAlerts
+      });
+    } catch (error) {
+      console.error("Error broadcasting alerts:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Notification Logs (Admin only)
   app.get("/api/notification-logs", async (req, res) => {
     try {
@@ -1794,6 +1900,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/rider-messages/:id/mark-read", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { id } = req.params;
+      
+      // Load the message first to verify ownership
+      const messages = await storage.getRiderMessagesByOrganization(user.organizationId!);
+      const targetMessage = messages.find(m => m.id === id);
+      
+      if (!targetMessage) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateRiderMessageStatus(id, "read");
+      res.json(message);
+    } catch (error) {
+      console.error("Error marking rider message as read:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.patch("/api/rider-messages/:id/priority", async (req, res) => {
     try {
       const { id } = req.params;
@@ -1902,6 +2034,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response to driver message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/driver-messages/:id/mark-read", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { id } = req.params;
+      
+      // Load the message first to verify ownership
+      const messages = await storage.getDriverMessagesByOrganization(user.organizationId!);
+      const targetMessage = messages.find(m => m.id === id);
+      
+      if (!targetMessage) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateDriverMessageStatus(id, "read");
+      res.json(message);
+    } catch (error) {
+      console.error("Error marking driver message as read:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

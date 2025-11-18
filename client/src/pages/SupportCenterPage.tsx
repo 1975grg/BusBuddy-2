@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,14 @@ export default function SupportCenterPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [broadcastDialogOpen, setBroadcastDialogOpen] = useState(false);
+  const [broadcastFormData, setBroadcastFormData] = useState({
+    type: "general",
+    title: "",
+    message: "",
+    severity: "warning",
+    activeUntil: "",
+  });
   
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
@@ -374,6 +383,60 @@ export default function SupportCenterPage() {
     }
   });
 
+  // Mark rider message as read
+  const markRiderMessageReadMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      return await apiRequest("PATCH", `/api/rider-messages/${messageId}/mark-read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+    },
+  });
+
+  // Mark driver message as read
+  const markDriverMessageReadMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      return await apiRequest("PATCH", `/api/driver-messages/${messageId}/mark-read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+    },
+  });
+
+  // Broadcast alert to all routes
+  const broadcastAlertMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/service-alerts/broadcast-all", {
+        organization_id: currentAdmin?.organizationId,
+        ...data,
+        activeUntil: data.activeUntil || null,
+      });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
+      toast({
+        title: "Broadcast successful",
+        description: `Alert sent to ${response.routesNotified} routes (${response.notificationsSent} notifications attempted)`,
+      });
+      setBroadcastDialogOpen(false);
+      setBroadcastFormData({
+        type: "general",
+        title: "",
+        message: "",
+        severity: "warning",
+        activeUntil: "",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Broadcast failed",
+        description: "Could not send alert to all routes",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "new":
@@ -664,7 +727,7 @@ export default function SupportCenterPage() {
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
                 {/* Messages List */}
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {filteredMessages.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No messages</p>
                   ) : (
@@ -674,7 +737,17 @@ export default function SupportCenterPage() {
                         className={`cursor-pointer transition-colors ${
                           selectedMessage?.id === message.id ? "border-primary" : ""
                         }`}
-                        onClick={() => setSelectedMessage(message)}
+                        onClick={() => {
+                          // Mark message as read when clicked
+                          if (message.status === "new") {
+                            if (message.messageType === 'rider') {
+                              markRiderMessageReadMutation.mutate(message.id);
+                            } else {
+                              markDriverMessageReadMutation.mutate(message.id);
+                            }
+                          }
+                          setSelectedMessage(message);
+                        }}
                         data-testid={`message-card-${message.id}`}
                       >
                         <CardContent className="p-4">
@@ -866,6 +939,29 @@ export default function SupportCenterPage() {
 
         {/* Alerts Tab */}
         <TabsContent value="alerts" className="space-y-4">
+          {/* Broadcast to All Routes */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Radio className="w-5 h-5" />
+                Broadcast to All Routes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Send an alert to all active routes in your organization at once
+              </p>
+              <Button
+                onClick={() => setBroadcastDialogOpen(true)}
+                variant="default"
+                data-testid="button-broadcast-all"
+              >
+                <Radio className="w-4 h-4 mr-2" />
+                Broadcast Alert to All Routes
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -877,7 +973,7 @@ export default function SupportCenterPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Send broadcast alerts to all riders on a specific route
               </p>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {activeRoutes.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No active routes</p>
                 ) : (
@@ -1010,7 +1106,7 @@ export default function SupportCenterPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Manage currently active alerts sent to riders
               </p>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
                 {filteredAlerts.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No active alerts</p>
                 ) : (
@@ -1250,6 +1346,117 @@ export default function SupportCenterPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Broadcast Alert Dialog */}
+      <Dialog open={broadcastDialogOpen} onOpenChange={setBroadcastDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]" data-testid="dialog-broadcast-alert">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Radio className="h-5 w-5 text-primary" />
+              Broadcast Alert to All Routes
+            </DialogTitle>
+            <DialogDescription>
+              This alert will be sent to all active routes in your organization
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-type">Alert Type *</Label>
+              <Select
+                value={broadcastFormData.type}
+                onValueChange={(value) => setBroadcastFormData(prev => ({ ...prev, type: value }))}
+              >
+                <SelectTrigger id="broadcast-type" data-testid="select-broadcast-type">
+                  <SelectValue placeholder="Select alert type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General Notice</SelectItem>
+                  <SelectItem value="delayed">Service Delayed</SelectItem>
+                  <SelectItem value="bus_change">Bus Change</SelectItem>
+                  <SelectItem value="cancelled">Service Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-severity">Severity</Label>
+              <Select
+                value={broadcastFormData.severity}
+                onValueChange={(value) => setBroadcastFormData(prev => ({ ...prev, severity: value }))}
+              >
+                <SelectTrigger id="broadcast-severity" data-testid="select-broadcast-severity">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">Info</SelectItem>
+                  <SelectItem value="warning">Warning</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-title">Title *</Label>
+              <Input
+                id="broadcast-title"
+                value={broadcastFormData.title}
+                onChange={(e) => setBroadcastFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g., School Closure - Snow Day"
+                maxLength={100}
+                data-testid="input-broadcast-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-message">Message *</Label>
+              <Textarea
+                id="broadcast-message"
+                value={broadcastFormData.message}
+                onChange={(e) => setBroadcastFormData(prev => ({ ...prev, message: e.target.value }))}
+                placeholder="Provide details about this alert..."
+                className="min-h-[100px]"
+                maxLength={500}
+                data-testid="textarea-broadcast-message"
+              />
+              <p className="text-xs text-muted-foreground">
+                {broadcastFormData.message.length}/500 characters
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-expires">Expires (Optional)</Label>
+              <Input
+                id="broadcast-expires"
+                type="datetime-local"
+                value={broadcastFormData.activeUntil}
+                onChange={(e) => setBroadcastFormData(prev => ({ ...prev, activeUntil: e.target.value }))}
+                data-testid="input-broadcast-expires"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty for manual expiration
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBroadcastDialogOpen(false)}
+              data-testid="button-cancel-broadcast"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => broadcastAlertMutation.mutate(broadcastFormData)}
+              disabled={!broadcastFormData.title || !broadcastFormData.message || broadcastAlertMutation.isPending}
+              data-testid="button-send-broadcast"
+            >
+              {broadcastAlertMutation.isPending ? "Broadcasting..." : "Broadcast to All Routes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Send Alert Dialog */}
       {alertRoute && (
