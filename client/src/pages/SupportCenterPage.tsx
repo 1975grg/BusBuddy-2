@@ -85,6 +85,9 @@ export default function SupportCenterPage() {
     end: getTodayDateString(),
   });
   
+  // Track if "Today" button is selected (default: true since we start with today's date)
+  const [isTodaySelected, setIsTodaySelected] = useState(true);
+  
   // Handle tab parameter from URL for dropdown menu navigation
   // Update currentTab when URL path changes (e.g., clicking dropdown link)
   const [location] = useLocation();
@@ -1310,7 +1313,10 @@ export default function SupportCenterPage() {
                   <Input
                     type="date"
                     value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    onChange={(e) => {
+                      setDateRange({ ...dateRange, start: e.target.value });
+                      setIsTodaySelected(false); // Unselect "Today" when manually changing dates
+                    }}
                     data-testid="input-start-date"
                   />
                 </div>
@@ -1320,10 +1326,28 @@ export default function SupportCenterPage() {
                   <Input
                     type="date"
                     value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    onChange={(e) => {
+                      setDateRange({ ...dateRange, end: e.target.value });
+                      setIsTodaySelected(false); // Unselect "Today" when manually changing dates
+                    }}
                     data-testid="input-end-date"
                   />
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <Button
+                  variant={isTodaySelected ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    const today = getTodayDateString();
+                    setDateRange({ start: today, end: today });
+                    setIsTodaySelected(true);
+                  }}
+                  data-testid="button-today"
+                >
+                  Today
+                </Button>
               </div>
 
               <div className="mt-4 space-y-2">
@@ -1346,6 +1370,7 @@ export default function SupportCenterPage() {
                       setSelectedType("all");
                       setSearchText("");
                       setDateRange({ start: "", end: "" });
+                      setIsTodaySelected(false); // Unselect "Today" button
                     }}
                     data-testid="button-clear-filters"
                   >
