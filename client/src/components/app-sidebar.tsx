@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin, MessageSquare } from "lucide-react";
+import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin, MessageSquare, ChevronDown, Bell, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -13,10 +13,19 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/contexts/UserContext";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Route } from "@shared/schema";
 import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
 import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
@@ -60,8 +69,26 @@ const getRoleLabel = (role: string) => {
 };
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user: authenticatedUser } = useUser();
+  const { toast } = useToast();
+  
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+      // Redirect to login page
+      setLocation("/login");
+      toast({
+        title: "Logged out successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to logout. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Detect user role from URL path
   const userRole = useMemo<"admin" | "driver" | "rider">(() => {
@@ -197,15 +224,10 @@ export function AppSidebar() {
             icon: Users,
           },
           {
-            title: "Messages",
+            title: "Inbox",
             url: "/admin/support",
             icon: MessageSquare,
             badge: newMessagesCount > 0 ? `${newMessagesCount} New` : undefined
-          },
-          {
-            title: "Settings",
-            url: "/admin/settings",
-            icon: Settings,
           },
         ];
       case "driver":
@@ -246,18 +268,45 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-            style={{ backgroundColor: orgSettings?.primaryColor || "#0080FF" }}
-          >
-            UHS
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">Bus Buddy</h2>
-            <p className="text-sm text-muted-foreground">{orgSettings?.name || "Bus Tracking"}</p>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="w-full" data-testid="dropdown-bus-buddy-menu">
+            <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-md p-2 cursor-pointer">
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: orgSettings?.primaryColor || "#0080FF" }}
+              >
+                UHS
+              </div>
+              <div className="flex-1 text-left">
+                <h2 className="font-bold text-lg">Bus Buddy</h2>
+                <p className="text-sm text-muted-foreground">{orgSettings?.name || "Bus Tracking"}</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem asChild>
+              <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer" data-testid="menu-settings">
+                <Settings className="w-4 h-4" />
+                <span>Settings</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/support?tab=logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4" />
+                  <span>Notification Logs</span>
+                </div>
+                <span className="text-xs text-muted-foreground pl-6">System delivery tracking & debugging</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer text-destructive" data-testid="menu-logout">
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarHeader>
       
       <SidebarContent>
