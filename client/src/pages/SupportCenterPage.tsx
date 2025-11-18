@@ -6,13 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { RiderMessage, DriverMessage, Route, ServiceAlert } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import type { RiderMessage, DriverMessage, Route, ServiceAlert, NotificationLog } from "@shared/schema";
 
 type Message = (RiderMessage | DriverMessage) & { messageType: 'rider' | 'driver' };
 
@@ -25,6 +28,15 @@ export default function SupportCenterPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  
+  // Notification logs filters
+  const [selectedRoute, setSelectedRoute] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [searchText, setSearchText] = useState("");
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+    start: "",
+    end: "",
+  });
 
   if (authLoading || !user) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -83,6 +95,52 @@ export default function SupportCenterPage() {
     enabled: !!currentAdmin?.organizationId,
     refetchInterval: 10000,
   });
+  
+  // Build query params for notification logs
+  const logsQueryParams = new URLSearchParams({
+    organization_id: currentAdmin?.organizationId || "",
+  });
+  
+  if (selectedRoute !== "all") {
+    logsQueryParams.set("route_id", selectedRoute);
+  }
+  
+  if (selectedType !== "all") {
+    logsQueryParams.set("notification_type", selectedType);
+  }
+  
+  if (searchText) {
+    logsQueryParams.set("search", searchText);
+  }
+  
+  if (dateRange.start) {
+    logsQueryParams.set("start_date", dateRange.start);
+  }
+  
+  if (dateRange.end) {
+    logsQueryParams.set("end_date", dateRange.end);
+  }
+  
+  // Fetch notification logs
+  const { data: notificationLogs = [], isLoading: logsLoading } = useQuery<NotificationLog[]>({
+    queryKey: ["/api/notification-logs", logsQueryParams.toString()],
+    queryFn: async () => {
+      const response = await fetch(`/api/notification-logs?${logsQueryParams}`);
+      return response.json();
+    },
+    staleTime: 0,
+  });
+  
+  // Fetch total notification count
+  const { data: countData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notification-logs/count", currentAdmin?.organizationId],
+    queryFn: async () => {
+      const response = await fetch(`/api/notification-logs/count?organization_id=${currentAdmin.organizationId}`);
+      return response.json();
+    },
+  });
+  
+  const totalNotificationCount = countData?.count || 0;
 
   // Combine and tag messages
   const allMessages: Message[] = [
@@ -316,6 +374,49 @@ export default function SupportCenterPage() {
     });
   };
 
+  // Helper functions for notification logs
+  const getNotificationTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      route_started: "Route Started",
+      approaching_stop: "Approaching Stop",
+      arrived_at_stop: "Arrived at Stop",
+      service_alert: "Service Alert",
+      welcome: "Welcome",
+      rider_removed: "Rider Removed",
+    };
+    return labels[type] || type;
+  };
+
+  const getNotificationTypeIcon = (type: string) => {
+    switch (type) {
+      case "route_started":
+        return <Bus className="w-4 h-4" />;
+      case "approaching_stop":
+      case "arrived_at_stop":
+        return <Bell className="w-4 h-4" />;
+      case "service_alert":
+        return <AlertCircle className="w-4 h-4" />;
+      default:
+        return <MessageSquare className="w-4 h-4" />;
+    }
+  };
+
+  const getDeliveryMethodBadge = (method: string) => {
+    if (method === "sms") {
+      return <Badge variant="outline" className="gap-1"><Phone className="w-3 h-3" />SMS</Badge>;
+    }
+    return <Badge variant="outline" className="gap-1"><Bell className="w-3 h-3" />Push</Badge>;
+  };
+
+  const getNotificationStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "destructive" | "secondary"> = {
+      sent: "default",
+      failed: "destructive",
+      delivered: "secondary",
+    };
+    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -336,6 +437,10 @@ export default function SupportCenterPage() {
           <TabsTrigger value="active-alerts" data-testid="tab-active-alerts">
             <Bell className="w-4 h-4 mr-2" />
             Active Alerts
+          </TabsTrigger>
+          <TabsTrigger value="notification-logs" data-testid="tab-notification-logs">
+            <Radio className="w-4 h-4 mr-2" />
+            Notification Logs
           </TabsTrigger>
         </TabsList>
 
@@ -698,6 +803,181 @@ export default function SupportCenterPage() {
                     })
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notification Logs Tab */}
+        <TabsContent value="notification-logs" className="space-y-4">
+          {/* Summary Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalNotificationCount.toLocaleString()}</div>
+              <p className="text-sm text-muted-foreground">notifications logged</p>
+            </CardContent>
+          </Card>
+
+          {/* Filters Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="w-5 h-5" />
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Route</Label>
+                  <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+                    <SelectTrigger data-testid="select-route">
+                      <SelectValue placeholder="All routes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All routes</SelectItem>
+                      {activeRoutes.map((route) => (
+                        <SelectItem key={route.id} value={route.id}>
+                          {route.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notification Type</Label>
+                  <Select value={selectedType} onValueChange={setSelectedType}>
+                    <SelectTrigger data-testid="select-type">
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All types</SelectItem>
+                      <SelectItem value="route_started">Route Started</SelectItem>
+                      <SelectItem value="approaching_stop">Approaching Stop</SelectItem>
+                      <SelectItem value="arrived_at_stop">Arrived at Stop</SelectItem>
+                      <SelectItem value="service_alert">Service Alert</SelectItem>
+                      <SelectItem value="welcome">Welcome</SelectItem>
+                      <SelectItem value="rider_removed">Rider Removed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    data-testid="input-start-date"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    data-testid="input-end-date"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <Label>Search</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by recipient name, phone, or message..."
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedRoute("all");
+                      setSelectedType("all");
+                      setSearchText("");
+                      setDateRange({ start: "", end: "" });
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notification History Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {logsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="text-muted-foreground">Loading notifications...</div>
+                </div>
+              ) : notificationLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bell className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No notifications found</p>
+                  <p className="text-sm text-muted-foreground">
+                    Try adjusting your filters or send some notifications to see them here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {notificationLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="border rounded-lg p-4 hover-elevate transition-all"
+                      data-testid={`notification-log-${log.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="mt-1">
+                            {getNotificationTypeIcon(log.notificationType)}
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{log.recipientName || "Unknown"}</span>
+                              {log.recipientPhone && (
+                                <span className="text-sm text-muted-foreground">
+                                  {log.recipientPhone}
+                                </span>
+                              )}
+                              <Badge variant="secondary" className="gap-1">
+                                {getNotificationTypeLabel(log.notificationType)}
+                              </Badge>
+                              {getDeliveryMethodBadge(log.deliveryMethod)}
+                              {getNotificationStatusBadge(log.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{log.message}</p>
+                            {log.errorMessage && (
+                              <p className="text-sm text-destructive">Error: {log.errorMessage}</p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {log.sentAt ? format(new Date(log.sentAt), "MMM d, yyyy h:mm a") : "Not sent"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

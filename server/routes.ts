@@ -1426,17 +1426,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         console.log(`📱 Fetching riders for route: ${clientData.routeId}`);
         const riders = await storage.getRidersForRoute(clientData.routeId);
-        console.log(`📱 Found ${riders.length} riders:`, riders.map(r => ({ name: r.name, phone: r.phone, smsConsent: r.smsConsent })));
+        console.log(`📱 Found ${riders.length} riders:`, riders.map(r => ({ name: r.name, phoneNumber: r.phoneNumber, smsConsent: r.smsConsent })));
         
         const ridersWithSms = riders.filter((rider: any) => rider.smsConsent);
         console.log(`📱 ${ridersWithSms.length} riders have SMS consent`);
         
         // Send SMS to each rider with consent
         for (const rider of ridersWithSms) {
-          if (rider.phone) {
-            console.log(`📱 Sending SMS to ${rider.name} (${rider.phone})...`);
+          if (rider.phoneNumber) {
+            console.log(`📱 Sending SMS to ${rider.name} (${rider.phoneNumber})...`);
             const result = await smsService.sendServiceAlertNotification(
-              rider.phone,
+              rider.phoneNumber,
               route.name,
               clientData.title,
               clientData.message
@@ -1450,7 +1450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 routeId: clientData.routeId,
                 userId: null, // Riders are in rider_profiles, not users table
                 recipientName: rider.name,
-                recipientPhone: rider.phone,
+                recipientPhone: rider.phoneNumber,
                 notificationType: "service_alert",
                 deliveryMethod: "sms",
                 message: `${clientData.title}: ${clientData.message}`,
