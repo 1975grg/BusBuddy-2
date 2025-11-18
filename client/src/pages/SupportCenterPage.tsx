@@ -60,9 +60,16 @@ export default function SupportCenterPage() {
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchText, setSearchText] = useState("");
+  
+  // Get today's date in YYYY-MM-DD format for default date filters
+  const getTodayDateString = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+  
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: "",
-    end: "",
+    start: getTodayDateString(),
+    end: getTodayDateString(),
   });
 
   if (authLoading || !user) {
