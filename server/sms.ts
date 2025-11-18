@@ -117,8 +117,12 @@ export class SmsService {
   /**
    * Send removal notification when rider is deleted from a route
    */
-  async sendRiderRemovedMessage(to: string, routeName: string, organizationName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const message = `🚌 ${organizationName}: You've been removed from ${routeName} route notifications. Thanks for using our service! If this was a mistake, please contact support.`;
+  async sendRiderRemovedMessage(to: string, routeName: string, organizationName: string, riderName?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    // Extract first name from full name (e.g., "Emma Johnson" -> "Emma")
+    const firstName = riderName ? riderName.split(' ')[0] : '';
+    const greeting = firstName ? `Hey ${firstName}, ` : '';
+    
+    const message = `${greeting}just to let you know - you're no longer receiving notifications for the ${routeName} route. Thanks for using ${organizationName}! If this was a mistake, please contact support.`;
     return this.sendSms(to, message);
   }
 

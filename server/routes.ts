@@ -2561,7 +2561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const smsResult = await smsService.sendRiderRemovedMessage(
                 result.riderProfile.phoneNumber,
                 route.name,
-                organization.name
+                organization.name,
+                result.riderProfile.name
               );
               
               if (!smsResult.success) {
@@ -2572,6 +2573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // Log notification
               try {
+                const firstName = result.riderProfile.name ? result.riderProfile.name.split(' ')[0] : '';
+                const greeting = firstName ? `Hey ${firstName}, ` : '';
+                
                 await storage.createNotificationLog({
                   organizationId: route.organizationId,
                   routeId: route.id,
@@ -2580,7 +2584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   recipientPhone: result.riderProfile.phoneNumber,
                   notificationType: "rider_removed",
                   deliveryMethod: "sms",
-                  message: `${organization.name}: You've been removed from ${route.name} route notifications.`,
+                  message: `${greeting}just to let you know - you're no longer receiving notifications for the ${route.name} route.`,
                   status: smsResult.success ? "sent" : "failed",
                   errorMessage: smsResult.error || null,
                   sentAt: new Date(),
