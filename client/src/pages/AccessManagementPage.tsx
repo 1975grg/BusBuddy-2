@@ -118,10 +118,6 @@ export default function AccessManagementPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute, "riders"] });
-      toast({
-        title: "Access removed",
-        description: "Rider has been removed from this route.",
-      });
       setRemovalDialog({ open: false, type: null, id: null, name: null });
     },
     onError: (error: any) => {
