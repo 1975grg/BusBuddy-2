@@ -29,6 +29,24 @@ export default function SupportCenterPage() {
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   
+  // Inbox filters
+  const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
+  const [inboxDateRange, setInboxDateRange] = useState<{ start: string; end: string }>({
+    start: "",
+    end: "",
+  });
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [inboxSearchText, setInboxSearchText] = useState("");
+
+  // Active Alerts filters
+  const [alertsRouteFilter, setAlertsRouteFilter] = useState<string>("all");
+  const [alertTypeFilter, setAlertTypeFilter] = useState<string>("all");
+  const [alertSeverityFilter, setAlertSeverityFilter] = useState<string>("all");
+  const [alertsDateRange, setAlertsDateRange] = useState<{ start: string; end: string }>({
+    start: "",
+    end: "",
+  });
+  
   // Notification logs filters
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -164,10 +182,46 @@ export default function SupportCenterPage() {
     return aPriority - bPriority;
   });
 
-  // Filter messages by status
-  const filteredMessages = statusFilter === "all" 
-    ? allMessages 
-    : allMessages.filter(m => m.status === statusFilter);
+  // Filter messages by status, route, priority, date range, and search
+  const filteredMessages = allMessages.filter(m => {
+    // Status filter
+    if (statusFilter !== "all" && m.status !== statusFilter) return false;
+    
+    // Route filter
+    if (inboxRouteFilter !== "all" && m.routeId !== inboxRouteFilter) return false;
+    
+    // Priority filter
+    if (priorityFilter !== "all" && m.priority !== priorityFilter) return false;
+    
+    // Date range filter
+    if (inboxDateRange.start && m.createdAt) {
+      const messageDate = new Date(m.createdAt);
+      const startDate = new Date(inboxDateRange.start);
+      if (messageDate < startDate) return false;
+    }
+    if (inboxDateRange.end && m.createdAt) {
+      const messageDate = new Date(m.createdAt);
+      const endDate = new Date(inboxDateRange.end);
+      endDate.setHours(23, 59, 59, 999); // End of day
+      if (messageDate > endDate) return false;
+    }
+    
+    // Search text filter
+    if (inboxSearchText) {
+      const searchLower = inboxSearchText.toLowerCase();
+      const messageText = m.message.toLowerCase();
+      const riderName = m.messageType === 'rider' ? ((m as RiderMessage).riderName || "").toLowerCase() : "";
+      const routeName = getRouteName(m.routeId).toLowerCase();
+      
+      if (!messageText.includes(searchLower) && 
+          !riderName.includes(searchLower) && 
+          !routeName.includes(searchLower)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
 
   // Respond to message mutation
   const respondMutation = useMutation({
@@ -374,6 +428,50 @@ export default function SupportCenterPage() {
     });
   };
 
+  // Clear inbox filters
+  const clearInboxFilters = () => {
+    setStatusFilter("new");
+    setInboxRouteFilter("all");
+    setPriorityFilter("all");
+    setInboxDateRange({ start: "", end: "" });
+    setInboxSearchText("");
+  };
+
+  // Clear active alerts filters
+  const clearAlertsFilters = () => {
+    setAlertsRouteFilter("all");
+    setAlertTypeFilter("all");
+    setAlertSeverityFilter("all");
+    setAlertsDateRange({ start: "", end: "" });
+  };
+
+  // Filter active alerts
+  const filteredAlerts = serviceAlerts.filter(alert => {
+    // Route filter
+    if (alertsRouteFilter !== "all" && alert.routeId !== alertsRouteFilter) return false;
+    
+    // Type filter
+    if (alertTypeFilter !== "all" && alert.type !== alertTypeFilter) return false;
+    
+    // Severity filter
+    if (alertSeverityFilter !== "all" && alert.severity !== alertSeverityFilter) return false;
+    
+    // Date range filter
+    if (alertsDateRange.start && alert.createdAt) {
+      const alertDate = new Date(alert.createdAt);
+      const startDate = new Date(alertsDateRange.start);
+      if (alertDate < startDate) return false;
+    }
+    if (alertsDateRange.end && alert.createdAt) {
+      const alertDate = new Date(alert.createdAt);
+      const endDate = new Date(alertsDateRange.end);
+      endDate.setHours(23, 59, 59, 999); // End of day
+      if (alertDate > endDate) return false;
+    }
+    
+    return true;
+  });
+
   // Helper functions for notification logs
   const getNotificationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
@@ -448,12 +546,12 @@ export default function SupportCenterPage() {
         <TabsContent value="inbox" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  Message Inbox
-                </CardTitle>
-                <div className="flex items-center gap-3">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Message Inbox
+                  </CardTitle>
                   <div className="flex items-center gap-2">
                     <Checkbox 
                       id="show-archived" 
@@ -465,17 +563,101 @@ export default function SupportCenterPage() {
                       Show archived
                     </label>
                   </div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40" data-testid="select-status-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Messages</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="read">Read</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                    </SelectContent>
-                  </Select>
+                </div>
+                
+                {/* Filter Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="inbox-route-filter" className="text-xs">Route</Label>
+                    <Select value={inboxRouteFilter} onValueChange={setInboxRouteFilter}>
+                      <SelectTrigger id="inbox-route-filter" data-testid="select-inbox-route-filter">
+                        <SelectValue placeholder="All Routes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Routes</SelectItem>
+                        {routes.map(route => (
+                          <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="status-filter" className="text-xs">Status</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger id="status-filter" data-testid="select-status-filter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="read">Read</SelectItem>
+                        <SelectItem value="resolved">Resolved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="priority-filter" className="text-xs">Priority</Label>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                      <SelectTrigger id="priority-filter" data-testid="select-priority-filter">
+                        <SelectValue placeholder="All Priorities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Priorities</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="inbox-start-date" className="text-xs">Start Date</Label>
+                    <Input
+                      id="inbox-start-date"
+                      type="date"
+                      value={inboxDateRange.start}
+                      onChange={(e) => setInboxDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      data-testid="input-inbox-start-date"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="inbox-end-date" className="text-xs">End Date</Label>
+                    <Input
+                      id="inbox-end-date"
+                      type="date"
+                      value={inboxDateRange.end}
+                      onChange={(e) => setInboxDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      data-testid="input-inbox-end-date"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="inbox-search" className="text-xs">Search</Label>
+                    <Input
+                      id="inbox-search"
+                      type="text"
+                      placeholder="Search messages..."
+                      value={inboxSearchText}
+                      onChange={(e) => setInboxSearchText(e.target.value)}
+                      data-testid="input-inbox-search"
+                    />
+                  </div>
+                </div>
+                
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearInboxFilters}
+                    data-testid="button-clear-inbox-filters"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    Clear Filters
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -733,20 +915,106 @@ export default function SupportCenterPage() {
         <TabsContent value="active-alerts" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
-                Active Service Alerts
-              </CardTitle>
+              <div className="space-y-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Active Service Alerts
+                </CardTitle>
+                
+                {/* Filter Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="alerts-route-filter" className="text-xs">Route</Label>
+                    <Select value={alertsRouteFilter} onValueChange={setAlertsRouteFilter}>
+                      <SelectTrigger id="alerts-route-filter" data-testid="select-alerts-route-filter">
+                        <SelectValue placeholder="All Routes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Routes</SelectItem>
+                        {routes.map(route => (
+                          <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="alert-type-filter" className="text-xs">Alert Type</Label>
+                    <Select value={alertTypeFilter} onValueChange={setAlertTypeFilter}>
+                      <SelectTrigger id="alert-type-filter" data-testid="select-alert-type-filter">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="delayed">Delayed</SelectItem>
+                        <SelectItem value="bus_change">Bus Change</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="alert-severity-filter" className="text-xs">Severity</Label>
+                    <Select value={alertSeverityFilter} onValueChange={setAlertSeverityFilter}>
+                      <SelectTrigger id="alert-severity-filter" data-testid="select-alert-severity-filter">
+                        <SelectValue placeholder="All Severities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Severities</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="warning">Warning</SelectItem>
+                        <SelectItem value="info">Info</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="alerts-start-date" className="text-xs">Start Date</Label>
+                    <Input
+                      id="alerts-start-date"
+                      type="date"
+                      value={alertsDateRange.start}
+                      onChange={(e) => setAlertsDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      data-testid="input-alerts-start-date"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="alerts-end-date" className="text-xs">End Date</Label>
+                    <Input
+                      id="alerts-end-date"
+                      type="date"
+                      value={alertsDateRange.end}
+                      onChange={(e) => setAlertsDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      data-testid="input-alerts-end-date"
+                    />
+                  </div>
+                </div>
+                
+                {/* Clear Filters Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearAlertsFilters}
+                    data-testid="button-clear-alerts-filters"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    Clear Filters
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
                 Manage currently active alerts sent to riders
               </p>
               <div className="space-y-3">
-                {serviceAlerts.length === 0 ? (
+                {filteredAlerts.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No active alerts</p>
                 ) : (
-                  serviceAlerts.map((alert) => {
+                  filteredAlerts.map((alert) => {
                       const route = routes.find(r => r.id === alert.routeId);
                       const alertType = alert.type === "delayed" ? { icon: Clock, color: "bg-yellow-500" } :
                                        alert.type === "bus_change" ? { icon: Bus, color: "bg-blue-500" } :
