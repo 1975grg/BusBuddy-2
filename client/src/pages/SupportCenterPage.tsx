@@ -43,7 +43,14 @@ export default function SupportCenterPage() {
   const [showAlertCompose, setShowAlertCompose] = useState(false);
   
   // Track current tab (for dropdown menu navigation to Notification Logs)
-  const [currentTab, setCurrentTab] = useState("messages");
+  // Initialize from URL parameter if present
+  const getInitialTab = () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get('tab');
+    const validTabs = ['messages', 'service-alerts', 'notification-logs'];
+    return tabParam && validTabs.includes(tabParam) ? tabParam : 'messages';
+  };
+  const [currentTab, setCurrentTab] = useState(getInitialTab());
   
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
@@ -79,7 +86,7 @@ export default function SupportCenterPage() {
   });
   
   // Handle tab parameter from URL for dropdown menu navigation
-  // Note: wouter's useLocation doesn't include query params, so we use window.location.search
+  // Update currentTab when URL path changes (e.g., clicking dropdown link)
   const [location] = useLocation();
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -88,8 +95,8 @@ export default function SupportCenterPage() {
     
     if (tabParam && validTabs.includes(tabParam)) {
       setCurrentTab(tabParam);
-    } else if (tabParam && !validTabs.includes(tabParam)) {
-      // Reset to default tab if invalid tab parameter
+    } else if (!tabParam) {
+      // No tab parameter, default to messages
       setCurrentTab('messages');
     }
   }, [location]);
