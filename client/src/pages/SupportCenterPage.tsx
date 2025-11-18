@@ -25,7 +25,7 @@ export default function SupportCenterPage() {
   const { toast } = useToast();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [responseText, setResponseText] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("new");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [alertRoute, setAlertRoute] = useState<Route | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
@@ -493,7 +493,7 @@ export default function SupportCenterPage() {
 
   // Clear inbox filters
   const clearInboxFilters = () => {
-    setStatusFilter("new");
+    setStatusFilter("all");
     setInboxRouteFilter("all");
     setPriorityFilter("all");
     setInboxDateRange({ start: "", end: "" });
