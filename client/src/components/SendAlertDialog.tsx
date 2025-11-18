@@ -20,6 +20,7 @@ interface SendAlertDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   route: Route;
+  onSuccess?: () => void;
 }
 
 const alertTypes = [
@@ -90,7 +91,7 @@ const clientAlertSchema = insertServiceAlertSchema.omit({
 
 type ClientAlertData = z.infer<typeof clientAlertSchema>;
 
-export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogProps) {
+export function SendAlertDialog({ open, onOpenChange, route, onSuccess }: SendAlertDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expirationOption, setExpirationOption] = useState("end-of-day");
@@ -120,6 +121,7 @@ export function SendAlertDialog({ open, onOpenChange, route }: SendAlertDialogPr
         description: "Service alert has been sent to all riders on this route.",
       });
       handleClose();
+      onSuccess?.();
     },
     onError: (error) => {
       console.error("Error sending alert:", error);

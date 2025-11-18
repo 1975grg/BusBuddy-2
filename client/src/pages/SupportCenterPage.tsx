@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone } from "lucide-react";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -37,6 +37,9 @@ export default function SupportCenterPage() {
     severity: "warning",
     activeUntil: "",
   });
+  
+  // Track which view to show in Service Alerts tab
+  const [showAlertCompose, setShowAlertCompose] = useState(false);
   
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
@@ -433,6 +436,7 @@ export default function SupportCenterPage() {
         description: `Alert sent to ${response.routesNotified} routes (${response.notificationsSent} notifications attempted)`,
       });
       setBroadcastDialogOpen(false);
+      setShowAlertCompose(false);
       setBroadcastFormData({
         type: "general",
         title: "",
@@ -594,23 +598,19 @@ export default function SupportCenterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Messages</h1>
-        <p className="text-muted-foreground">Manage rider and driver communications</p>
+        <h1 className="text-2xl font-bold">Inbox</h1>
+        <p className="text-muted-foreground">Manage communications and service alerts</p>
       </div>
 
-      <Tabs defaultValue="inbox" className="space-y-4">
+      <Tabs defaultValue="messages" className="space-y-4">
         <TabsList data-testid="support-tabs">
-          <TabsTrigger value="inbox" data-testid="tab-inbox">
+          <TabsTrigger value="messages" data-testid="tab-messages">
             <MessageSquare className="w-4 h-4 mr-2" />
-            Inbox
+            Messages
           </TabsTrigger>
-          <TabsTrigger value="alerts" data-testid="tab-alerts">
+          <TabsTrigger value="service-alerts" data-testid="tab-service-alerts">
             <Megaphone className="w-4 h-4 mr-2" />
-            Send Alert
-          </TabsTrigger>
-          <TabsTrigger value="active-alerts" data-testid="tab-active-alerts">
-            <Bell className="w-4 h-4 mr-2" />
-            Active Alerts
+            Service Alerts
           </TabsTrigger>
           <TabsTrigger value="notification-logs" data-testid="tab-notification-logs">
             <Radio className="w-4 h-4 mr-2" />
@@ -618,16 +618,19 @@ export default function SupportCenterPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Inbox Tab */}
-        <TabsContent value="inbox" className="space-y-4">
+        {/* Messages Tab (formerly Inbox) */}
+        <TabsContent value="messages" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-3">
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5" />
-                    Message Inbox
-                  </CardTitle>
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5" />
+                      Messages
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">Two-way conversations with students, families & drivers</p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Checkbox 
                       id="show-archived" 
@@ -950,238 +953,260 @@ export default function SupportCenterPage() {
           </Card>
         </TabsContent>
 
-        {/* Alerts Tab */}
-        <TabsContent value="alerts" className="space-y-4">
-          {/* Broadcast to All Routes */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Radio className="w-5 h-5" />
-                Broadcast to All Routes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Send an alert to all active routes in your organization at once
-              </p>
+        {/* Service Alerts Tab (combines Send Alert + Active Alerts) */}
+        <TabsContent value="service-alerts" className="space-y-4">
+          {showAlertCompose ? (
+            /* Compose New Alert View */
+            <>
+              {/* Back Button */}
               <Button
-                onClick={() => setBroadcastDialogOpen(true)}
-                variant="default"
-                data-testid="button-broadcast-all"
+                variant="outline"
+                onClick={() => setShowAlertCompose(false)}
+                data-testid="button-back-to-alerts"
               >
-                <Radio className="w-4 h-4 mr-2" />
-                Broadcast Alert to All Routes
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Active Alerts
               </Button>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Megaphone className="w-5 h-5" />
-                Send Route Alerts
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Send broadcast alerts to all riders on a specific route
-              </p>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                {activeRoutes.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No active routes</p>
-                ) : (
-                  activeRoutes.map((route) => (
-                    <Card key={route.id} className="hover-elevate" data-testid={`route-alert-card-${route.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-medium">{route.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {route.vehicleNumber ? `Vehicle: ${route.vehicleNumber}` : "No vehicle assigned"}
-                            </p>
-                          </div>
-                          <Button
-                            onClick={() => {
-                              setAlertRoute(route);
-                              setAlertDialogOpen(true);
-                            }}
-                            data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                          >
-                            <Megaphone className="w-4 h-4 mr-2" />
-                            Send Alert
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Active Alerts Tab */}
-        <TabsContent value="active-alerts" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="space-y-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="w-5 h-5" />
-                  Active Service Alerts
-                </CardTitle>
-                
-                {/* Filter Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="alerts-route-filter" className="text-xs">Route</Label>
-                    <Select value={alertsRouteFilter} onValueChange={setAlertsRouteFilter}>
-                      <SelectTrigger id="alerts-route-filter" data-testid="select-alerts-route-filter">
-                        <SelectValue placeholder="All Routes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Routes</SelectItem>
-                        {routes.map(route => (
-                          <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label htmlFor="alert-type-filter" className="text-xs">Alert Type</Label>
-                    <Select value={alertTypeFilter} onValueChange={setAlertTypeFilter}>
-                      <SelectTrigger id="alert-type-filter" data-testid="select-alert-type-filter">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="delayed">Delayed</SelectItem>
-                        <SelectItem value="bus_change">Bus Change</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="general">General</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label htmlFor="alert-severity-filter" className="text-xs">Severity</Label>
-                    <Select value={alertSeverityFilter} onValueChange={setAlertSeverityFilter}>
-                      <SelectTrigger id="alert-severity-filter" data-testid="select-alert-severity-filter">
-                        <SelectValue placeholder="All Severities" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Severities</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="warning">Warning</SelectItem>
-                        <SelectItem value="info">Info</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label htmlFor="alerts-start-date" className="text-xs">Start Date</Label>
-                    <Input
-                      id="alerts-start-date"
-                      type="date"
-                      value={alertsDateRange.start}
-                      onChange={(e) => setAlertsDateRange(prev => ({ ...prev, start: e.target.value }))}
-                      data-testid="input-alerts-start-date"
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label htmlFor="alerts-end-date" className="text-xs">End Date</Label>
-                    <Input
-                      id="alerts-end-date"
-                      type="date"
-                      value={alertsDateRange.end}
-                      onChange={(e) => setAlertsDateRange(prev => ({ ...prev, end: e.target.value }))}
-                      data-testid="input-alerts-end-date"
-                    />
-                  </div>
-                </div>
-                
-                {/* Clear Filters Button */}
-                <div className="flex justify-end">
+              {/* Broadcast to All Routes */}
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Radio className="w-5 h-5" />
+                    Broadcast to All Routes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Send an alert to all active routes in your organization at once
+                  </p>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={clearAlertsFilters}
-                    data-testid="button-clear-alerts-filters"
+                    onClick={() => setBroadcastDialogOpen(true)}
+                    variant="default"
+                    data-testid="button-broadcast-all"
                   >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Clear Filters
+                    <Radio className="w-4 h-4 mr-2" />
+                    Broadcast Alert to All Routes
                   </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Manage currently active alerts sent to riders
-              </p>
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {filteredAlerts.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No active alerts</p>
-                ) : (
-                  filteredAlerts.map((alert) => {
-                      const route = routes.find(r => r.id === alert.routeId);
-                      const alertType = alert.type === "delayed" ? { icon: Clock, color: "bg-yellow-500" } :
-                                       alert.type === "bus_change" ? { icon: Bus, color: "bg-blue-500" } :
-                                       alert.type === "cancelled" ? { icon: XCircle, color: "bg-red-500" } :
-                                       { icon: AlertCircle, color: "bg-gray-500" };
-                      const Icon = alertType.icon;
+                </CardContent>
+              </Card>
 
-                      return (
-                        <Card key={alert.id} className="hover-elevate" data-testid={`active-alert-${alert.id}`}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Megaphone className="w-5 h-5" />
+                    Send Route Alerts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Send broadcast alerts to all riders on a specific route
+                  </p>
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {activeRoutes.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No active routes</p>
+                    ) : (
+                      activeRoutes.map((route) => (
+                        <Card key={route.id} className="hover-elevate" data-testid={`route-alert-card-${route.id}`}>
                           <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className={`p-1.5 rounded-full ${alertType.color} flex-shrink-0`}>
-                                <Icon className="h-4 w-4 text-white" />
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-medium">{route.name}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {route.vehicleNumber ? `Vehicle: ${route.vehicleNumber}` : "No vehicle assigned"}
+                                </p>
                               </div>
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <h3 className="font-medium">{alert.title}</h3>
-                                    <p className="text-sm text-muted-foreground">{route?.name || "Unknown route"}</p>
-                                  </div>
-                                  <Badge variant={alert.severity === "critical" ? "destructive" : alert.severity === "warning" ? "default" : "secondary"}>
-                                    {alert.severity}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm">{alert.message}</p>
-                                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-4">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3" />
-                                      Sent {alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "Unknown"}
-                                    </span>
-                                    {alert.activeUntil && (
-                                      <span>
-                                        Expires {new Date(alert.activeUntil).toLocaleString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => expireAlertMutation.mutate(alert.id)}
-                                    disabled={expireAlertMutation.isPending}
-                                    data-testid={`button-expire-alert-${alert.id}`}
-                                  >
-                                    <XCircle className="w-3 h-3 mr-1" />
-                                    Expire Now
-                                  </Button>
-                                </div>
-                              </div>
+                              <Button
+                                onClick={() => {
+                                  setAlertRoute(route);
+                                  setAlertDialogOpen(true);
+                                }}
+                                data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <Megaphone className="w-4 h-4 mr-2" />
+                                Send Alert
+                              </Button>
                             </div>
                           </CardContent>
                         </Card>
-                      );
-                    })
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            /* Active Alerts View (default) */
+            <Card>
+              <CardHeader>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Bell className="w-5 h-5" />
+                        Active Service Alerts
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">One-way broadcast notifications to students & families</p>
+                    </div>
+                    <Button
+                      onClick={() => setShowAlertCompose(true)}
+                      data-testid="button-compose-alert"
+                    >
+                      <Megaphone className="w-4 h-4 mr-2" />
+                      + Compose New Alert
+                    </Button>
+                  </div>
+                  
+                  {/* Filter Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="alerts-route-filter" className="text-xs">Route</Label>
+                      <Select value={alertsRouteFilter} onValueChange={setAlertsRouteFilter}>
+                        <SelectTrigger id="alerts-route-filter" data-testid="select-alerts-route-filter">
+                          <SelectValue placeholder="All Routes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Routes</SelectItem>
+                          {routes.map(route => (
+                            <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="alert-type-filter" className="text-xs">Alert Type</Label>
+                      <Select value={alertTypeFilter} onValueChange={setAlertTypeFilter}>
+                        <SelectTrigger id="alert-type-filter" data-testid="select-alert-type-filter">
+                          <SelectValue placeholder="All Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          <SelectItem value="delayed">Delayed</SelectItem>
+                          <SelectItem value="bus_change">Bus Change</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="general">General</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="alert-severity-filter" className="text-xs">Severity</Label>
+                      <Select value={alertSeverityFilter} onValueChange={setAlertSeverityFilter}>
+                        <SelectTrigger id="alert-severity-filter" data-testid="select-alert-severity-filter">
+                          <SelectValue placeholder="All Severities" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Severities</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                          <SelectItem value="warning">Warning</SelectItem>
+                          <SelectItem value="info">Info</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="alerts-start-date" className="text-xs">Start Date</Label>
+                      <Input
+                        id="alerts-start-date"
+                        type="date"
+                        value={alertsDateRange.start}
+                        onChange={(e) => setAlertsDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        data-testid="input-alerts-start-date"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label htmlFor="alerts-end-date" className="text-xs">End Date</Label>
+                      <Input
+                        id="alerts-end-date"
+                        type="date"
+                        value={alertsDateRange.end}
+                        onChange={(e) => setAlertsDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        data-testid="input-alerts-end-date"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Clear Filters Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAlertsFilters}
+                      data-testid="button-clear-alerts-filters"
+                    >
+                      <Filter className="w-4 h-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {filteredAlerts.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No active alerts</p>
+                  ) : (
+                    filteredAlerts.map((alert) => {
+                        const route = routes.find(r => r.id === alert.routeId);
+                        const alertType = alert.type === "delayed" ? { icon: Clock, color: "bg-yellow-500" } :
+                                         alert.type === "bus_change" ? { icon: Bus, color: "bg-blue-500" } :
+                                         alert.type === "cancelled" ? { icon: XCircle, color: "bg-red-500" } :
+                                         { icon: AlertCircle, color: "bg-gray-500" };
+                        const Icon = alertType.icon;
+
+                        return (
+                          <Card key={alert.id} className="hover-elevate" data-testid={`active-alert-${alert.id}`}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-3">
+                                <div className={`p-1.5 rounded-full ${alertType.color} flex-shrink-0`}>
+                                  <Icon className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <h3 className="font-medium">{alert.title}</h3>
+                                      <p className="text-sm text-muted-foreground">{route?.name || "Unknown route"}</p>
+                                    </div>
+                                    <Badge variant={alert.severity === "critical" ? "destructive" : alert.severity === "warning" ? "default" : "secondary"}>
+                                      {alert.severity}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm">{alert.message}</p>
+                                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-4">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        Sent {alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "Unknown"}
+                                      </span>
+                                      {alert.activeUntil && (
+                                        <span>
+                                          Expires {new Date(alert.activeUntil).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => expireAlertMutation.mutate(alert.id)}
+                                      disabled={expireAlertMutation.isPending}
+                                      data-testid={`button-expire-alert-${alert.id}`}
+                                    >
+                                      <XCircle className="w-3 h-3 mr-1" />
+                                      Expire Now
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Notification Logs Tab */}
@@ -1477,6 +1502,7 @@ export default function SupportCenterPage() {
           open={alertDialogOpen}
           onOpenChange={setAlertDialogOpen}
           route={alertRoute}
+          onSuccess={() => setShowAlertCompose(false)}
         />
       )}
     </div>
