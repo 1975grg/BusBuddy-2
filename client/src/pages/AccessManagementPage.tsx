@@ -3,9 +3,10 @@ import { AccessCodeGenerator } from "@/components/AccessCodeGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car } from "lucide-react";
+import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -43,6 +44,9 @@ export default function AccessManagementPage() {
     .sort((a, b) => a.name.localeCompare(b.name));
   
   const [selectedRoute, setSelectedRoute] = useState<string>("");
+  const [riderSearch, setRiderSearch] = useState("");
+  const [notificationFilter, setNotificationFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"name" | "joined">("name");
   const [removalDialog, setRemovalDialog] = useState<RemovalDialogState>({
     open: false,
     type: null,
@@ -79,6 +83,32 @@ export default function AccessManagementPage() {
   });
 
   const selectedRouteData = activeRoutes.find(r => r.id === selectedRoute);
+
+  // Filter and sort riders
+  const filteredRiders = riders
+    .filter(rider => {
+      // Search filter - check name and phone
+      const searchLower = riderSearch.toLowerCase();
+      const matchesSearch = !riderSearch || 
+        rider.name?.toLowerCase().includes(searchLower) ||
+        rider.phoneNumber?.toLowerCase().includes(searchLower);
+      
+      // Notification mode filter
+      const matchesNotification = notificationFilter === "all" || 
+        rider.notificationMode === notificationFilter;
+      
+      return matchesSearch && matchesNotification;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name") {
+        return (a.name || "").localeCompare(b.name || "");
+      } else {
+        // Sort by joined date (createdAt) - newest first
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }
+    });
 
   // Remove rider mutation
   const removeMutation = useMutation({
@@ -225,8 +255,57 @@ export default function AccessManagementPage() {
                     No riders assigned to this route yet.
                   </p>
                 ) : (
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {riders.map((rider) => (
+                  <div className="space-y-4">
+                    {/* Search and Filter Controls */}
+                    <div className="flex gap-2 flex-wrap">
+                      <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by name or phone..."
+                          value={riderSearch}
+                          onChange={(e) => setRiderSearch(e.target.value)}
+                          className="pl-10"
+                          data-testid="input-search-riders"
+                        />
+                      </div>
+                      <Select value={notificationFilter} onValueChange={setNotificationFilter}>
+                        <SelectTrigger className="w-40" data-testid="select-notification-filter">
+                          <Filter className="w-4 h-4 mr-2" />
+                          <SelectValue placeholder="Filter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Modes</SelectItem>
+                          <SelectItem value="sms">SMS</SelectItem>
+                          <SelectItem value="push">Push</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={sortBy} onValueChange={(value) => setSortBy(value as "name" | "joined")}>
+                        <SelectTrigger className="w-36" data-testid="select-sort-riders">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name">Sort by Name</SelectItem>
+                          <SelectItem value="joined">Sort by Joined</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Results count */}
+                    {riderSearch || notificationFilter !== "all" ? (
+                      <p className="text-sm text-muted-foreground">
+                        Showing {filteredRiders.length} of {riders.length} riders
+                      </p>
+                    ) : null}
+
+                    {/* Riders List */}
+                    {filteredRiders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No riders match your filters.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                        {filteredRiders.map((rider) => (
                       <div 
                         key={rider.id} 
                         className="flex items-center justify-between p-3 border rounded-lg"
@@ -256,7 +335,9 @@ export default function AccessManagementPage() {
                           <UserX className="w-4 h-4" />
                         </Button>
                       </div>
-                    ))}
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
