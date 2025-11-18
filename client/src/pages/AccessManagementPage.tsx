@@ -225,7 +225,7 @@ export default function AccessManagementPage() {
                     No riders assigned to this route yet.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
                     {riders.map((rider) => (
                       <div 
                         key={rider.id} 

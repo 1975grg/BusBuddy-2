@@ -193,8 +193,15 @@ export default function SupportCenterPage() {
 
   // Filter messages by status, route, priority, date range, and search
   const filteredMessages = allMessages.filter(m => {
-    // Status filter
-    if (statusFilter !== "all" && m.status !== statusFilter) return false;
+    // Status filter - treat "responded" as equivalent to "read"
+    if (statusFilter !== "all") {
+      if (statusFilter === "read") {
+        // "Read" filter should include both "read" and "responded" messages
+        if (m.status !== "read" && m.status !== "responded") return false;
+      } else if (m.status !== statusFilter) {
+        return false;
+      }
+    }
     
     // Route filter
     if (inboxRouteFilter !== "all" && m.routeId !== inboxRouteFilter) return false;
