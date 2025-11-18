@@ -292,12 +292,12 @@ export function AppSidebar() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/admin/support?tab=logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
+              <Link href="/admin/support?tab=notification-logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4" />
                   <span>Notification Logs</span>
                 </div>
-                <span className="text-xs text-muted-foreground pl-6">System delivery tracking & debugging</span>
+                <span className="text-xs text-muted-foreground pl-6">View SMS notification history</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

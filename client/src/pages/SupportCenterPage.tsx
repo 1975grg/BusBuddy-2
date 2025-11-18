@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,9 @@ export default function SupportCenterPage() {
   // Track which view to show in Service Alerts tab
   const [showAlertCompose, setShowAlertCompose] = useState(false);
   
+  // Track current tab (for dropdown menu navigation to Notification Logs)
+  const [currentTab, setCurrentTab] = useState("messages");
+  
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
   const [inboxDateRange, setInboxDateRange] = useState<{ start: string; end: string }>({
@@ -73,6 +77,21 @@ export default function SupportCenterPage() {
     start: getTodayDateString(),
     end: getTodayDateString(),
   });
+  
+  // Handle tab parameter from URL for dropdown menu navigation
+  const [location] = useLocation();
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    const tabParam = searchParams.get('tab');
+    const validTabs = ['messages', 'service-alerts', 'notification-logs'];
+    
+    if (tabParam && validTabs.includes(tabParam)) {
+      setCurrentTab(tabParam);
+    } else if (tabParam && !validTabs.includes(tabParam)) {
+      // Reset to default tab if invalid tab parameter
+      setCurrentTab('messages');
+    }
+  }, [location]);
 
   if (authLoading || !user) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -602,7 +621,7 @@ export default function SupportCenterPage() {
         <p className="text-muted-foreground">Manage communications and service alerts</p>
       </div>
 
-      <Tabs defaultValue="messages" className="space-y-4">
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-4">
         <TabsList data-testid="support-tabs">
           <TabsTrigger value="messages" data-testid="tab-messages">
             <MessageSquare className="w-4 h-4 mr-2" />
@@ -612,10 +631,8 @@ export default function SupportCenterPage() {
             <Megaphone className="w-4 h-4 mr-2" />
             Service Alerts
           </TabsTrigger>
-          <TabsTrigger value="notification-logs" data-testid="tab-notification-logs">
-            <Radio className="w-4 h-4 mr-2" />
-            Notification Logs
-          </TabsTrigger>
+          {/* Hidden trigger for Notification Logs (accessed via dropdown menu) */}
+          <TabsTrigger value="notification-logs" className="hidden" data-testid="tab-notification-logs" />
         </TabsList>
 
         {/* Messages Tab (formerly Inbox) */}
@@ -1211,6 +1228,19 @@ export default function SupportCenterPage() {
 
         {/* Notification Logs Tab */}
         <TabsContent value="notification-logs" className="space-y-4">
+          {/* Back to Inbox Navigation */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentTab('messages')}
+              data-testid="button-back-to-inbox"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Inbox
+            </Button>
+          </div>
+          
           {/* Summary Card */}
           <Card>
             <CardHeader>
