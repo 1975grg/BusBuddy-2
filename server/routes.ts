@@ -1802,8 +1802,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/status", async (req, res) => {
+  app.patch("/api/rider-messages/:id/status", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { status } = req.body;
       
@@ -1811,12 +1812,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "status is required" });
       }
       
-      const message = await storage.updateRiderMessageStatus(id, status);
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateRiderMessageStatus(id, status);
       res.json(message);
     } catch (error) {
       console.error("Error updating message status:", error);
@@ -1824,8 +1832,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/respond", async (req, res) => {
+  app.patch("/api/rider-messages/:id/respond", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { adminResponse, respondedByUserId } = req.body;
       
@@ -1833,12 +1842,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "adminResponse and respondedByUserId are required" });
       }
       
-      const message = await storage.addAdminResponse(id, adminResponse, respondedByUserId);
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.addAdminResponse(id, adminResponse, respondedByUserId);
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response:", error);
@@ -1846,8 +1862,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/archive", async (req, res) => {
+  app.patch("/api/rider-messages/:id/archive", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { archivedByUserId } = req.body;
       
@@ -1855,12 +1872,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "archivedByUserId is required" });
       }
       
-      const message = await storage.archiveRiderMessage(id, archivedByUserId);
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.archiveRiderMessage(id, archivedByUserId);
       res.json(message);
     } catch (error) {
       console.error("Error archiving rider message:", error);
@@ -1868,15 +1892,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/restore", async (req, res) => {
+  app.patch("/api/rider-messages/:id/restore", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
-      const message = await storage.restoreRiderMessage(id);
       
-      if (!message) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.restoreRiderMessage(id);
       res.json(message);
     } catch (error) {
       console.error("Error restoring rider message:", error);
@@ -1884,15 +1917,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/rider-messages/:id", async (req, res) => {
+  app.delete("/api/rider-messages/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
-      const success = await storage.deleteRiderMessage(id);
       
-      if (!success) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const success = await storage.deleteRiderMessage(id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting rider message:", error);
@@ -1905,9 +1947,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
       
-      // Load the message first to verify ownership
-      const messages = await storage.getRiderMessagesByOrganization(user.organizationId!);
-      const targetMessage = messages.find(m => m.id === id);
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
       
       if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
@@ -1926,8 +1967,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/priority", async (req, res) => {
+  app.patch("/api/rider-messages/:id/priority", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       
       // Validate priority using Zod schema
@@ -1936,12 +1978,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const { priority } = prioritySchema.parse(req.body);
-      const message = await storage.updateRiderMessagePriority(id, priority);
       
-      if (!message) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getRiderMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateRiderMessagePriority(id, priority);
       res.json(message);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -1994,8 +2044,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/status", async (req, res) => {
+  app.patch("/api/driver-messages/:id/status", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { status } = req.body;
       
@@ -2003,12 +2054,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "status is required" });
       }
       
-      const message = await storage.updateDriverMessageStatus(id, status);
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateDriverMessageStatus(id, status);
       res.json(message);
     } catch (error) {
       console.error("Error updating driver message status:", error);
@@ -2016,8 +2074,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/respond", async (req, res) => {
+  app.patch("/api/driver-messages/:id/respond", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { adminResponse, respondedByUserId } = req.body;
       
@@ -2025,12 +2084,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "adminResponse and respondedByUserId are required" });
       }
       
-      const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response to driver message:", error);
@@ -2043,9 +2109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
       
-      // Load the message first to verify ownership
-      const messages = await storage.getDriverMessagesByOrganization(user.organizationId!);
-      const targetMessage = messages.find(m => m.id === id);
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
       
       if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
@@ -2064,8 +2129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/archive", async (req, res) => {
+  app.patch("/api/driver-messages/:id/archive", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { archivedByUserId } = req.body;
       
@@ -2073,12 +2139,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "archivedByUserId is required" });
       }
       
-      const message = await storage.archiveDriverMessage(id, archivedByUserId);
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
       
-      if (!message) {
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.archiveDriverMessage(id, archivedByUserId);
       res.json(message);
     } catch (error) {
       console.error("Error archiving driver message:", error);
@@ -2086,15 +2159,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/restore", async (req, res) => {
+  app.patch("/api/driver-messages/:id/restore", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
-      const message = await storage.restoreDriverMessage(id);
       
-      if (!message) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.restoreDriverMessage(id);
       res.json(message);
     } catch (error) {
       console.error("Error restoring driver message:", error);
@@ -2102,15 +2184,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/driver-messages/:id", async (req, res) => {
+  app.delete("/api/driver-messages/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
-      const success = await storage.deleteDriverMessage(id);
       
-      if (!success) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const success = await storage.deleteDriverMessage(id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting driver message:", error);
@@ -2118,8 +2209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/priority", async (req, res) => {
+  app.patch("/api/driver-messages/:id/priority", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       
       // Validate priority using Zod schema
@@ -2128,12 +2220,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const { priority } = prioritySchema.parse(req.body);
-      const message = await storage.updateDriverMessagePriority(id, priority);
       
-      if (!message) {
+      // Load the message directly by ID
+      const targetMessage = await storage.getDriverMessage(id);
+      
+      if (!targetMessage) {
         return res.status(404).json({ error: "Message not found" });
       }
       
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+      
+      const message = await storage.updateDriverMessagePriority(id, priority);
       res.json(message);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -2146,8 +2246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Message Forwarding Routes
   // Forward rider message to driver (creates driver message with forwarded content)
-  app.post("/api/rider-messages/:id/forward-to-driver", async (req, res) => {
+  app.post("/api/rider-messages/:id/forward-to-driver", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { forwardedByUserId } = req.body;
       
@@ -2159,6 +2260,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const riderMessage = await storage.getRiderMessage(id);
       if (!riderMessage) {
         return res.status(404).json({ error: "Rider message not found" });
+      }
+      
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && riderMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
       }
       
       // Get the route to find driver
@@ -2201,8 +2307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Broadcast driver message as service alert (visible to all riders on route)
-  app.post("/api/driver-messages/:id/broadcast-as-alert", async (req, res) => {
+  app.post("/api/driver-messages/:id/broadcast-as-alert", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
       const { id } = req.params;
       const { broadcastByUserId, severity = "warning" } = req.body;
       
@@ -2214,6 +2321,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const driverMessage = await storage.getDriverMessage(id);
       if (!driverMessage) {
         return res.status(404).json({ error: "Driver message not found" });
+      }
+      
+      // Verify organization ownership (system admins can access any org)
+      if (user.role !== "system_admin" && driverMessage.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to modify this message" });
       }
       
       // Get driver info for attribution
