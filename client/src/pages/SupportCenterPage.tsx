@@ -60,22 +60,22 @@ export default function SupportCenterPage() {
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
   const [inboxDateRange, setInboxDateRange] = useState<{ start: string; end: string }>({
-    start: getTodayDateString(),
-    end: getTodayDateString(),
+    start: "",
+    end: "",
   });
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [inboxSearchText, setInboxSearchText] = useState("");
-  const [isInboxTodaySelected, setIsInboxTodaySelected] = useState(true);
+  const [isInboxTodaySelected, setIsInboxTodaySelected] = useState(false);
 
   // Active Alerts filters
   const [alertsRouteFilter, setAlertsRouteFilter] = useState<string>("all");
   const [alertTypeFilter, setAlertTypeFilter] = useState<string>("all");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState<string>("all");
   const [alertsDateRange, setAlertsDateRange] = useState<{ start: string; end: string }>({
-    start: getTodayDateString(),
-    end: getTodayDateString(),
+    start: "",
+    end: "",
   });
-  const [isAlertsTodaySelected, setIsAlertsTodaySelected] = useState(true);
+  const [isAlertsTodaySelected, setIsAlertsTodaySelected] = useState(false);
   
   // Notification logs filters
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
