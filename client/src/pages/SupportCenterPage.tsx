@@ -213,7 +213,12 @@ export default function SupportCenterPage() {
     queryKey: ["/api/notification-logs", logsQueryParams.toString()],
     queryFn: async () => {
       const response = await fetch(`/api/notification-logs?${logsQueryParams}`);
-      return response.json();
+      if (!response.ok) {
+        console.error('Failed to fetch notification logs:', response.status, response.statusText);
+        return [];
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 0,
   });
