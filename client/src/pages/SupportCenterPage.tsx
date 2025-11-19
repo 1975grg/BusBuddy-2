@@ -91,10 +91,35 @@ export default function SupportCenterPage() {
   const [isTodaySelected, setIsTodaySelected] = useState(true);
   
   // Handle tab parameter from URL for dropdown menu navigation
-  // Update currentTab when URL path changes (e.g., clicking dropdown link)
+  // Update currentTab when URL changes (including query parameters)
   const [location] = useLocation();
+  const [urlSearch, setUrlSearch] = useState(window.location.search);
+  
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
+    // Listen for URL changes (including hash and query params)
+    const handleUrlChange = () => {
+      setUrlSearch(window.location.search);
+    };
+    
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    
+    // Also poll for URL changes in case navigation happens without these events
+    const interval = setInterval(() => {
+      if (window.location.search !== urlSearch) {
+        setUrlSearch(window.location.search);
+      }
+    }, 100);
+    
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+      clearInterval(interval);
+    };
+  }, [urlSearch]);
+  
+  useEffect(() => {
+    const searchParams = new URLSearchParams(urlSearch);
     const tabParam = searchParams.get('tab');
     const validTabs = ['messages', 'service-alerts', 'notification-logs'];
     
@@ -104,7 +129,7 @@ export default function SupportCenterPage() {
       // No tab parameter, default to messages
       setCurrentTab('messages');
     }
-  }, [location]);
+  }, [location, urlSearch]);
 
   // Refetch all queries when switching tabs to ensure fresh data
   useEffect(() => {
