@@ -104,6 +104,14 @@ export default function SupportCenterPage() {
     }
   }, [location]);
 
+  // Refetch all queries when switching tabs to ensure fresh data
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
+  }, [currentTab]);
+
   if (authLoading || !user) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
