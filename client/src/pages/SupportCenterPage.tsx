@@ -52,35 +52,35 @@ export default function SupportCenterPage() {
   };
   const [currentTab, setCurrentTab] = useState(getInitialTab());
   
+  // Get today's date in YYYY-MM-DD format for default date filters (using local time)
+  const getTodayDateString = () => {
+    return format(new Date(), 'yyyy-MM-dd');
+  };
+  
   // Inbox filters
   const [inboxRouteFilter, setInboxRouteFilter] = useState<string>("all");
   const [inboxDateRange, setInboxDateRange] = useState<{ start: string; end: string }>({
-    start: "",
-    end: "",
+    start: getTodayDateString(),
+    end: getTodayDateString(),
   });
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [inboxSearchText, setInboxSearchText] = useState("");
-  const [isInboxTodaySelected, setIsInboxTodaySelected] = useState(false);
+  const [isInboxTodaySelected, setIsInboxTodaySelected] = useState(true);
 
   // Active Alerts filters
   const [alertsRouteFilter, setAlertsRouteFilter] = useState<string>("all");
   const [alertTypeFilter, setAlertTypeFilter] = useState<string>("all");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState<string>("all");
   const [alertsDateRange, setAlertsDateRange] = useState<{ start: string; end: string }>({
-    start: "",
-    end: "",
+    start: getTodayDateString(),
+    end: getTodayDateString(),
   });
-  const [isAlertsTodaySelected, setIsAlertsTodaySelected] = useState(false);
+  const [isAlertsTodaySelected, setIsAlertsTodaySelected] = useState(true);
   
   // Notification logs filters
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchText, setSearchText] = useState("");
-  
-  // Get today's date in YYYY-MM-DD format for default date filters (using local time)
-  const getTodayDateString = () => {
-    return format(new Date(), 'yyyy-MM-dd');
-  };
   
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: getTodayDateString(),
