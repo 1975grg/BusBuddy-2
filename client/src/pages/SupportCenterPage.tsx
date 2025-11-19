@@ -60,6 +60,7 @@ export default function SupportCenterPage() {
   });
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [inboxSearchText, setInboxSearchText] = useState("");
+  const [isInboxTodaySelected, setIsInboxTodaySelected] = useState(false);
 
   // Active Alerts filters
   const [alertsRouteFilter, setAlertsRouteFilter] = useState<string>("all");
@@ -69,6 +70,7 @@ export default function SupportCenterPage() {
     start: "",
     end: "",
   });
+  const [isAlertsTodaySelected, setIsAlertsTodaySelected] = useState(false);
   
   // Notification logs filters
   const [selectedRoute, setSelectedRoute] = useState<string>("all");
@@ -553,6 +555,7 @@ export default function SupportCenterPage() {
     setPriorityFilter("all");
     setInboxDateRange({ start: "", end: "" });
     setInboxSearchText("");
+    setIsInboxTodaySelected(false);
   };
 
   // Clear active alerts filters
@@ -733,7 +736,10 @@ export default function SupportCenterPage() {
                       id="inbox-start-date"
                       type="date"
                       value={inboxDateRange.start}
-                      onChange={(e) => setInboxDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      onChange={(e) => {
+                        setInboxDateRange(prev => ({ ...prev, start: e.target.value }));
+                        setIsInboxTodaySelected(false);
+                      }}
                       data-testid="input-inbox-start-date"
                     />
                   </div>
@@ -744,7 +750,10 @@ export default function SupportCenterPage() {
                       id="inbox-end-date"
                       type="date"
                       value={inboxDateRange.end}
-                      onChange={(e) => setInboxDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      onChange={(e) => {
+                        setInboxDateRange(prev => ({ ...prev, end: e.target.value }));
+                        setIsInboxTodaySelected(false);
+                      }}
                       data-testid="input-inbox-end-date"
                     />
                   </div>
@@ -762,8 +771,20 @@ export default function SupportCenterPage() {
                   </div>
                 </div>
                 
-                {/* Clear Filters Button */}
-                <div className="flex justify-end">
+                {/* Today Button and Clear Filters */}
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant={isInboxTodaySelected ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const today = getTodayDateString();
+                      setInboxDateRange({ start: today, end: today });
+                      setIsInboxTodaySelected(true);
+                    }}
+                    data-testid="button-inbox-today"
+                  >
+                    Today
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
