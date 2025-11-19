@@ -197,11 +197,15 @@ export default function SupportCenterPage() {
   }
   
   if (dateRange.start) {
-    logsQueryParams.set("start_date", dateRange.start);
+    // Convert local date to UTC ISO timestamp (start of day in local time)
+    const startDate = new Date(dateRange.start + 'T00:00:00');
+    logsQueryParams.set("start_date", startDate.toISOString());
   }
   
   if (dateRange.end) {
-    logsQueryParams.set("end_date", dateRange.end);
+    // Convert local date to UTC ISO timestamp (end of day in local time)
+    const endDate = new Date(dateRange.end + 'T23:59:59.999');
+    logsQueryParams.set("end_date", endDate.toISOString());
   }
   
   // Fetch notification logs

@@ -1678,13 +1678,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (start_date && typeof start_date === 'string') {
-        // Parse as local time (beginning of day) to avoid timezone issues
-        params.startDate = new Date(start_date + 'T00:00:00');
+        // Parse ISO timestamp string from frontend (already converted to UTC)
+        params.startDate = new Date(start_date);
       }
 
       if (end_date && typeof end_date === 'string') {
-        // Parse as local time (end of day) to include all notifications on this date
-        params.endDate = new Date(end_date + 'T23:59:59.999');
+        // Parse ISO timestamp string from frontend (already converted to UTC)
+        params.endDate = new Date(end_date);
       }
 
       if (search && typeof search === 'string') {
