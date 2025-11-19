@@ -108,10 +108,17 @@ export default function SupportCenterPage() {
 
   // Refetch all queries when switching tabs to ensure fresh data
   useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
+    // Use predicate to match query keys that start with these paths
+    // This ensures parameterized queries (like notification-logs) also get invalidated
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return key === "/api/rider-messages" || 
+               key === "/api/driver-messages" || 
+               key === "/api/service-alerts" || 
+               key === "/api/notification-logs";
+      }
+    });
   }, [currentTab]);
 
   if (authLoading || !user) {
@@ -564,6 +571,7 @@ export default function SupportCenterPage() {
     setAlertTypeFilter("all");
     setAlertSeverityFilter("all");
     setAlertsDateRange({ start: "", end: "" });
+    setIsAlertsTodaySelected(false);
   };
 
   // Filter active alerts
@@ -1168,7 +1176,10 @@ export default function SupportCenterPage() {
                         id="alerts-start-date"
                         type="date"
                         value={alertsDateRange.start}
-                        onChange={(e) => setAlertsDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        onChange={(e) => {
+                          setAlertsDateRange(prev => ({ ...prev, start: e.target.value }));
+                          setIsAlertsTodaySelected(false);
+                        }}
                         data-testid="input-alerts-start-date"
                       />
                     </div>
@@ -1179,14 +1190,29 @@ export default function SupportCenterPage() {
                         id="alerts-end-date"
                         type="date"
                         value={alertsDateRange.end}
-                        onChange={(e) => setAlertsDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        onChange={(e) => {
+                          setAlertsDateRange(prev => ({ ...prev, end: e.target.value }));
+                          setIsAlertsTodaySelected(false);
+                        }}
                         data-testid="input-alerts-end-date"
                       />
                     </div>
                   </div>
                   
-                  {/* Clear Filters Button */}
-                  <div className="flex justify-end">
+                  {/* Today Button and Clear Filters */}
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant={isAlertsTodaySelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        const today = getTodayDateString();
+                        setAlertsDateRange({ start: today, end: today });
+                        setIsAlertsTodaySelected(true);
+                      }}
+                      data-testid="button-alerts-today"
+                    >
+                      Today
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
