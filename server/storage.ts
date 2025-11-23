@@ -1042,12 +1042,24 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Session not found');
     }
 
-    // Get all stops for this route
-    const stops = await this.getRouteStopsByRoute(session.routeId);
+    // Get all stops for this route, sorted by order
+    const allStops = await this.getRouteStopsByRoute(session.routeId);
     const stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> = [];
 
-    // Check each stop for geofence triggers
-    for (const stop of stops) {
+    // Determine current stop progression to prevent duplicate notifications on backtracking
+    let currentStopOrderIndex = 0;
+    if (session.currentStopId) {
+      const currentStop = allStops.find(s => s.id === session.currentStopId);
+      if (currentStop) {
+        currentStopOrderIndex = currentStop.orderIndex;
+      }
+    }
+
+    // Only check stops that are at or after the current stop (upcoming stops)
+    const upcomingStops = allStops.filter(stop => stop.orderIndex >= currentStopOrderIndex);
+
+    // Check each upcoming stop for geofence triggers
+    for (const stop of upcomingStops) {
       if (!stop.latitude || !stop.longitude) continue;
 
       const stopLat = parseFloat(stop.latitude);
@@ -1059,6 +1071,17 @@ export class DatabaseStorage implements IStorage {
       // Check for arrival notification (smaller radius)
       if (!tracking?.arrivalNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.arrivalRadiusFt)) {
         stopsToNotify.push({ stopId: stop.id, notificationType: 'arrived' });
+        
+        // Update current stop to mark progression
+        const [updatedSession] = await db.update(routeSessions)
+          .set({ currentStopId: stop.id })
+          .where(eq(routeSessions.id, sessionId))
+          .returning();
+        
+        // Update the session object to reflect the change
+        if (updatedSession) {
+          Object.assign(session, updatedSession);
+        }
       }
       // Check for approaching notification (larger radius)
       else if (!tracking?.approachingNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.approachingRadiusFt)) {
@@ -1307,6 +1330,7 @@ export class MemStorage implements IStorage {
   private routeStops: Map<string, RouteStop>;
   private routeSessions: Map<string, RouteSession>;
   private notificationLogs: Map<string, NotificationLog>;
+  private stopNotificationTracking: Map<string, StopNotificationTracking>;
   private defaultOrgId: string;
   private defaultOrgSettingsId: string;
 
@@ -1318,6 +1342,7 @@ export class MemStorage implements IStorage {
     this.routeStops = new Map();
     this.routeSessions = new Map();
     this.notificationLogs = new Map();
+    this.stopNotificationTracking = new Map();
     
     // Create default organization
     this.defaultOrgId = randomUUID();
@@ -1348,9 +1373,13 @@ export class MemStorage implements IStorage {
       id: systemAdminId,
       name: "System Administrator",
       email: "admin@busbuddy.system",
+      phoneNumber: null,
       role: "system_admin",
       organizationId: null, // System admins don't belong to a specific org
       favoriteRouteId: null,
+      defaultRouteId: null,
+      sessionToken: null,
+      sessionExpiresAt: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -1362,9 +1391,13 @@ export class MemStorage implements IStorage {
       id: orgAdminId,
       name: "Sarah Johnson",
       email: "admin@springfield.edu",
+      phoneNumber: null,
       role: "org_admin",
       organizationId: this.defaultOrgId,
       favoriteRouteId: null,
+      defaultRouteId: null,
+      sessionToken: null,
+      sessionExpiresAt: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -1376,9 +1409,13 @@ export class MemStorage implements IStorage {
       id: driverId,
       name: "Mike Wilson",
       email: "driver@springfield.edu",
+      phoneNumber: null,
       role: "driver",
       organizationId: this.defaultOrgId,
       favoriteRouteId: null,
+      defaultRouteId: null,
+      sessionToken: null,
+      sessionExpiresAt: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -1390,9 +1427,13 @@ export class MemStorage implements IStorage {
       id: riderId,
       name: "Emma Davis",
       email: "student@springfield.edu",
+      phoneNumber: null,
       role: "rider",
       organizationId: this.defaultOrgId,
       favoriteRouteId: null,
+      defaultRouteId: null,
+      sessionToken: null,
+      sessionExpiresAt: null,
       isActive: true,
       createdAt: new Date()
     };
@@ -1436,8 +1477,9 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusFt: 800, // Default 800ft for approaching notification
-        arrivalRadiusFt: 250, // Default 250ft for arrival notification
+        approachingRadiusFt: 12000, // 12000ft for ~5 min warning at 25 mph
+        arrivalRadiusFt: 250, // 250ft for arrival notification
+        scheduledArrivalMinutes: null, // Not used for MVP
         isActive: true,
         createdAt: new Date()
       };
@@ -1478,8 +1520,9 @@ export class MemStorage implements IStorage {
         orderIndex: stop.orderIndex,
         latitude: null,
         longitude: null,
-        approachingRadiusFt: 800, // Default 800ft for approaching notification
-        arrivalRadiusFt: 250, // Default 250ft for arrival notification
+        approachingRadiusFt: 12000, // 12000ft for ~5 min warning at 25 mph
+        arrivalRadiusFt: 250, // 250ft for arrival notification
+        scheduledArrivalMinutes: null, // Not used for MVP
         isActive: true,
         createdAt: new Date()
       };
@@ -2045,6 +2088,155 @@ export class MemStorage implements IStorage {
     return Array.from(this.notificationLogs.values()).filter(
       log => log.organizationId === organizationId
     ).length;
+  }
+
+  // GPS Tracking Methods
+  async startRoute(routeId: string, driverUserId: string): Promise<RouteSession> {
+    // Check if there's already an active session for this route
+    const existingSession = Array.from(this.routeSessions.values()).find(
+      session => session.routeId === routeId && session.status === 'active'
+    );
+    
+    if (existingSession) {
+      return existingSession;
+    }
+
+    // Create new session
+    const id = randomUUID();
+    const session: RouteSession = {
+      id,
+      routeId,
+      driverUserId,
+      status: 'active',
+      startedAt: new Date(),
+      completedAt: null,
+      currentStopId: null,
+      currentLatitude: null,
+      currentLongitude: null,
+      lastLocationUpdate: null,
+      estimatedCompletionTime: null,
+      createdAt: new Date(),
+    };
+    this.routeSessions.set(id, session);
+    return session;
+  }
+
+  async endRoute(sessionId: string): Promise<RouteSession | undefined> {
+    const session = this.routeSessions.get(sessionId);
+    if (!session) return undefined;
+
+    const updated: RouteSession = {
+      ...session,
+      status: 'completed',
+      completedAt: new Date(),
+    };
+    this.routeSessions.set(sessionId, updated);
+    return updated;
+  }
+
+  async updateDriverLocation(
+    sessionId: string,
+    latitude: number,
+    longitude: number
+  ): Promise<{ session: RouteSession; stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> }> {
+    // Import geofence utilities
+    const { isWithinGeofence } = await import('./geofence');
+
+    // Update session location
+    const session = await this.updateRouteSessionLocation(sessionId, latitude.toString(), longitude.toString());
+    if (!session) {
+      throw new Error('Route session not found');
+    }
+
+    // Get all stops for this route, sorted by order
+    const allStops = Array.from(this.routeStops.values()).filter(stop => stop.routeId === session.routeId && stop.isActive);
+    const stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> = [];
+
+    // Determine current stop progression to prevent duplicate notifications on backtracking
+    let currentStopOrderIndex = 0;
+    if (session.currentStopId) {
+      const currentStop = allStops.find(s => s.id === session.currentStopId);
+      if (currentStop) {
+        currentStopOrderIndex = currentStop.orderIndex;
+      }
+    }
+
+    // Only check stops that are at or after the current stop (upcoming stops)
+    const upcomingStops = allStops.filter(stop => stop.orderIndex >= currentStopOrderIndex);
+
+    for (const stop of upcomingStops) {
+      const stopLat = stop.latitude ? parseFloat(stop.latitude) : null;
+      const stopLon = stop.longitude ? parseFloat(stop.longitude) : null;
+
+      if (stopLat === null || stopLon === null) continue;
+
+      // Check if notification was already sent for this stop in this session
+      const tracking = await this.getStopNotificationTracking(sessionId, stop.id);
+
+      // Check for arrival notification (smaller radius)
+      if (!tracking?.arrivalNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.arrivalRadiusFt)) {
+        stopsToNotify.push({ stopId: stop.id, notificationType: 'arrived' });
+        
+        // Update current stop to mark progression
+        session.currentStopId = stop.id;
+        this.routeSessions.set(sessionId, session);
+      }
+      // Check for approaching notification (larger radius)
+      else if (!tracking?.approachingNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.approachingRadiusFt)) {
+        stopsToNotify.push({ stopId: stop.id, notificationType: 'approaching' });
+      }
+    }
+
+    return { session, stopsToNotify };
+  }
+
+  async getStopNotificationTracking(sessionId: string, stopId: string): Promise<StopNotificationTracking | undefined> {
+    const key = `${sessionId}-${stopId}`;
+    return this.stopNotificationTracking.get(key);
+  }
+
+  async markApproachingNotificationSent(sessionId: string, stopId: string): Promise<void> {
+    const key = `${sessionId}-${stopId}`;
+    const existing = this.stopNotificationTracking.get(key);
+
+    if (existing) {
+      this.stopNotificationTracking.set(key, {
+        ...existing,
+        approachingNotificationSentAt: new Date(),
+      });
+    } else {
+      const tracking: StopNotificationTracking = {
+        id: randomUUID(),
+        sessionId,
+        stopId,
+        approachingNotificationSentAt: new Date(),
+        arrivalNotificationSentAt: null,
+        createdAt: new Date(),
+      };
+      this.stopNotificationTracking.set(key, tracking);
+    }
+  }
+
+  async markArrivalNotificationSent(sessionId: string, stopId: string): Promise<void> {
+    const key = `${sessionId}-${stopId}`;
+    const existing = this.stopNotificationTracking.get(key);
+
+    if (existing) {
+      this.stopNotificationTracking.set(key, {
+        ...existing,
+        arrivalNotificationSentAt: new Date(),
+      });
+    } else {
+      const tracking: StopNotificationTracking = {
+        id: randomUUID(),
+        sessionId,
+        stopId,
+        approachingNotificationSentAt: null,
+        arrivalNotificationSentAt: new Date(),
+        createdAt: new Date(),
+      };
+      this.stopNotificationTracking.set(key, tracking);
+    }
   }
 
   // Additional helper methods

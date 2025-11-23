@@ -1055,7 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route Session Management Routes (GPS Tracking)
-  app.post("/api/route-sessions/start", async (req, res) => {
+  app.post("/api/route-sessions/start", authenticateUser, requireRole('driver'), async (req, res) => {
     try {
       const { routeId, driverUserId } = req.body;
       
@@ -1076,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/route-sessions/:id/end", async (req, res) => {
+  app.post("/api/route-sessions/:id/end", authenticateUser, requireRole('driver'), async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -1093,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/route-sessions/:id/location", async (req, res) => {
+  app.patch("/api/route-sessions/:id/location", authenticateUser, requireRole('driver'), async (req, res) => {
     try {
       const { id } = req.params;
       const { latitude, longitude } = req.body;
@@ -1126,26 +1126,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Route session not found" });
       }
 
+      // Get route and riders once upfront (instead of per-stop)
+      const route = await storage.getRoute(session.routeId);
+      if (!route) {
+        return res.json(session);
+      }
+
+      const riders = await storage.getRidersForRoute(session.routeId);
+      if (riders.length === 0) {
+        return res.json(session);
+      }
+
+      // Batch-load all subscriptions for these riders in one query
+      const riderIds = riders.map(r => r.id);
+      const allSubscriptions = await Promise.all(
+        riderIds.map(riderId => storage.getSubscriptionsByRiderProfile(riderId))
+      );
+      const subscriptionMap = new Map<string, typeof allSubscriptions[0][0]>();
+      allSubscriptions.flat().forEach(sub => {
+        if (sub.routeId === session.routeId) {
+          subscriptionMap.set(sub.riderProfileId, sub);
+        }
+      });
+
+      // Batch-load all stop preferences for these subscriptions in one query
+      const subscriptionIds = Array.from(subscriptionMap.values()).map(s => s.id);
+      const allStopPrefs = await Promise.all(
+        subscriptionIds.map(subId => storage.getStopPreferencesBySubscription(subId))
+      );
+      
+      // Build lookup map: subscriptionId -> Map<stopId, prefs>
+      const stopPrefsMap = new Map<string, Map<string, typeof allStopPrefs[0][0]>>();
+      allStopPrefs.forEach((prefs, idx) => {
+        const stopMap = new Map<string, typeof prefs[0]>();
+        prefs.forEach(pref => stopMap.set(pref.stopId, pref));
+        stopPrefsMap.set(subscriptionIds[idx], stopMap);
+      });
+
       // Send notifications for stops within geofence
       for (const { stopId, notificationType } of stopsToNotify) {
         const stop = await storage.getRouteStop(stopId);
         if (!stop) continue;
 
-        // Get all riders subscribed to this route and stop
-        const riders = await storage.getRidersForRoute(session.routeId);
-        
-        // Get organization for notification context
-        const route = await storage.getRoute(session.routeId);
-        if (!route) continue;
+        // Track if we sent any notification for this stop (for spam prevention)
+        let notificationSent = false;
 
         for (const rider of riders) {
-          // Check if rider wants notifications for this stop
-          const subscription = await storage.getSubscriptionsByRiderProfile(rider.id);
-          const routeSubscription = subscription.find(s => s.routeId === session.routeId);
-          if (!routeSubscription) continue;
+          const subscription = subscriptionMap.get(rider.id);
+          if (!subscription) continue;
 
-          const stopPrefs = await storage.getStopPreferencesBySubscription(routeSubscription.id);
-          const stopPref = stopPrefs.find(sp => sp.stopId === stopId);
+          const riderStopPrefs = stopPrefsMap.get(subscription.id);
+          const stopPref = riderStopPrefs?.get(stopId);
           
           // Skip if rider doesn't want notifications for this stop/type
           if (notificationType === 'approaching' && stopPref && !stopPref.notifyOnApproaching) continue;
@@ -1162,6 +1193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               body: message
             });
 
+            notificationSent = true;
+
             // Log the notification
             await storage.createNotificationLog({
               organizationId: route.organizationId,
@@ -1175,13 +1208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message,
               status: 'sent',
             });
-
-            // Mark notification as sent to prevent spam
-            if (notificationType === 'approaching') {
-              await storage.markApproachingNotificationSent(id, stopId);
-            } else {
-              await storage.markArrivalNotificationSent(id, stopId);
-            }
           } catch (smsError) {
             console.error(`Failed to send ${notificationType} SMS to ${rider.phoneNumber}:`, smsError);
             // Log failed notification
@@ -1198,6 +1224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: 'failed',
               errorMessage: smsError instanceof Error ? smsError.message : 'Unknown error',
             });
+          }
+        }
+
+        // Mark notification as sent ONCE per stop (not per rider) to prevent spam
+        if (notificationSent) {
+          if (notificationType === 'approaching') {
+            await storage.markApproachingNotificationSent(id, stopId);
+          } else {
+            await storage.markArrivalNotificationSent(id, stopId);
           }
         }
       }
