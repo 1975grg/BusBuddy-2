@@ -101,9 +101,9 @@ export const routeStops = pgTable("route_stops", {
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   // Geofencing radii for proximity notifications (in feet)
-  approachingRadiusFt: integer("approaching_radius_ft").notNull().default(800), // Notify when bus is 800ft away
+  approachingRadiusFt: integer("approaching_radius_ft").notNull().default(12000), // Notify when bus is ~5 min away (12000ft)
   arrivalRadiusFt: integer("arrival_radius_ft").notNull().default(250), // Notify when bus arrives (250ft)
-  // Scheduled arrival time in minutes from route start (e.g., 0, 5, 10, 15 for stops at 0min, 5min, 10min, 15min)
+  // Scheduled arrival time in minutes from route start (optional - for future scheduling features)
   scheduledArrivalMinutes: integer("scheduled_arrival_minutes"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -243,6 +243,16 @@ export const driverSchedules = pgTable("driver_schedules", {
   daysOfWeek: text("days_of_week").array().notNull(), // ['monday', 'tuesday', ...]
   vacationWeeks: text("vacation_weeks").array().default([]), // ['2024-12-23', '2024-12-30'] - week start dates
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Stop notification tracking - prevents spam by tracking which notifications have been sent per session
+export const stopNotificationTracking = pgTable("stop_notification_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => routeSessions.id),
+  stopId: varchar("stop_id").notNull().references(() => routeStops.id),
+  approachingNotificationSentAt: timestamp("approaching_notification_sent_at"),
+  arrivalNotificationSentAt: timestamp("arrival_notification_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -575,6 +585,13 @@ export const insertDriverScheduleSchema = createInsertSchema(driverSchedules).pi
   vacationWeeks: true,
 });
 
+export const insertStopNotificationTrackingSchema = createInsertSchema(stopNotificationTracking).pick({
+  sessionId: true,
+  stopId: true,
+  approachingNotificationSentAt: true,
+  arrivalNotificationSentAt: true,
+});
+
 export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({
   id: true,
   createdAt: true,
@@ -647,6 +664,8 @@ export type InsertRouteSession = z.infer<typeof insertRouteSessionSchema>;
 export type RouteSession = typeof routeSessions.$inferSelect;
 export type InsertDriverSchedule = z.infer<typeof insertDriverScheduleSchema>;
 export type DriverSchedule = typeof driverSchedules.$inferSelect;
+export type InsertStopNotificationTracking = z.infer<typeof insertStopNotificationTrackingSchema>;
+export type StopNotificationTracking = typeof stopNotificationTracking.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLog = typeof notificationLogs.$inferSelect;
 export type InsertInviteToken = z.infer<typeof insertInviteTokenSchema>;

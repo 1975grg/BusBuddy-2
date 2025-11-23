@@ -24,6 +24,8 @@ import {
   type InsertStopPreference,
   type RouteSession,
   type InsertRouteSession,
+  type StopNotificationTracking,
+  type InsertStopNotificationTracking,
   type NotificationLog,
   type InsertNotificationLog,
   type InviteToken,
@@ -44,6 +46,7 @@ import {
   routeSubscriptions,
   stopPreferences,
   routeSessions,
+  stopNotificationTracking,
   notificationLogs,
   inviteTokens,
   userRouteAssignments,
@@ -174,6 +177,14 @@ export interface IStorage {
   updateRouteSessionStatus(sessionId: string, status: 'pending' | 'active' | 'completed' | 'cancelled'): Promise<RouteSession | undefined>;
   updateRouteSessionCurrentStop(sessionId: string, stopId: string | null): Promise<RouteSession | undefined>;
   updateRouteSessionLocation(sessionId: string, latitude: string, longitude: string): Promise<RouteSession | undefined>;
+  startRoute(routeId: string, driverUserId: string): Promise<RouteSession>;
+  endRoute(sessionId: string): Promise<RouteSession | undefined>;
+  updateDriverLocation(sessionId: string, latitude: number, longitude: number): Promise<{ session: RouteSession; stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> }>;
+  
+  // Stop notification tracking (prevent spam)
+  getStopNotificationTracking(sessionId: string, stopId: string): Promise<StopNotificationTracking | undefined>;
+  markApproachingNotificationSent(sessionId: string, stopId: string): Promise<void>;
+  markArrivalNotificationSent(sessionId: string, stopId: string): Promise<void>;
   
   // Notification logs
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
@@ -988,6 +999,128 @@ export class DatabaseStorage implements IStorage {
       .where(eq(routeSessions.id, sessionId))
       .returning();
     return session || undefined;
+  }
+
+  async startRoute(routeId: string, driverUserId: string): Promise<RouteSession> {
+    // Check if there's already an active session for this route
+    const existingSession = await this.getActiveRouteSession(routeId);
+    if (existingSession) {
+      throw new Error('Route already has an active session');
+    }
+
+    const [session] = await db.insert(routeSessions).values({
+      routeId,
+      driverUserId,
+      status: 'active',
+      startedAt: new Date(),
+    }).returning();
+    return session;
+  }
+
+  async endRoute(sessionId: string): Promise<RouteSession | undefined> {
+    const [session] = await db.update(routeSessions)
+      .set({ 
+        status: 'completed',
+        completedAt: new Date()
+      })
+      .where(eq(routeSessions.id, sessionId))
+      .returning();
+    return session || undefined;
+  }
+
+  async updateDriverLocation(
+    sessionId: string, 
+    latitude: number, 
+    longitude: number
+  ): Promise<{ session: RouteSession; stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> }> {
+    // Import geofence utilities
+    const { isWithinGeofence } = await import('./geofence');
+    
+    // Update session location
+    const session = await this.updateRouteSessionLocation(sessionId, latitude.toString(), longitude.toString());
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Get all stops for this route
+    const stops = await this.getRouteStopsByRoute(session.routeId);
+    const stopsToNotify: Array<{ stopId: string; notificationType: 'approaching' | 'arrived' }> = [];
+
+    // Check each stop for geofence triggers
+    for (const stop of stops) {
+      if (!stop.latitude || !stop.longitude) continue;
+
+      const stopLat = parseFloat(stop.latitude);
+      const stopLon = parseFloat(stop.longitude);
+
+      // Check if notification was already sent for this stop in this session
+      const tracking = await this.getStopNotificationTracking(sessionId, stop.id);
+
+      // Check for arrival notification (smaller radius)
+      if (!tracking?.arrivalNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.arrivalRadiusFt)) {
+        stopsToNotify.push({ stopId: stop.id, notificationType: 'arrived' });
+      }
+      // Check for approaching notification (larger radius)
+      else if (!tracking?.approachingNotificationSentAt && isWithinGeofence(latitude, longitude, stopLat, stopLon, stop.approachingRadiusFt)) {
+        stopsToNotify.push({ stopId: stop.id, notificationType: 'approaching' });
+      }
+    }
+
+    return { session, stopsToNotify };
+  }
+
+  // Stop notification tracking
+  async getStopNotificationTracking(sessionId: string, stopId: string): Promise<StopNotificationTracking | undefined> {
+    const [tracking] = await db.select().from(stopNotificationTracking)
+      .where(and(
+        eq(stopNotificationTracking.sessionId, sessionId),
+        eq(stopNotificationTracking.stopId, stopId)
+      ));
+    return tracking || undefined;
+  }
+
+  async markApproachingNotificationSent(sessionId: string, stopId: string): Promise<void> {
+    // Check if tracking record exists
+    const existing = await this.getStopNotificationTracking(sessionId, stopId);
+    
+    if (existing) {
+      // Update existing record
+      await db.update(stopNotificationTracking)
+        .set({ approachingNotificationSentAt: new Date() })
+        .where(and(
+          eq(stopNotificationTracking.sessionId, sessionId),
+          eq(stopNotificationTracking.stopId, stopId)
+        ));
+    } else {
+      // Create new record
+      await db.insert(stopNotificationTracking).values({
+        sessionId,
+        stopId,
+        approachingNotificationSentAt: new Date(),
+      });
+    }
+  }
+
+  async markArrivalNotificationSent(sessionId: string, stopId: string): Promise<void> {
+    // Check if tracking record exists
+    const existing = await this.getStopNotificationTracking(sessionId, stopId);
+    
+    if (existing) {
+      // Update existing record
+      await db.update(stopNotificationTracking)
+        .set({ arrivalNotificationSentAt: new Date() })
+        .where(and(
+          eq(stopNotificationTracking.sessionId, sessionId),
+          eq(stopNotificationTracking.stopId, stopId)
+        ));
+    } else {
+      // Create new record
+      await db.insert(stopNotificationTracking).values({
+        sessionId,
+        stopId,
+        arrivalNotificationSentAt: new Date(),
+      });
+    }
   }
 
   // Notification log

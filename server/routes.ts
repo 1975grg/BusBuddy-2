@@ -1057,31 +1057,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Route Session Management Routes (GPS Tracking)
   app.post("/api/route-sessions/start", async (req, res) => {
     try {
-      const { routeId, driverUserId, estimatedCompletionTime } = req.body;
+      const { routeId, driverUserId } = req.body;
       
       if (!routeId || !driverUserId) {
         return res.status(400).json({ error: "routeId and driverUserId are required" });
       }
 
-      // Check if there's already an active session for this route
-      const existingSession = await storage.getActiveRouteSession(routeId);
-      if (existingSession) {
-        return res.status(400).json({ error: "Route already has an active session" });
-      }
-
-      // Create and start the session
-      const session = await storage.createRouteSession({
-        routeId,
-        driverUserId,
-        estimatedCompletionTime: estimatedCompletionTime ? new Date(estimatedCompletionTime) : undefined,
-      });
-
-      // Immediately set status to active and record start time
-      const activeSession = await storage.updateRouteSessionStatus(session.id, 'active');
+      // Use the new startRoute method which handles active session checking
+      const session = await storage.startRoute(routeId, driverUserId);
       
-      res.status(201).json(activeSession);
+      res.status(201).json(session);
     } catch (error) {
+      if (error instanceof Error && error.message === 'Route already has an active session') {
+        return res.status(400).json({ error: error.message });
+      }
       console.error("Error starting route session:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/route-sessions/:id/end", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const session = await storage.endRoute(id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Route session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Error ending route session:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1112,10 +1119,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "longitude must be between -180 and 180" });
       }
 
-      const session = await storage.updateRouteSessionLocation(id, String(lat), String(lng));
+      // Update location and check geofences
+      const { session, stopsToNotify } = await storage.updateDriverLocation(id, lat, lng);
       
       if (!session) {
         return res.status(404).json({ error: "Route session not found" });
+      }
+
+      // Send notifications for stops within geofence
+      for (const { stopId, notificationType } of stopsToNotify) {
+        const stop = await storage.getRouteStop(stopId);
+        if (!stop) continue;
+
+        // Get all riders subscribed to this route and stop
+        const riders = await storage.getRidersForRoute(session.routeId);
+        
+        // Get organization for notification context
+        const route = await storage.getRoute(session.routeId);
+        if (!route) continue;
+
+        for (const rider of riders) {
+          // Check if rider wants notifications for this stop
+          const subscription = await storage.getSubscriptionsByRiderProfile(rider.id);
+          const routeSubscription = subscription.find(s => s.routeId === session.routeId);
+          if (!routeSubscription) continue;
+
+          const stopPrefs = await storage.getStopPreferencesBySubscription(routeSubscription.id);
+          const stopPref = stopPrefs.find(sp => sp.stopId === stopId);
+          
+          // Skip if rider doesn't want notifications for this stop/type
+          if (notificationType === 'approaching' && stopPref && !stopPref.notifyOnApproaching) continue;
+          if (notificationType === 'arrived' && stopPref && !stopPref.notifyOnArrival) continue;
+
+          // Send notification
+          const message = notificationType === 'approaching'
+            ? `Your bus is approximately 5 minutes away from ${stop.name}`
+            : `Your bus has arrived at ${stop.name}`;
+
+          try {
+            await smsService.sendSms({
+              to: rider.phoneNumber,
+              body: message
+            });
+
+            // Log the notification
+            await storage.createNotificationLog({
+              organizationId: route.organizationId,
+              routeId: session.routeId,
+              userId: null,
+              recipientPhone: rider.phoneNumber,
+              recipientName: rider.name || undefined,
+              notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
+              deliveryMethod: 'sms',
+              title: undefined,
+              message,
+              status: 'sent',
+            });
+
+            // Mark notification as sent to prevent spam
+            if (notificationType === 'approaching') {
+              await storage.markApproachingNotificationSent(id, stopId);
+            } else {
+              await storage.markArrivalNotificationSent(id, stopId);
+            }
+          } catch (smsError) {
+            console.error(`Failed to send ${notificationType} SMS to ${rider.phoneNumber}:`, smsError);
+            // Log failed notification
+            await storage.createNotificationLog({
+              organizationId: route.organizationId,
+              routeId: session.routeId,
+              userId: null,
+              recipientPhone: rider.phoneNumber,
+              recipientName: rider.name || undefined,
+              notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
+              deliveryMethod: 'sms',
+              title: undefined,
+              message,
+              status: 'failed',
+              errorMessage: smsError instanceof Error ? smsError.message : 'Unknown error',
+            });
+          }
+        }
       }
       
       res.json(session);
@@ -1157,12 +1241,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const stops = await storage.getRouteStopsByRoute(routeId);
-      const { status, minutesBehindSchedule } = calculateBusStatus(session, stops);
+      const { status } = calculateBusStatus(session, stops);
       
       res.json({
         ...session,
-        calculatedStatus: status,
-        minutesBehindSchedule
+        calculatedStatus: status
       });
     } catch (error) {
       console.error("Error fetching active session:", error);

@@ -1,87 +1,43 @@
 import type { RouteSession, RouteStop } from "@shared/schema";
 
-export type BusStatus = "active" | "delayed" | "offline";
+export type BusStatus = "active" | "offline";
 
 interface BusStatusCalculation {
   status: BusStatus;
-  minutesBehindSchedule: number;
 }
 
-const DELAYED_THRESHOLD_MINUTES = 5; // Bus is delayed if more than 5 minutes behind schedule
 const OFFLINE_THRESHOLD_MINUTES = 10; // Bus is offline if no GPS update in 10 minutes
 
 export function calculateBusStatus(
   session: RouteSession | null,
-  stops: RouteStop[]
+  stops?: RouteStop[]
 ): BusStatusCalculation {
   
-  if (!session) {
+  // No session or session is not active = offline
+  if (!session || session.status !== 'active') {
     return {
-      status: "offline",
-      minutesBehindSchedule: 0
-    };
-  }
-
-  if (session.status !== 'active') {
-    return {
-      status: "offline",
-      minutesBehindSchedule: 0
+      status: "offline"
     };
   }
 
   const now = new Date();
   
+  // Check if GPS location is recent (within last 10 minutes)
   const lastUpdate = session.lastLocationUpdate ? new Date(session.lastLocationUpdate) : null;
   const minutesSinceUpdate = lastUpdate 
     ? (now.getTime() - lastUpdate.getTime()) / (1000 * 60)
     : Infinity;
 
+  // If no recent GPS update, mark as offline
   if (minutesSinceUpdate > OFFLINE_THRESHOLD_MINUTES) {
     return {
-      status: "offline",
-      minutesBehindSchedule: 0
+      status: "offline"
     };
   }
 
-  if (!session.startedAt) {
-    return {
-      status: "active",
-      minutesBehindSchedule: 0
-    };
-  }
-
-  const startedAt = new Date(session.startedAt);
-  const minutesSinceStart = (now.getTime() - startedAt.getTime()) / (1000 * 60);
-
-  const currentStopId = session.currentStopId;
-  if (!currentStopId) {
-    return {
-      status: "active",
-      minutesBehindSchedule: 0
-    };
-  }
-
-  const currentStop = stops.find(s => s.id === currentStopId);
-  if (!currentStop || currentStop.scheduledArrivalMinutes === null || currentStop.scheduledArrivalMinutes === undefined) {
-    return {
-      status: "active",
-      minutesBehindSchedule: 0
-    };
-  }
-
-  const scheduledMinutes = currentStop.scheduledArrivalMinutes;
-  const minutesBehindSchedule = minutesSinceStart - scheduledMinutes;
-
-  if (minutesBehindSchedule > DELAYED_THRESHOLD_MINUTES) {
-    return {
-      status: "delayed",
-      minutesBehindSchedule: Math.round(minutesBehindSchedule)
-    };
-  }
-
+  // Session is active and has recent GPS = active
   return {
-    status: "active",
-    minutesBehindSchedule: Math.round(minutesBehindSchedule)
+    status: "active"
   };
 }
 
