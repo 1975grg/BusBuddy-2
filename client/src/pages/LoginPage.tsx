@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
+import { HelpCircle } from "lucide-react";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -183,6 +184,31 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Development Mode: Magic links will be shown in toast notifications</p>
+          </div>
+
+          <div className="mt-6 p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-start gap-3">
+              <HelpCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Need access?</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Access is provided by your school, hospital, or transportation provider. You'll receive either:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 ml-4">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>QR code</strong> - Scan it to get instant access</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Magic link</strong> - Click the link sent via email or SMS</span>
+                  </li>
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Contact your administrator if you haven't received your access code yet.
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

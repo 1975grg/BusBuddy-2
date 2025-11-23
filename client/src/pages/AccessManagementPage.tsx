@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter } from "lucide-react";
+import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -54,6 +54,8 @@ export default function AccessManagementPage() {
     id: null,
     name: null,
   });
+  
+  const [renewalDialog, setRenewalDialog] = useState(false);
   
   // Set first route as selected when routes load (useEffect to avoid render issues)
   useEffect(() => {
@@ -135,6 +137,46 @@ export default function AccessManagementPage() {
     }
   };
 
+  // Renew all rider passwords mutation
+  const renewPasswordsMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.organizationId) {
+        throw new Error("Organization ID not found");
+      }
+      
+      const response = await apiRequest("POST", "/api/users/renew-all-rider-passwords", {
+        organizationId: user.organizationId
+      });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      // Invalidate all queries that might be affected by password renewal
+      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
+      if (selectedRoute) {
+        queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute] });
+      }
+      
+      toast({
+        title: "Passwords Renewed",
+        description: data.message || `Successfully renewed passwords for ${data.renewedCount} rider${data.renewedCount !== 1 ? 's' : ''}. New expiration: July 1st.`,
+      });
+      setRenewalDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to renew passwords. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRenewPasswords = () => {
+    renewPasswordsMutation.mutate();
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -214,6 +256,19 @@ export default function AccessManagementPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => setRenewalDialog(true)}
+                      data-testid="button-renew-passwords"
+                    >
+                      <CalendarClock className="w-4 h-4 mr-2" />
+                      Renew All Rider Passwords
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Reset all rider password expiration dates to next July 1st.
+                    </p>
+                    
                     <Button 
                       variant="outline" 
                       className="w-full"
@@ -379,6 +434,37 @@ export default function AccessManagementPage() {
               data-testid="button-confirm-removal"
             >
               {removeMutation.isPending ? "Removing..." : "Remove Access"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Renewal Confirmation Dialog */}
+      <AlertDialog open={renewalDialog} onOpenChange={setRenewalDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Renew All Rider Passwords?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset the password expiration date for <strong>all riders</strong> in your organization to July 1st of next year.
+              <br /><br />
+              Riders will be able to continue using their existing access codes, QR codes, and magic links without interruption.
+              <br /><br />
+              This is typically done at the start of each school year to refresh rider access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={renewPasswordsMutation.isPending}
+              data-testid="button-cancel-renewal"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRenewPasswords}
+              disabled={renewPasswordsMutation.isPending}
+              data-testid="button-confirm-renewal"
+            >
+              {renewPasswordsMutation.isPending ? "Renewing..." : "Renew All Passwords"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
