@@ -285,26 +285,38 @@ export function AppSidebar() {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer" data-testid="menu-settings">
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/support?tab=notification-logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4" />
-                  <span>Notification Logs</span>
-                </div>
-                <span className="text-xs text-muted-foreground pl-6">View SMS notification history</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer text-destructive" data-testid="menu-logout">
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </DropdownMenuItem>
+            {authenticatedUser && (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer" data-testid="menu-settings">
+                    <Settings className="w-4 h-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/support?tab=notification-logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      <span>Notification Logs</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground pl-6">View SMS notification history</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer text-destructive" data-testid="menu-logout">
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </>
+            )}
+            {!authenticatedUser && (
+              <DropdownMenuItem asChild>
+                <Link href="/login" className="flex items-center gap-2 cursor-pointer" data-testid="menu-login">
+                  <LogOut className="w-4 h-4" />
+                  <span>Login</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarHeader>
