@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -22,6 +22,7 @@ import RiderOnboardingPage from "@/pages/RiderOnboardingPage";
 import AccessPage from "@/pages/AccessPage";
 import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
+import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -50,14 +51,15 @@ function Router() {
       
       {/* Public Rider Onboarding (QR Code Access) */}
       <Route path="/ride/:organizationId/:routeId" component={RiderOnboardingPage} />
+      <Route path="/access" component={AccessPage} />
       
       {/* Authentication */}
       <Route path="/login" component={LoginPage} />
       <Route path="/auth/verify" component={LoginPage} />
       <Route path="/auth/invite/:token" component={LoginPage} />
       
-      {/* Public Access */}
-      <Route path="/" component={AccessPage} />
+      {/* Landing Page */}
+      <Route path="/" component={LandingPage} />
       
       {/* Fallback */}
       <Route component={NotFound} />
@@ -67,6 +69,18 @@ function Router() {
 
 function AppContent() {
   const { user } = useUser();
+  const [location] = useLocation();
+  
+  // Public pages that should not show sidebar/header
+  const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/");
+  
+  if (isPublicPage) {
+    return (
+      <main className="w-full h-screen overflow-auto" key={user?.id || 'anonymous'}>
+        <Router />
+      </main>
+    );
+  }
   
   return (
     <div className="flex h-screen w-full">

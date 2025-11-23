@@ -169,6 +169,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check password expiration for riders before granting session
+      if (user.role === 'rider' && user.passwordExpiresAt) {
+        const { isPasswordExpired } = await import("./passwordExpiration");
+        if (isPasswordExpired(user.passwordExpiresAt)) {
+          return res.status(401).json({ 
+            error: "Password expired", 
+            code: "PASSWORD_EXPIRED",
+            message: "Your access has expired. Please request a new access code from your administrator.",
+            redirectTo: "/access"
+          });
+        }
+      }
+
       // Generate session token
       const sessionToken = generateSessionToken();
       const sessionExpiresAt = getSessionExpirationDate();
@@ -598,6 +611,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.name === "ZodError") {
         return res.status(400).json({ error: "Invalid user data", details: error.errors });
       }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Bulk renew all rider passwords for an organization (admin only)
+  app.post("/api/users/renew-all-rider-passwords", authenticateUser, async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      
+      // Only org_admin and system_admin can renew passwords
+      if (user.role !== 'org_admin' && user.role !== 'system_admin') {
+        return res.status(403).json({ error: "Unauthorized - admin access required" });
+      }
+      
+      // Validate request body with Zod
+      const renewPasswordSchema = z.object({
+        organizationId: z.string().uuid("Invalid organization ID format")
+      });
+      
+      const validationResult = renewPasswordSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { organizationId } = validationResult.data;
+      
+      // Org admins can only renew passwords for their own organization
+      if (user.role === 'org_admin' && organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "Cannot renew passwords for other organizations" });
+      }
+      
+      // Import the password expiration utility
+      const { getNextJuly1st } = await import("./passwordExpiration");
+      const newExpiresAt = getNextJuly1st();
+      
+      // Renew all rider passwords for this organization
+      const renewedCount = await storage.renewAllRiderPasswords(organizationId, newExpiresAt);
+      
+      res.json({ 
+        success: true,
+        renewedCount,
+        newExpiresAt: newExpiresAt.toISOString(),
+        message: `Successfully renewed ${renewedCount} rider password(s) to expire on ${newExpiresAt.toLocaleDateString()}`
+      });
+    } catch (error) {
+      console.error("Error renewing rider passwords:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

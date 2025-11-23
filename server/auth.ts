@@ -53,6 +53,20 @@ export async function authenticateUser(
       return res.status(401).json({ error: "Invalid or expired session" });
     }
 
+    // Check password expiration for riders
+    if (user.role === 'rider' && user.passwordExpiresAt) {
+      const { isPasswordExpired } = await import("./passwordExpiration");
+      if (isPasswordExpired(user.passwordExpiresAt)) {
+        // Clear the session since password has expired
+        await storage.clearUserSession(user.id);
+        return res.status(401).json({ 
+          error: "Password expired", 
+          code: "PASSWORD_EXPIRED",
+          message: "Your access has expired. Please request a new access code from your administrator."
+        });
+      }
+    }
+
     // Get user's route assignments
     const routeAssignments = await storage.getUserRouteAssignments(user.id);
 

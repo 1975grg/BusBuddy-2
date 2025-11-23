@@ -24,14 +24,21 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Primary Database**: PostgreSQL via Neon serverless hosting.
-- **Schema Management**: Drizzle migrations.
+- **Schema Management**: Drizzle push-based workflow (`npm run db:push`).
+  - Fresh environments must run `npm run db:push` to sync schema
+  - Password expiration feature requires users.password_expires_at column
 - **Strategy**: Multi-tenant architecture for organization isolation.
 
 ### Authentication & Authorization
-- **Authentication**: Session-based with database persistence.
+- **Authentication**: Session-based with database persistence (90-day sessions).
 - **Access Control**: Role-based (Admin, Driver, Rider).
 - **Rider Onboarding**: QR codes, magic links, password-based access.
-- **Security**: Token revocation, access reset, role detection via URL paths. Server-side message filtering is a required production enhancement.
+- **Password Expiration**: Automatic expiration system with role-based policies:
+  - **Riders**: Passwords expire automatically on July 1st every year (end of school year)
+  - **Drivers & Admins**: Never expire unless manually revoked
+  - **Bulk Renewal**: Admins can renew all rider passwords in one click
+  - **Login Enforcement**: Expired riders cannot log in and receive redirection to request new access
+- **Security**: Token revocation, access reset, role detection via URL paths, password expiration enforcement. Server-side message filtering is a required production enhancement.
 
 ### Key Design Patterns
 - **Multi-organization Support**: Tenant isolation and customizable branding.
@@ -42,11 +49,13 @@ Preferred communication style: Simple, everyday language.
 - **TCPA Compliance**: SMS consent tracking with opt-out keyword support.
 
 ### Features
+- **Professional Landing Page**: Multi-portal landing experience with three clear entry points (Parents/Students, Drivers, Admins), brand messaging, feature highlights, and role-appropriate CTAs. Designed for first-time visitors and unauthenticated users.
 - **SMS Notifications & TCPA Compliance**: Opt-in/opt-out system with consent tracking, standard opt-out keywords (STOP, UNSUBSCRIBE), Twilio webhook processing, and welcome messages.
 - **Bidirectional Messaging System**: Allows Riders ↔ Admin and Drivers ↔ Admin communication with real-time updates (polling), message attribution, and a unified Support Center for administrators to manage messages and send broadcast alerts.
 - **Rider Experience & Notifications**: Riders are assigned to a single route post-onboarding, with notifications for route start, approaching/arrived at home stop (geofenced), and service alerts.
 - **Route Management & Archival**: Soft-delete architecture for routes via an `archivedAt` timestamp. Archiving a route automatically revokes assignments, deactivates subscriptions, alerts, and stops, ensuring data integrity through transactional operations.
 - **Admin Dashboard**: Streamlined dashboard with key metrics (Active Routes, Support Requests) and action cards for Routes, Access, and Support management. Simplified sidebar navigation.
+- **Annual Password Expiration**: Automated rider password expiration on July 1st with bulk renewal tools for administrators, ensuring school-year-aligned access control.
 
 ## External Dependencies
 

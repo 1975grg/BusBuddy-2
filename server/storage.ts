@@ -73,6 +73,7 @@ export interface IStorage {
   setUserSession(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
   clearUserSession(userId: string): Promise<User | undefined>;
   deactivateUser(userId: string): Promise<User | undefined>;
+  renewAllRiderPasswords(organizationId: string, newExpiresAt: Date): Promise<number>;
   
   // Push notification tokens
   registerPushToken(token: InsertPushToken): Promise<PushToken>;
@@ -222,7 +223,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    // Import password expiration utility
+    const { getPasswordExpirationForRole } = await import("./passwordExpiration");
+    
+    // Set password expiration based on role
+    // Riders: expire on next July 1st
+    // Drivers/Admins: never expire (null)
+    const passwordExpiresAt = getPasswordExpirationForRole(insertUser.role);
+    
+    const [user] = await db.insert(users).values({
+      ...insertUser,
+      passwordExpiresAt
+    }).returning();
     return user;
   }
 
@@ -286,6 +298,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;
+  }
+
+  async renewAllRiderPasswords(organizationId: string, newExpiresAt: Date): Promise<number> {
+    const result = await db.update(users)
+      .set({ passwordExpiresAt: newExpiresAt })
+      .where(
+        and(
+          eq(users.organizationId, organizationId),
+          eq(users.role, 'rider')
+        )
+      )
+      .returning({ id: users.id });
+    return result.length;
   }
 
   // Push notification tokens
@@ -1542,14 +1567,22 @@ export class MemStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    // Import password expiration utility
+    const { getPasswordExpirationForRole } = await import("./passwordExpiration");
+    
     const id = randomUUID();
     const user: User = { 
       id,
       name: insertUser.name,
       email: insertUser.email,
+      phoneNumber: insertUser.phoneNumber || null,
       role: insertUser.role,
       organizationId: insertUser.organizationId || null,
       favoriteRouteId: null,
+      defaultRouteId: null,
+      sessionToken: null,
+      sessionExpiresAt: null,
+      passwordExpiresAt: insertUser.passwordExpiresAt || getPasswordExpirationForRole(insertUser.role),
       isActive: true,
       createdAt: new Date()
     };
@@ -1578,6 +1611,24 @@ export class MemStorage implements IStorage {
     
     this.users.set(userId, updatedUser);
     return updatedUser;
+  }
+
+  async renewAllRiderPasswords(organizationId: string, newExpiresAt: Date): Promise<number> {
+    let renewedCount = 0;
+    const users = Array.from(this.users.values());
+    
+    for (const user of users) {
+      if (user.role === 'rider' && user.organizationId === organizationId) {
+        const updatedUser: User = {
+          ...user,
+          passwordExpiresAt: newExpiresAt
+        };
+        this.users.set(user.id, updatedUser);
+        renewedCount++;
+      }
+    }
+    
+    return renewedCount;
   }
 
   // Organization management
