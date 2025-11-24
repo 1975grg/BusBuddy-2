@@ -70,7 +70,7 @@ export function SmartAppBanner() {
             data-testid="button-download-app"
           >
             <Download className="w-3 h-3 mr-1" />
-            {device?.platform === 'ios' ? 'App Store' : 'Play Store'}
+            {device?.platform === 'ios' ? 'TestFlight' : 'Play Store'}
           </Button>
 
           {/* Close Button */}

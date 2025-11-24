@@ -104,5 +104,5 @@ integrations = ["firebase_barebones_javascript:1.0.0", "javascript_object_storag
 [userenv]
 
 [userenv.shared]
-VITE_IOS_APP_STORE_URL = "https://apps.apple.com/app/bus-buddy/id123456789"
+VITE_IOS_APP_STORE_URL = "https://testflight.apple.com/join/befk86Cg"
 VITE_ANDROID_APP_STORE_URL = "https://play.google.com/store/apps/details?id=com.bytevia.busbuddy"
