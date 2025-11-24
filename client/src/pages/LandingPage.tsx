@@ -45,8 +45,8 @@ export default function LandingPage() {
             <p className="text-sm text-muted-foreground">Automatic SMS alerts when buses approach stops</p>
           </div>
           <div className="flex flex-col items-center text-center p-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-              <Shield className="w-6 h-6 text-primary" />
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
+              <Shield className="w-6 h-6 text-emerald-600" />
             </div>
             <h3 className="font-semibold mb-2">Secure & Reliable</h3>
             <p className="text-sm text-muted-foreground">Multi-organization support with role-based access control</p>
@@ -100,9 +100,9 @@ export default function LandingPage() {
           </Card>
 
           {/* Driver Portal */}
-          <Card className="hover-elevate transition-all border-2 border-bus-active/20">
+          <Card className="hover-elevate transition-all">
             <CardHeader>
-              <div className="w-12 h-12 rounded-lg bg-bus-active flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mb-4">
                 <Bus className="w-6 h-6 text-white" />
               </div>
               <CardTitle>Driver Portal</CardTitle>
@@ -113,19 +113,19 @@ export default function LandingPage() {
             <CardContent className="space-y-4">
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-bus-active mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
                   <span>Start and manage route trips</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-bus-active mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
                   <span>Automatic stop progression</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-bus-active mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
                   <span>GPS tracking enabled automatically</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-bus-active mt-1.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
                   <span>Message administrators directly</span>
                 </li>
               </ul>
