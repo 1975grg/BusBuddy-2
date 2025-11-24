@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
 import { HelpCircle } from "lucide-react";
+import { SmartAppBanner } from "@/components/SmartAppBanner";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -114,6 +115,9 @@ export default function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
+      {/* Smart App Banner for Mobile */}
+      <SmartAppBanner />
+      
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Login</CardTitle>

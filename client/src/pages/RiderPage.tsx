@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import { useRequireRole } from "@/contexts/UserContext";
 import type { ServiceAlert } from "@shared/schema";
+import { SmartAppBanner } from "@/components/SmartAppBanner";
 
 export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
@@ -62,6 +63,9 @@ export default function RiderPage() {
 
   return (
     <div className="space-y-6">
+      {/* Smart App Banner for Mobile */}
+      <SmartAppBanner />
+
       <div>
         <h1 className="text-2xl font-bold">Track Your Bus</h1>
         <p className="text-muted-foreground">Real-time location and arrival estimates for your route</p>

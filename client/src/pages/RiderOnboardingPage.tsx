@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Route, RouteStop, Organization } from "@shared/schema";
+import { SmartAppBanner } from "@/components/SmartAppBanner";
 
 interface RouteWithStops extends Route {
   stops: RouteStop[];
@@ -238,6 +239,9 @@ export default function RiderOnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Smart App Banner for Mobile */}
+      <SmartAppBanner />
+
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="max-w-md mx-auto">
