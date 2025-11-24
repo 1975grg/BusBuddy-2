@@ -45,8 +45,8 @@ export default function LandingPage() {
             <p className="text-sm text-muted-foreground">Automatic SMS alerts when buses approach stops</p>
           </div>
           <div className="flex flex-col items-center text-center p-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
-              <Shield className="w-6 h-6 text-emerald-600" />
+            <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center mb-3">
+              <Shield className="w-6 h-6 text-purple-600" />
             </div>
             <h3 className="font-semibold mb-2">Secure & Reliable</h3>
             <p className="text-sm text-muted-foreground">Multi-organization support with role-based access control</p>
