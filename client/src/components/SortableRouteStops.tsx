@@ -187,10 +187,10 @@ function SortableRouteStopItem({ stop, index, control, onRemove, setValue, watch
                         {...field}
                         type="number"
                         min="50"
-                        max="5000"
-                        value={field.value || 800}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 800)}
-                        placeholder="800"
+                        max="15000"
+                        value={field.value || 12000}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 12000)}
+                        placeholder="12000"
                         data-testid={`input-approaching-radius-${index}`}
                       />
                     </FormControl>

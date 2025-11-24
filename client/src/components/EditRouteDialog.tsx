@@ -94,13 +94,13 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
           placeId: stop.placeId || undefined,
           latitude: stop.latitude ? parseFloat(stop.latitude) : undefined,
           longitude: stop.longitude ? parseFloat(stop.longitude) : undefined,
-          approachingRadiusFt: stop.approachingRadiusFt || 800,
+          approachingRadiusFt: stop.approachingRadiusFt || 12000,
           arrivalRadiusFt: stop.arrivalRadiusFt || 250,
           orderIndex: stop.orderIndex,
         })) : [{ 
           id: crypto.randomUUID(), 
           name: "", 
-          approachingRadiusFt: 800,
+          approachingRadiusFt: 12000,
           arrivalRadiusFt: 250 
         }];
 
@@ -142,7 +142,7 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
           latitude: stop.latitude ? String(stop.latitude) : null,
           longitude: stop.longitude ? String(stop.longitude) : null,
           orderIndex: i + 1,
-          approachingRadiusFt: stop.approachingRadiusFt || 800,
+          approachingRadiusFt: stop.approachingRadiusFt || 12000,
           arrivalRadiusFt: stop.arrivalRadiusFt || 250,
         });
       }
@@ -202,7 +202,7 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
     form.setValue("stops", [...currentStops, { 
       id: crypto.randomUUID(), 
       name: "", 
-      approachingRadiusFt: 800,
+      approachingRadiusFt: 12000,
       arrivalRadiusFt: 250 
     }]);
   };
