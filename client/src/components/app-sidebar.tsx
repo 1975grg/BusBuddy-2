@@ -27,7 +27,7 @@ import { useUser } from "@/contexts/UserContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Route } from "@shared/schema";
-import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
+import busIconUrl from "@assets/bus-buddy-logo.png";
 import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_448585dd.png";
 import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
 import riderIconUrl from "@assets/generated_images/Rider_GPS_pin_icon_48a84853.png";

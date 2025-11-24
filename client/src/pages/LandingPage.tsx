@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, Settings, ArrowRight, Bus, Shield, Bell } from "lucide-react";
-import busIconUrl from "@assets/generated_images/Bus_Buddy_app_icon_a37f6bcb.png";
+import busIconUrl from "@assets/bus-buddy-logo.png";
 
 export default function LandingPage() {
   return (
