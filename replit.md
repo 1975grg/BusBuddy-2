@@ -82,3 +82,19 @@ Preferred communication style: Simple, everyday language.
 - **Date/Time**: date-fns.
 - **QR Code Generation**: react-qr-code.
 - **Class Management**: clsx, tailwind-merge.
+
+## Deployment
+
+### Production Environment
+- **Production URL**: https://bus-buddy-v-3-user-interface-1975grg.replit.app
+- **Deployment Type**: Autoscale (1 vCPU / 0.5 GiB RAM / 1 Max)
+- **Status**: Live 24/7
+- **Deployed**: November 25, 2025
+
+### iOS App (TestFlight)
+- **Bundle ID**: com.bytevia.busbuddy
+- **App Name**: Bus Buddy (listed as "BusBuddy Hub" in App Store Connect)
+- **TestFlight Link**: https://testflight.apple.com/join/befk86Cg
+- **Current Build**: 5 (pending submission)
+- **Build 4 Status**: Rejected (server was sleeping during review)
+- **Build 5 Fix**: Updated to use production URL for 24/7 availability
