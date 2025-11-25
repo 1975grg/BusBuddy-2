@@ -428,7 +428,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Password reset tokens management
-  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken> {
+  // Note: The 'hashedToken' parameter should already be bcrypt-hashed by the caller
+  async createPasswordResetToken(userId: string, hashedToken: string, expiresAt: Date): Promise<PasswordResetToken> {
     // Invalidate any existing unused tokens for this user
     await db.update(passwordResetTokens)
       .set({ usedAt: new Date() })
@@ -437,19 +438,34 @@ export class DatabaseStorage implements IStorage {
         isNull(passwordResetTokens.usedAt)
       ));
     
-    // Create new reset token
+    // Create new reset token (stores the pre-hashed token)
     const [resetToken] = await db.insert(passwordResetTokens).values({
       userId,
-      token,
+      token: hashedToken,
       expiresAt,
     }).returning();
     return resetToken;
   }
 
-  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
-    const [resetToken] = await db.select().from(passwordResetTokens)
-      .where(eq(passwordResetTokens.token, token));
-    return resetToken || undefined;
+  // Verify a raw (unhashed) token against stored bcrypt hashes
+  async getPasswordResetToken(rawToken: string): Promise<PasswordResetToken | undefined> {
+    // Get all unexpired, unused tokens 
+    const bcrypt = await import("bcrypt");
+    const validTokens = await db.select().from(passwordResetTokens)
+      .where(and(
+        isNull(passwordResetTokens.usedAt),
+        sql`${passwordResetTokens.expiresAt} > NOW()`
+      ));
+    
+    // Compare the raw token against each stored hash using bcrypt
+    // bcrypt.compare(rawToken, storedHash) returns true if they match
+    for (const resetToken of validTokens) {
+      const isMatch = await bcrypt.compare(rawToken, resetToken.token);
+      if (isMatch) {
+        return resetToken;
+      }
+    }
+    return undefined;
   }
 
   async markPasswordResetTokenUsed(id: string): Promise<boolean> {

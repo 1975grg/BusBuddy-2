@@ -407,11 +407,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crypto = await import("crypto");
       const resetToken = crypto.randomBytes(32).toString("hex");
       
-      // Store the reset token (expires in 1 hour)
+      // Hash the token before storing for security
+      const bcrypt = await import("bcrypt");
+      const hashedToken = await bcrypt.hash(resetToken, 10);
+      
+      // Store the hashed reset token (expires in 1 hour)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      await storage.createPasswordResetToken(user.id, resetToken, expiresAt);
+      await storage.createPasswordResetToken(user.id, hashedToken, expiresAt);
 
-      // Send password reset email
+      // Send password reset email (with unhashed token for URL)
       const { sendPasswordResetEmail } = await import("./email");
       await sendPasswordResetEmail(normalizedEmail, resetToken, user.name);
 
