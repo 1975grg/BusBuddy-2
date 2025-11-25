@@ -21,6 +21,9 @@ export default function RiderOnboardingPage() {
   const { organizationId, routeId } = useParams();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedStops, setSelectedStops] = useState<Set<string>>(new Set());
   const [notificationMode, setNotificationMode] = useState<"always" | "manual">("always");
   const [smsConsent, setSmsConsent] = useState(false);
@@ -50,87 +53,43 @@ export default function RiderOnboardingPage() {
   
   const organization = organizations?.find(org => org.id === organizationId);
 
-  // Subscribe to route mutation
+  // Subscribe to route mutation - now creates user account with password
   const subscribeToRouteMutation = useMutation({
     mutationFn: async () => {
-      // Ensure phone number is sent as string (remove non-digits but keep as string)
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
 
-      let riderProfile: any = null;
-      let subscription: any = null;
+      // Create rider account with password using the new onboarding endpoint
+      const response = await apiRequest("POST", "/api/rider-onboard", {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phoneNumber: cleanPhoneNumber,
+        organizationId,
+        routeId,
+        selectedStopIds: Array.from(selectedStops),
+        notificationMode,
+        smsConsent,
+      });
 
-      try {
-        // Create rider profile
-        const riderProfileResponse = await apiRequest("POST", "/api/rider-profiles", {
-          phoneNumber: cleanPhoneNumber,
-          name: name || undefined,
-          organizationId,
-          notificationMethod: "sms",
-          smsConsent: smsConsent,
-        });
-
-        riderProfile = await riderProfileResponse.json();
-
-        // Create route subscription
-        const subscriptionResponse = await apiRequest("POST", "/api/route-subscriptions", {
-          routeId,
-          riderProfileId: riderProfile.id,
-          notificationMode,
-        });
-
-        subscription = await subscriptionResponse.json();
-
-        // Create stop preferences for selected stops
-        if (selectedStops.size > 0) {
-          const stopPreferenceErrors: string[] = [];
-          
-          await Promise.all(
-            Array.from(selectedStops).map(async (stopId) => {
-              try {
-                const preferenceResponse = await apiRequest("POST", "/api/stop-preferences", {
-                  subscriptionId: subscription.id,
-                  stopId,
-                  notifyOnApproaching: true,
-                  notifyOnArrival: true,
-                });
-                return await preferenceResponse.json();
-              } catch (error) {
-                console.error(`Failed to create preference for stop ${stopId}:`, error);
-                stopPreferenceErrors.push(stopId);
-                return null;
-              }
-            })
-          );
-
-          // If some stop preferences failed, warn but don't fail the whole signup
-          if (stopPreferenceErrors.length > 0) {
-            console.warn(`Failed to create ${stopPreferenceErrors.length} stop preferences`);
-          }
-        }
-
-        return { riderProfile, subscription };
-      } catch (error) {
-        // If subscription creation failed but rider profile was created,
-        // log it for admin cleanup but still throw to show error to user
-        if (riderProfile && !subscription) {
-          console.error("Orphaned rider profile created:", riderProfile.id);
-          console.error("Admin should clean up this rider profile manually");
-        }
-        throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Registration failed");
       }
+
+      return await response.json();
     },
     onSuccess: () => {
       setIsSubscribed(true);
       toast({
-        title: "Successfully subscribed!",
-        description: `You'll receive SMS notifications for the ${route?.name} route.`,
+        title: "Account created!",
+        description: `You can now log in with your email and password to track the ${route?.name} route.`,
       });
     },
-    onError: (error) => {
-      console.error("Error subscribing to route:", error);
+    onError: (error: Error) => {
+      console.error("Error creating rider account:", error);
       toast({
-        title: "Subscription failed",
-        description: "Please check your information and try again. If the problem persists, contact support.",
+        title: "Registration failed",
+        description: error.message || "Please check your information and try again.",
         variant: "destructive",
       });
     },
@@ -147,6 +106,51 @@ export default function RiderOnboardingPage() {
   };
 
   const handleSubscribe = () => {
+    if (!name.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter your name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!email.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address to create an account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!password) {
+      toast({
+        title: "Password required",
+        description: "Please create a password for your account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Passwords don't match",
+        description: "Please make sure your passwords match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!phoneNumber.trim()) {
       toast({
         title: "Phone number required",
@@ -280,16 +284,67 @@ export default function RiderOnboardingPage() {
           </CardContent>
         </Card>
 
-        {/* Notification Setup */}
+        {/* Account Creation */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Smartphone className="w-5 h-5" />
-              Get Notifications
+              Create Your Account
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="name">Your Name *</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                data-testid="input-rider-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                data-testid="input-rider-email"
+              />
+              <p className="text-xs text-muted-foreground">
+                You'll use this to log in
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Create Password *</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                data-testid="input-rider-password"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password *</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Re-enter your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                data-testid="input-rider-confirm-password"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
               <Label htmlFor="phone">Phone Number *</Label>
               <Input
                 id="phone"
@@ -303,18 +358,6 @@ export default function RiderOnboardingPage() {
               <p className="text-xs text-muted-foreground">
                 We'll send SMS notifications to this number
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Name (Optional)</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                data-testid="input-rider-name"
-              />
             </div>
 
             <div className="space-y-3">
@@ -408,19 +451,19 @@ export default function RiderOnboardingPage() {
         <div className="sticky bottom-4">
           <Button
             onClick={handleSubscribe}
-            disabled={subscribeToRouteMutation.isPending || !phoneNumber.trim() || !smsConsent || selectedStops.size === 0}
+            disabled={subscribeToRouteMutation.isPending || !name.trim() || !email.trim() || !password || password !== confirmPassword || !phoneNumber.trim() || !smsConsent || selectedStops.size === 0}
             className="w-full py-6 text-lg"
             data-testid="button-subscribe"
           >
             {subscribeToRouteMutation.isPending ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Subscribing...
+                Creating Account...
               </>
             ) : (
               <>
-                <MessageSquare className="w-5 h-5 mr-2" />
-                Get SMS Notifications
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Create Account & Subscribe
               </>
             )}
           </Button>

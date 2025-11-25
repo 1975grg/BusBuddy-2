@@ -379,6 +379,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== RIDER ONBOARDING (QR CODE SIGNUP) ====================
+  
+  // Complete rider onboarding from QR code - creates user account, rider profile, and subscription
+  app.post("/api/rider-onboard", async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      
+      // Validate input
+      const onboardSchema = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Invalid email address"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        phoneNumber: z.string().min(10, "Valid phone number required"),
+        organizationId: z.string().min(1, "Organization ID required"),
+        routeId: z.string().min(1, "Route ID required"),
+        selectedStopIds: z.array(z.string()).min(1, "At least one stop must be selected"),
+        notificationMode: z.enum(["always", "manual"]).default("always"),
+        smsConsent: z.boolean(),
+      });
+
+      const validatedData = onboardSchema.parse(req.body);
+
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "An account with this email already exists. Please log in instead." });
+      }
+
+      // Check if phone number already has a rider profile for this organization
+      const existingProfile = await storage.getRiderProfileByPhone(validatedData.phoneNumber, validatedData.organizationId);
+      if (existingProfile) {
+        return res.status(400).json({ error: "This phone number is already registered. Please log in instead." });
+      }
+
+      // Hash password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(validatedData.password, 10);
+
+      // Get password expiration for rider (next July 1st)
+      const { getPasswordExpirationForRole } = await import("./passwordExpiration");
+      const passwordExpiresAt = getPasswordExpirationForRole("rider");
+
+      // Create user account
+      const user = await storage.createUser({
+        name: validatedData.name,
+        email: validatedData.email,
+        phoneNumber: validatedData.phoneNumber,
+        role: "rider",
+        organizationId: validatedData.organizationId,
+        favoriteRouteId: validatedData.routeId,
+        isActive: true,
+      });
+
+      // Set password with expiration
+      await storage.setUserPasswordWithExpiration(user.id, passwordHash, passwordExpiresAt);
+
+      // Create rider profile for SMS notifications
+      const riderProfile = await storage.createRiderProfile({
+        phoneNumber: validatedData.phoneNumber,
+        name: validatedData.name,
+        organizationId: validatedData.organizationId,
+        notificationMethod: "sms",
+        smsConsent: validatedData.smsConsent,
+        smsConsentAt: validatedData.smsConsent ? new Date() : undefined,
+      });
+
+      // Create route subscription
+      const subscription = await storage.createRouteSubscription({
+        routeId: validatedData.routeId,
+        riderProfileId: riderProfile.id,
+        notificationMode: validatedData.notificationMode,
+      });
+
+      // Create stop preferences
+      for (const stopId of validatedData.selectedStopIds) {
+        try {
+          await storage.createStopPreference({
+            subscriptionId: subscription.id,
+            stopId,
+            notifyOnApproaching: true,
+            notifyOnArrival: true,
+          });
+        } catch (error) {
+          console.error(`Failed to create stop preference for ${stopId}:`, error);
+        }
+      }
+
+      // Create route assignment for the user
+      await storage.createUserRouteAssignment({
+        userId: user.id,
+        routeId: validatedData.routeId,
+        assignedByUserId: user.id, // Self-assigned via QR code
+        isDefault: true,
+        isActive: true,
+      });
+
+      // Create a session for the user so they're logged in
+      const sessionToken = generateSessionToken();
+      const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+      await storage.setUserSession(user.id, sessionToken, sessionExpiresAt);
+
+      // Send welcome SMS if consent given
+      if (validatedData.smsConsent && smsService) {
+        try {
+          const route = await storage.getRoute(validatedData.routeId);
+          await smsService.sendWelcomeSms(validatedData.phoneNumber, route?.name || "your route");
+        } catch (error) {
+          console.error("Failed to send welcome SMS:", error);
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Account created successfully",
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        sessionToken,
+      });
+    } catch (error: any) {
+      console.error("Error in rider onboarding:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: error.errors[0]?.message || "Invalid input" });
+      }
+      res.status(500).json({ error: "Failed to create account. Please try again." });
+    }
+  });
+
   // ==================== INVITE MANAGEMENT ROUTES ====================
   
   // Create invite for driver or rider (org admins only)
