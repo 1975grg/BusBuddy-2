@@ -59,6 +59,16 @@ export const inviteTokens = pgTable("invite_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Password reset tokens for forgot password functionality
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(), // Unique token for password reset
+  expiresAt: timestamp("expires_at").notNull(), // Token expiration (1 hour)
+  usedAt: timestamp("used_at"), // When the token was used
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Route assignments for authenticated users (drivers and riders)
 export const userRouteAssignments = pgTable("user_route_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -673,6 +683,7 @@ export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLog = typeof notificationLogs.$inferSelect;
 export type InsertInviteToken = z.infer<typeof insertInviteTokenSchema>;
 export type InviteToken = typeof inviteTokens.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertUserRouteAssignment = z.infer<typeof insertUserRouteAssignmentSchema>;
 export type UserRouteAssignment = typeof userRouteAssignments.$inferSelect;
 export type UserRole = z.infer<typeof roleEnum>;

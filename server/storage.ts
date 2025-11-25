@@ -34,7 +34,9 @@ import {
   type InsertUserRouteAssignment,
   type PushToken,
   type InsertPushToken,
+  type PasswordResetToken,
   users,
+  passwordResetTokens,
   organizations,
   organizationSettings,
   routes,
@@ -89,6 +91,11 @@ export interface IStorage {
   claimInviteToken(token: string): Promise<InviteToken | undefined>;
   getActiveInvitesByOrganization(organizationId: string): Promise<InviteToken[]>;
   expireInviteToken(id: string): Promise<boolean>;
+  
+  // Password reset tokens
+  createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<boolean>;
   
   // User route assignments (for multi-route users)
   createUserRouteAssignment(assignment: InsertUserRouteAssignment): Promise<UserRouteAssignment>;
@@ -418,6 +425,39 @@ export class DatabaseStorage implements IStorage {
       .set({ isActive: false })
       .where(eq(inviteTokens.id, id));
     return true;
+  }
+
+  // Password reset tokens management
+  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<PasswordResetToken> {
+    // Invalidate any existing unused tokens for this user
+    await db.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(passwordResetTokens.userId, userId),
+        isNull(passwordResetTokens.usedAt)
+      ));
+    
+    // Create new reset token
+    const [resetToken] = await db.insert(passwordResetTokens).values({
+      userId,
+      token,
+      expiresAt,
+    }).returning();
+    return resetToken;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db.select().from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return resetToken || undefined;
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<boolean> {
+    const [updated] = await db.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, id))
+      .returning();
+    return !!updated;
   }
 
   // User route assignments management

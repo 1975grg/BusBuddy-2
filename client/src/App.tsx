@@ -22,6 +22,8 @@ import RiderOnboardingPage from "@/pages/RiderOnboardingPage";
 import AccessPage from "@/pages/AccessPage";
 import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
@@ -55,6 +57,8 @@ function Router() {
       
       {/* Authentication */}
       <Route path="/login" component={LoginPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/auth/verify" component={LoginPage} />
       <Route path="/auth/invite/:token" component={LoginPage} />
       
@@ -72,7 +76,7 @@ function AppContent() {
   const [location] = useLocation();
   
   // Public pages that should not show sidebar/header
-  const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/");
+  const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/ride/");
   
   if (isPublicPage) {
     return (

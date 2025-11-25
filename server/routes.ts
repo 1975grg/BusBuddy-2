@@ -379,6 +379,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Request password reset - sends email with reset link
+  app.post("/api/auth/password/reset-request", async (req, res) => {
+    try {
+      const resetRequestSchema = z.object({
+        email: z.string().email("Invalid email address"),
+      });
+      
+      const parseResult = resetRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      const { email } = parseResult.data;
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Find user by email
+      const user = await storage.getUserByEmail(normalizedEmail);
+      
+      // Always return success to prevent email enumeration attacks
+      if (!user || !user.isActive) {
+        console.log(`Password reset requested for non-existent/inactive email: ${normalizedEmail}`);
+        return res.json({ success: true, message: "If an account exists with this email, you'll receive a password reset link." });
+      }
+
+      // Generate a secure random token
+      const crypto = await import("crypto");
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      
+      // Store the reset token (expires in 1 hour)
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await storage.createPasswordResetToken(user.id, resetToken, expiresAt);
+
+      // Send password reset email
+      const { sendPasswordResetEmail } = await import("./email");
+      await sendPasswordResetEmail(normalizedEmail, resetToken, user.name);
+
+      res.json({ success: true, message: "If an account exists with this email, you'll receive a password reset link." });
+    } catch (error) {
+      console.error("Error requesting password reset:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/auth/password/reset", async (req, res) => {
+    try {
+      const resetSchema = z.object({
+        token: z.string().min(1, "Token is required"),
+        newPassword: z.string().min(6, "Password must be at least 6 characters"),
+      });
+      
+      const parseResult = resetSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+      
+      const { token, newPassword } = parseResult.data;
+
+      // Find the reset token
+      const resetToken = await storage.getPasswordResetToken(token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+      }
+
+      // Check if token is expired
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
+      }
+
+      // Check if token was already used
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: "This reset link has already been used. Please request a new one." });
+      }
+
+      // Get the user
+      const user = await storage.getUser(resetToken.userId);
+      if (!user) {
+        return res.status(400).json({ error: "User not found" });
+      }
+
+      // Hash the new password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+
+      // Determine password expiration based on role
+      const { getPasswordExpirationForRole } = await import("./passwordExpiration");
+      const passwordExpiresAt = getPasswordExpirationForRole(user.role);
+
+      // Update the user's password
+      await storage.setUserPasswordWithExpiration(user.id, passwordHash, passwordExpiresAt);
+
+      // Mark the token as used
+      await storage.markPasswordResetTokenUsed(resetToken.id);
+
+      // Invalidate all existing sessions for security
+      await storage.setUserSession(user.id, null, null);
+
+      res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // ==================== RIDER ONBOARDING (QR CODE SIGNUP) ====================
   
   // Complete rider onboarding from QR code - creates user account, rider profile, and subscription
@@ -488,6 +593,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error("Failed to send welcome SMS:", error);
         }
+      }
+
+      // Send welcome email (non-blocking)
+      try {
+        const route = await storage.getRoute(validatedData.routeId);
+        const { sendWelcomeEmail } = await import("./email");
+        sendWelcomeEmail(validatedData.email, validatedData.name, route?.name).catch(err => {
+          console.error("Failed to send welcome email:", err);
+        });
+      } catch (error) {
+        console.error("Failed to send welcome email:", error);
       }
 
       res.status(201).json({

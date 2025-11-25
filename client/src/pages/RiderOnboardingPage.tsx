@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapPin, Clock, Smartphone, MessageSquare, QrCode, CheckCircle } from "lucide-react";
+import { MapPin, Clock, Smartphone, MessageSquare, QrCode, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,6 +29,8 @@ export default function RiderOnboardingPage() {
   const [notificationMode, setNotificationMode] = useState<"always" | "manual">("always");
   const [smsConsent, setSmsConsent] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -322,26 +325,48 @@ export default function RiderOnboardingPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Create Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                data-testid="input-rider-password"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="At least 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                  data-testid="input-rider-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  data-testid="button-toggle-password"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm Password *</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                data-testid="input-rider-confirm-password"
-              />
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                  data-testid="input-rider-confirm-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  data-testid="button-toggle-confirm-password"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2 pt-2 border-t">
@@ -467,6 +492,20 @@ export default function RiderOnboardingPage() {
               </>
             )}
           </Button>
+        </div>
+
+        {/* Already have an account link */}
+        <div className="text-center pb-4">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link 
+              href="/login" 
+              className="text-primary font-medium hover:underline"
+              data-testid="link-login"
+            >
+              Log in
+            </Link>
+          </p>
         </div>
 
         {/* Info Footer */}
