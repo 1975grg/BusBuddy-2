@@ -5,14 +5,14 @@ export class QrService {
   /**
    * Generate QR code URL for a route
    * This creates a link that riders can scan to access the route dashboard
+   * Uses the production URL so QR codes work when users scan them
    */
   generateRouteUrl(route: Route, organizationId: string): string {
-    // Use the correct Replit environment variable for public access
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS}` 
-      : 'http://localhost:5000';
+    // Use production URL for QR codes - this ensures they work when scanned
+    // Development URLs sleep and show "Unable To Wake Up" errors
+    const productionUrl = process.env.PRODUCTION_URL || 'https://bus-buddy-v-3-user-interface-1975grg.replit.app';
     
-    return `${baseUrl}/ride/${organizationId}/${route.id}`;
+    return `${productionUrl}/ride/${organizationId}/${route.id}`;
   }
 
   /**
