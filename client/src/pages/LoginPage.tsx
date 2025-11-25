@@ -8,16 +8,20 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, KeyRound, Mail } from "lucide-react";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
+
+type LoginMethod = "magic-link" | "password";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { refetchUser } = useUser();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [usePhone, setUsePhone] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
 
   // Request magic link mutation
   const requestMagicLinkMutation = useMutation({
@@ -29,18 +33,16 @@ export default function LoginPage() {
       return response.json();
     },
     onSuccess: (data: any) => {
-      // In development, auto-login with the token
       if (data.magicLink) {
         const url = new URL(data.magicLink);
         const token = url.searchParams.get('token');
         
         toast({
-          title: "🔗 Development Mode",
+          title: "Development Mode",
           description: "Logging you in automatically...",
           duration: 3000,
         });
         
-        // Auto-login after a short delay
         if (token) {
           setTimeout(() => {
             verifyTokenMutation.mutate(token);
@@ -62,6 +64,59 @@ export default function LoginPage() {
     },
   });
 
+  // Password login mutation
+  const passwordLoginMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/password/login", {
+        email,
+        password,
+      });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Login successful!",
+        description: "Welcome back",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      
+      const role = data.user.role;
+      if (role === "system_admin") {
+        window.location.href = "/system";
+      } else if (role === "org_admin") {
+        window.location.href = "/admin";
+      } else if (role === "driver") {
+        window.location.href = "/driver";
+      } else if (role === "rider") {
+        window.location.href = "/rider";
+      }
+    },
+    onError: (error: any) => {
+      if (error.code === "PASSWORD_EXPIRED") {
+        toast({
+          variant: "destructive",
+          title: "Access Expired",
+          description: "Your access has expired. Please contact your administrator for a new access code.",
+        });
+        setLocation("/access");
+      } else if (error.code === "NO_PASSWORD_SET") {
+        toast({
+          variant: "destructive",
+          title: "Password Not Set",
+          description: "Please use magic link login or contact your administrator.",
+        });
+        setLoginMethod("magic-link");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: error.message || "Invalid email or password",
+        });
+      }
+    },
+  });
+
   // Verify magic link token from URL
   const verifyTokenMutation = useMutation({
     mutationFn: async (token: string) => {
@@ -69,16 +124,13 @@ export default function LoginPage() {
       return response.json();
     },
     onSuccess: (data: any) => {
-      // Session is now stored in HTTP-only cookie
       toast({
         title: "Login successful!",
         description: "Welcome back",
       });
 
-      // Invalidate and refetch user data to clear old cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       
-      // Redirect based on role - use window.location to force full page reload
       const role = data.user.role;
       if (role === "system_admin") {
         window.location.href = "/system";
@@ -99,7 +151,6 @@ export default function LoginPage() {
     },
   });
 
-  // Check for token in URL on mount - use useEffect to avoid double execution
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
@@ -110,43 +161,104 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    requestMagicLinkMutation.mutate();
+    if (loginMethod === "password") {
+      passwordLoginMutation.mutate();
+    } else {
+      requestMagicLinkMutation.mutate();
+    }
   };
+
+  const isLoading = requestMagicLinkMutation.isPending || passwordLoginMutation.isPending || verifyTokenMutation.isPending;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      {/* Smart App Banner for Mobile */}
       <SmartAppBanner />
       
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Login</CardTitle>
           <CardDescription>
-            Enter your email or phone number to receive a magic link
+            {loginMethod === "password" 
+              ? "Enter your email and password" 
+              : "Enter your email or phone to receive a magic link"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center gap-4 mb-4">
-              <Button
-                type="button"
-                variant={!usePhone ? "default" : "outline"}
-                onClick={() => setUsePhone(false)}
-                data-testid="button-email-login"
-              >
-                Email
-              </Button>
-              <Button
-                type="button"
-                variant={usePhone ? "default" : "outline"}
-                onClick={() => setUsePhone(true)}
-                data-testid="button-phone-login"
-              >
-                Phone
-              </Button>
-            </div>
+          <div className="flex items-center gap-2 mb-4 p-1 bg-muted rounded-lg">
+            <Button
+              type="button"
+              variant={loginMethod === "password" ? "default" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setLoginMethod("password")}
+              data-testid="button-password-method"
+            >
+              <KeyRound className="w-4 h-4 mr-2" />
+              Password
+            </Button>
+            <Button
+              type="button"
+              variant={loginMethod === "magic-link" ? "default" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setLoginMethod("magic-link")}
+              data-testid="button-magiclink-method"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Magic Link
+            </Button>
+          </div>
 
-            {!usePhone ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {loginMethod === "magic-link" && (
+              <div className="flex items-center gap-4 mb-4">
+                <Button
+                  type="button"
+                  variant={!usePhone ? "default" : "outline"}
+                  onClick={() => setUsePhone(false)}
+                  data-testid="button-email-login"
+                >
+                  Email
+                </Button>
+                <Button
+                  type="button"
+                  variant={usePhone ? "default" : "outline"}
+                  onClick={() => setUsePhone(true)}
+                  data-testid="button-phone-login"
+                >
+                  Phone
+                </Button>
+              </div>
+            )}
+
+            {loginMethod === "password" ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    data-testid="input-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    data-testid="input-password"
+                  />
+                </div>
+              </>
+            ) : !usePhone ? (
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -177,18 +289,16 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={requestMagicLinkMutation.isPending}
+              disabled={isLoading}
               data-testid="button-submit-login"
             >
-              {requestMagicLinkMutation.isPending
-                ? "Sending..."
-                : "Send Magic Link"}
+              {isLoading
+                ? "Signing in..."
+                : loginMethod === "password" 
+                  ? "Sign In" 
+                  : "Send Magic Link"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Development Mode: Magic links will be shown in toast notifications</p>
-          </div>
 
           <div className="mt-6 p-4 bg-muted/50 rounded-lg border">
             <div className="flex items-start gap-3">
@@ -200,11 +310,15 @@ export default function LoginPage() {
                 </p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4">
                   <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
+                    <span className="text-primary mt-0.5">-</span>
+                    <span><strong>Password</strong> - Log in with your email and password</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">-</span>
                     <span><strong>QR code</strong> - Scan it to get instant access</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary mt-0.5">•</span>
+                    <span className="text-primary mt-0.5">-</span>
                     <span><strong>Magic link</strong> - Click the link sent via email or SMS</span>
                   </li>
                 </ul>

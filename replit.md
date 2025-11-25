@@ -32,7 +32,9 @@ Preferred communication style: Simple, everyday language.
 ### Authentication & Authorization
 - **Authentication**: Session-based with database persistence (90-day sessions).
 - **Access Control**: Role-based (Admin, Driver, Rider).
+- **Login Methods**: Password login (primary) and magic links (fallback).
 - **Rider Onboarding**: QR codes, magic links, password-based access.
+- **Test Accounts**: Westwood Academy admin/driver use password `busbuddy123`.
 - **Password Expiration**: Automatic expiration system with role-based policies:
   - **Riders**: Passwords expire automatically on July 1st every year (end of school year)
   - **Drivers & Admins**: Never expire unless manually revoked

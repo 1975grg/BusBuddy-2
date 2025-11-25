@@ -72,6 +72,8 @@ export interface IStorage {
   setUserFavoriteRoute(userId: string, routeId: string | null): Promise<User | undefined>;
   setUserSession(userId: string, token: string, expiresAt: Date): Promise<User | undefined>;
   clearUserSession(userId: string): Promise<User | undefined>;
+  setUserPassword(userId: string, passwordHash: string): Promise<User | undefined>;
+  setUserPasswordWithExpiration(userId: string, passwordHash: string, passwordExpiresAt: Date | null): Promise<User | undefined>;
   deactivateUser(userId: string): Promise<User | undefined>;
   renewAllRiderPasswords(organizationId: string, newExpiresAt: Date): Promise<number>;
   
@@ -287,6 +289,22 @@ export class DatabaseStorage implements IStorage {
   async clearUserSession(userId: string): Promise<User | undefined> {
     const [user] = await db.update(users)
       .set({ sessionToken: null, sessionExpiresAt: null })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async setUserPassword(userId: string, passwordHash: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async setUserPasswordWithExpiration(userId: string, passwordHash: string, passwordExpiresAt: Date | null): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ passwordHash, passwordExpiresAt })
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;

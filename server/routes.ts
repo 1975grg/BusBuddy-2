@@ -230,6 +230,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password-based login (for admin/driver accounts or when email isn't available)
+  app.post("/api/auth/password/login", async (req, res) => {
+    try {
+      // Validate input with Zod
+      const passwordLoginSchema = z.object({
+        email: z.string().email("Valid email required"),
+        password: z.string().min(1, "Password required"),
+      });
+      
+      const parseResult = passwordLoginSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Email and password required" });
+      }
+      
+      const { email, password } = parseResult.data;
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+
+      if (!user) {
+        // Don't reveal if user exists (security)
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Check if user has a password set
+      if (!user.passwordHash) {
+        return res.status(401).json({ 
+          error: "Password login not enabled. Please use magic link or contact your administrator.",
+          code: "NO_PASSWORD_SET"
+        });
+      }
+
+      // Verify password
+      const bcrypt = await import("bcrypt");
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Check password expiration for riders
+      if (user.role === 'rider' && user.passwordExpiresAt) {
+        const { isPasswordExpired } = await import("./passwordExpiration");
+        if (isPasswordExpired(user.passwordExpiresAt)) {
+          return res.status(401).json({ 
+            error: "Password expired", 
+            code: "PASSWORD_EXPIRED",
+            message: "Your access has expired. Please request a new access code from your administrator.",
+            redirectTo: "/access"
+          });
+        }
+      }
+
+      // Generate session token
+      const sessionToken = generateSessionToken();
+      const sessionExpiresAt = getSessionExpirationDate();
+
+      // Set user session
+      await storage.setUserSession(user.id, sessionToken, sessionExpiresAt);
+
+      // Set session cookie (HttpOnly for security)
+      res.cookie("sessionToken", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+      });
+
+      // Return session info
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          organizationId: user.organizationId,
+        }
+      });
+    } catch (error) {
+      console.error("Error with password login:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Set password for a user (admin only, or user setting their own)
+  app.post("/api/auth/password/set", authenticateUser, async (req, res) => {
+    try {
+      const requestingUser = (req as any).user as AuthUser;
+      
+      // Validate input with Zod
+      const setPasswordSchema = z.object({
+        userId: z.string().optional(),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        currentPassword: z.string().optional(),
+      });
+      
+      const parseResult = setPasswordSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      
+      const { userId, password, currentPassword } = parseResult.data;
+
+      // Determine target user
+      const targetUserId = userId || requestingUser.id;
+      const isSelf = targetUserId === requestingUser.id;
+
+      // If setting someone else's password, must be admin
+      if (!isSelf && requestingUser.role !== 'org_admin' && requestingUser.role !== 'system_admin') {
+        return res.status(403).json({ error: "Only administrators can set other users' passwords" });
+      }
+
+      // Get target user to check role and current password
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // If setting own password, verify current password if one exists
+      if (isSelf && targetUser.passwordHash) {
+        if (!currentPassword) {
+          return res.status(400).json({ error: "Current password required" });
+        }
+        const bcrypt = await import("bcrypt");
+        const isValid = await bcrypt.compare(currentPassword, targetUser.passwordHash);
+        if (!isValid) {
+          return res.status(401).json({ error: "Current password is incorrect" });
+        }
+      }
+
+      // Hash the new password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Determine password expiration based on role
+      const { getPasswordExpirationForRole } = await import("./passwordExpiration");
+      const passwordExpiresAt = getPasswordExpirationForRole(targetUser.role);
+
+      // Update user's password and expiration
+      await storage.setUserPasswordWithExpiration(targetUserId, passwordHash, passwordExpiresAt);
+
+      res.json({ success: true, message: "Password set successfully" });
+    } catch (error) {
+      console.error("Error setting password:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // ==================== INVITE MANAGEMENT ROUTES ====================
   
   // Create invite for driver or rider (org admins only)
