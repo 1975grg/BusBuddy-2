@@ -128,14 +128,18 @@ export function DriverControls({
   const updateLocationMutation = useMutation({
     mutationFn: async ({ sessionId, latitude, longitude }: { sessionId: string; latitude: number; longitude: number }) => {
       if (!sessionId) throw new Error("No active session");
+      console.log("[GPS] Sending location to server:", { sessionId: sessionId.substring(0, 8) + "...", latitude, longitude });
       const response = await apiRequest("PATCH", `/api/route-sessions/${sessionId}/location`, {
         latitude,
         longitude,
       });
       return response.json();
     },
+    onSuccess: (data: any) => {
+      console.log("[GPS] Location update SUCCESS - server stored coordinates");
+    },
     onError: (error: any) => {
-      console.error("Failed to update location:", error);
+      console.error("[GPS] Location update FAILED:", error?.message || error);
     },
   });
 
@@ -241,7 +245,7 @@ export function DriverControls({
 
   // GPS tracking functions with fail-safe logic
   const startGPSTracking = async (activeSessionId: string) => {
-    console.log("startGPSTracking called with sessionId:", activeSessionId);
+    console.log("[GPS] startGPSTracking called with sessionId:", activeSessionId);
     
     // Reset GPS state when starting tracking
     gpsErrorShownRef.current = false;
@@ -249,115 +253,105 @@ export function DriverControls({
     
     // Check if geolocation is available
     if (!navigator.geolocation) {
-      console.log("Geolocation not available!");
+      console.log("[GPS] Geolocation API not available!");
       toast({
         variant: "destructive",
         title: "GPS not available",
-        description: "Your device does not support GPS tracking",
+        description: "Your device does not support GPS tracking. Trip started but location won't update.",
       });
-      
-      // Cancel the backend session if one exists
-      if (activeSessionId) {
-        try {
-          await apiRequest("PATCH", `/api/route-sessions/${activeSessionId}/status`, {
-            status: "cancelled",
-          });
-          queryClient.invalidateQueries({ queryKey: ["/api/route-sessions"] });
-        } catch (cancelError) {
-          console.error("Failed to cancel session after geolocation unavailable:", cancelError);
-        }
-      }
-      
-      // Reset local state
-      setSessionId(null);
-      setTripStatus("stopped");
+      // Don't cancel the trip - just warn the user
       return;
     }
 
-    console.log("Setting up watchPosition...");
-    // Start watching position with fail-safe logic
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    console.log("[GPS] Setting up GPS tracking...");
+    
+    // IMPORTANT: Start backup interval IMMEDIATELY - don't wait for watchPosition
+    // In WebViews, watchPosition callbacks may not fire reliably
+    console.log("[GPS] Starting 5-second backup polling interval immediately");
+    locationIntervalRef.current = setInterval(() => {
+      // Check if session is still active before attempting to get location
+      if (!sessionIdRef.current || tripStatusRef.current !== "active") {
+        console.log("[GPS] Interval: Session not active, skipping", { sessionId: sessionIdRef.current, status: tripStatusRef.current });
+        return;
+      }
+      
+      console.log("[GPS] Interval: Requesting current position...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log("[GPS] Interval success:", latitude, longitude);
+          
+          // Double-check session is still active before sending update
+          if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+            console.log("[GPS] Sending location update to server...");
+            updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
+          }
+        },
+        (error) => {
+          // Log GPS errors but DON'T cancel the trip - keep retrying
+          console.log("[GPS] Interval error (will retry):", error.code, error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Longer timeout for WebView
+          maximumAge: 5000, // Allow slightly cached positions
+        }
+      );
+    }, 5000);
+    
+    // Also try to get an immediate position
+    console.log("[GPS] Requesting immediate position...");
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        console.log("GPS watchPosition success:", latitude, longitude, "sessionRef:", sessionIdRef.current, "statusRef:", tripStatusRef.current);
+        console.log("[GPS] Immediate position success:", latitude, longitude);
         
-        // On first successful GPS reading, start the backup interval
-        if (!watchPositionSucceededRef.current) {
-          watchPositionSucceededRef.current = true;
-          
-          // Set up 5-second interval as backup ONLY after watchPosition succeeds
-          locationIntervalRef.current = setInterval(() => {
-            // Check if session is still active before attempting to get location (use refs for current state)
-            if (!sessionIdRef.current || tripStatusRef.current !== "active") {
-              return;
-            }
-            
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                const { latitude, longitude } = position.coords;
-                
-                // Double-check session is still active before sending update (use refs for current state)
-                if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
-                  updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
-                }
-              },
-              (error) => {
-                // Only log GPS errors if session is still active (use refs for current state)
-                if (sessionIdRef.current && tripStatusRef.current === "active") {
-                  console.error("GPS interval error:", error);
-                }
-              },
-              {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-              }
-            );
-          }, 5000);
-        }
-        
-        // Only send update if session is still active and previous mutation is not pending
-        // This prevents updates during paused state and pile-up of pending requests
         if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
           updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
         }
       },
-      async (error) => {
-        console.error("GPS error:", error);
-        
-        // Show error toast only once to prevent spam
-        if (!gpsErrorShownRef.current) {
-          gpsErrorShownRef.current = true;
-          toast({
-            variant: "destructive",
-            title: "GPS error",
-            description: getGPSErrorMessage(error.code),
-          });
-        }
-        
-        // If watchPosition fails, cancel the backend session before resetting state
-        stopGPSTracking();
-        
-        // Cancel the backend session if one exists
-        if (activeSessionId) {
-          try {
-            await apiRequest("PATCH", `/api/route-sessions/${activeSessionId}/status`, {
-              status: "cancelled",
-            });
-            queryClient.invalidateQueries({ queryKey: ["/api/route-sessions/active", routeId] });
-          } catch (cancelError) {
-            console.error("Failed to cancel session after GPS error:", cancelError);
-          }
-        }
-        
-        // Reset local state
-        setTripStatus("stopped");
-        setSessionId(null);
+      (error) => {
+        console.log("[GPS] Immediate position failed (interval will retry):", error.code, error.message);
+        // Don't show toast or cancel trip - the interval will keep trying
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        timeout: 15000,
+        maximumAge: 5000,
+      }
+    );
+
+    // Also set up watchPosition as an additional source (but don't rely on it)
+    console.log("[GPS] Setting up watchPosition as additional source...");
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log("[GPS] watchPosition update:", latitude, longitude);
+        watchPositionSucceededRef.current = true;
+        
+        // Only send update if session is still active and previous mutation is not pending
+        if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+          updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+        }
+      },
+      (error) => {
+        // Log but DON'T cancel the trip - the interval will keep trying
+        console.log("[GPS] watchPosition error (interval will retry):", error.code, error.message);
+        
+        // Show error toast only once to help user understand
+        if (!gpsErrorShownRef.current && error.code === 1) {
+          gpsErrorShownRef.current = true;
+          toast({
+            variant: "destructive",
+            title: "GPS Permission",
+            description: "Please enable location access for better tracking accuracy.",
+          });
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000,
       }
     );
   };
