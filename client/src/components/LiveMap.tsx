@@ -184,26 +184,33 @@ export function LiveMap({ buses, className, followBus = false }: LiveMapProps) {
       }
     });
 
-    // Follow the active bus if followBus is enabled and coordinates changed significantly
-    if (followBus && activeBus) {
-      const lat = typeof activeBus.lat === 'string' ? parseFloat(activeBus.lat) : activeBus.lat;
-      const lng = typeof activeBus.lng === 'string' ? parseFloat(activeBus.lng) : activeBus.lng;
+    // Follow the first bus with valid coordinates if followBus is enabled
+    if (followBus && buses.length > 0) {
+      // Find first bus with valid coordinates (prioritize active, then delayed, then any)
+      const busToFollow = buses.find(b => b.status === 'active') || 
+                          buses.find(b => b.status === 'delayed') || 
+                          buses[0];
       
-      if (!isNaN(lat) && !isNaN(lng)) {
-        const lastCenter = lastCenterRef.current;
+      if (busToFollow) {
+        const lat = typeof busToFollow.lat === 'string' ? parseFloat(busToFollow.lat) : busToFollow.lat;
+        const lng = typeof busToFollow.lng === 'string' ? parseFloat(busToFollow.lng) : busToFollow.lng;
         
-        // Check if position changed significantly (more than ~100 meters)
-        const significantChange = !lastCenter || 
-          Math.abs(lastCenter.lat - lat) > 0.001 || 
-          Math.abs(lastCenter.lng - lng) > 0.001;
-        
-        if (significantChange) {
-          map.current?.flyTo({
-            center: [lng, lat],
-            zoom: 14,
-            duration: 1000,
-          });
-          lastCenterRef.current = { lat, lng };
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const lastCenter = lastCenterRef.current;
+          
+          // Check if position changed significantly (more than ~100 meters)
+          const significantChange = !lastCenter || 
+            Math.abs(lastCenter.lat - lat) > 0.001 || 
+            Math.abs(lastCenter.lng - lng) > 0.001;
+          
+          if (significantChange) {
+            map.current?.flyTo({
+              center: [lng, lat],
+              zoom: 14,
+              duration: 1000,
+            });
+            lastCenterRef.current = { lat, lng };
+          }
         }
       }
     }

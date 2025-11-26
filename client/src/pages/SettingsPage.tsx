@@ -196,7 +196,13 @@ export default function SettingsPage() {
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold ${orgLogo ? 'hidden' : ''}`}
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {orgName.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase()}
+                    {(() => {
+                      const words = orgName.trim().split(/\s+/);
+                      if (words.length === 1) {
+                        return words[0].slice(0, 3).toUpperCase();
+                      }
+                      return words.slice(0, 3).map(word => word[0]).join('').toUpperCase();
+                    })()}
                   </div>
                   <div>
                     <p className="font-bold">Bus Buddy</p>

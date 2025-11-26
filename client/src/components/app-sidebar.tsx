@@ -68,6 +68,30 @@ const getRoleLabel = (role: string) => {
   }
 };
 
+// Generate abbreviation from organization name (up to 3 characters)
+const getOrgAbbreviation = (orgName: string | undefined, userRole: string): string => {
+  // For super admin without org, show "BB" for Bus Buddy
+  if (!orgName || userRole === "system_admin") {
+    return "BB";
+  }
+  
+  // Split by spaces and get first letter of each word
+  const words = orgName.trim().split(/\s+/);
+  
+  if (words.length === 1) {
+    // Single word: take first 3 characters (e.g., "Westwood" → "WES")
+    return words[0].slice(0, 3).toUpperCase();
+  }
+  
+  // Multiple words: take first letter of each word, up to 3
+  const abbreviation = words
+    .slice(0, 3)
+    .map(word => word.charAt(0).toUpperCase())
+    .join("");
+  
+  return abbreviation || "BB";
+};
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user: authenticatedUser } = useUser();
@@ -271,12 +295,20 @@ export function AppSidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full" data-testid="dropdown-bus-buddy-menu">
             <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-md p-2 cursor-pointer">
-              <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                style={{ backgroundColor: orgSettings?.primaryColor || "#0080FF" }}
-              >
-                UHS
-              </div>
+              {orgSettings?.logoUrl ? (
+                <img 
+                  src={orgSettings.logoUrl} 
+                  alt={orgSettings?.name || "Organization"} 
+                  className="w-8 h-8 rounded-lg object-cover"
+                />
+              ) : (
+                <div 
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                  style={{ backgroundColor: orgSettings?.primaryColor || "#0080FF" }}
+                >
+                  {getOrgAbbreviation(orgSettings?.name, authenticatedUser?.role || "")}
+                </div>
+              )}
               <div className="flex-1 text-left">
                 <h2 className="font-bold text-lg">Bus Buddy</h2>
                 <p className="text-sm text-muted-foreground">{orgSettings?.name || "Bus Tracking"}</p>
