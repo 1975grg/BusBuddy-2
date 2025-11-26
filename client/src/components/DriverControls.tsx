@@ -247,6 +247,13 @@ export function DriverControls({
   const startGPSTracking = async (activeSessionId: string) => {
     console.log("[GPS] startGPSTracking called with sessionId:", activeSessionId);
     
+    // Guard: Clean up any existing tracking before starting new
+    stopGPSTracking();
+    
+    // Set refs IMMEDIATELY so callbacks can use current values
+    sessionIdRef.current = activeSessionId;
+    tripStatusRef.current = "active";
+    
     // Reset GPS state when starting tracking
     gpsErrorShownRef.current = false;
     watchPositionSucceededRef.current = false;
