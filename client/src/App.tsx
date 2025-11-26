@@ -98,19 +98,19 @@ function AppContent() {
   if (isRiderPage) {
     return (
       <div className="flex flex-col h-screen w-full bg-background">
-        <header className="flex items-center justify-between p-4 border-b bg-background">
+        <header className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-primary text-xs font-bold">
               BB
             </div>
-            <span className="font-bold">Bus Buddy</span>
+            <span className="font-bold text-white">Bus Buddy - Rider View</span>
           </div>
           <div className="flex items-center gap-2">
             <UserMenu />
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 overflow-auto" key={user?.id || 'anonymous'}>
+        <main className="flex-1 overflow-auto p-4" key={user?.id || 'anonymous'}>
           <Router />
         </main>
       </div>
