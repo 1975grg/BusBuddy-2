@@ -12,8 +12,12 @@ let tokenInitialized = false;
 // Check if running on native platform (iOS/Android) vs web
 function isNativePlatform(): boolean {
   try {
-    return Capacitor.isNativePlatform();
-  } catch {
+    const platform = Capacitor.getPlatform();
+    const isNative = Capacitor.isNativePlatform();
+    console.log("[AUTH-PLATFORM] Platform:", platform, "isNative:", isNative);
+    return isNative;
+  } catch (e) {
+    console.log("[AUTH-PLATFORM] Capacitor check failed:", e);
     return false;
   }
 }
@@ -66,42 +70,67 @@ export async function initializeSessionToken(): Promise<string | null> {
 }
 
 // Get stored session token (synchronous, uses cached value)
-// Only returns token on native - web relies on HttpOnly cookies
+// Returns token on native platforms for Bearer auth
 export function getStoredSessionToken(): string | null {
   // On web, never return a Bearer token - let cookies handle auth
   if (!isNativePlatform()) {
     return null;
   }
-  return cachedToken;
+  
+  // Return cached token if available
+  if (cachedToken) {
+    return cachedToken;
+  }
+  
+  // Fallback: try localStorage synchronously (in case Preferences failed)
+  try {
+    const value = localStorage.getItem(SESSION_TOKEN_KEY);
+    if (value) {
+      console.log("[AUTH-STORAGE] Retrieved token from localStorage fallback");
+      cachedToken = value;
+      return value;
+    }
+  } catch {}
+  
+  return null;
 }
 
 // Store session token for native app persistence
-// Only stores on native platforms - web uses HttpOnly cookies
+// Saves to both Capacitor Preferences AND localStorage for maximum reliability
 export async function setStoredSessionToken(token: string | null): Promise<void> {
   const isNative = isNativePlatform();
   console.log("[AUTH-STORAGE] Setting session token, isNative:", isNative, "token:", token ? "present" : "null");
   
-  // Update in-memory cache
+  // Update in-memory cache ALWAYS
   cachedToken = token;
   tokenInitialized = true;
   
-  // On web, don't store token - HttpOnly cookies handle auth
-  if (!isNative) {
-    console.log("[AUTH-STORAGE] Web platform, skipping token storage (using cookies)");
-    return;
-  }
-  
-  // On native, save to Capacitor Preferences (persistent across app restarts)
+  // ALWAYS save to localStorage as backup (works on both web and native)
   try {
     if (token) {
-      await Preferences.set({ key: SESSION_TOKEN_KEY, value: token });
-      console.log("[AUTH-STORAGE] Token saved to Capacitor Preferences");
+      localStorage.setItem(SESSION_TOKEN_KEY, token);
+      console.log("[AUTH-STORAGE] Token saved to localStorage");
     } else {
-      await Preferences.remove({ key: SESSION_TOKEN_KEY });
-      console.log("[AUTH-STORAGE] Token removed from Capacitor Preferences");
+      localStorage.removeItem(SESSION_TOKEN_KEY);
+      console.log("[AUTH-STORAGE] Token removed from localStorage");
     }
   } catch (e) {
-    console.log("[AUTH-STORAGE] Capacitor Preferences error:", e);
+    console.log("[AUTH-STORAGE] localStorage error:", e);
+  }
+  
+  // On native, ALSO save to Capacitor Preferences (more reliable for app restarts)
+  if (isNative) {
+    try {
+      if (token) {
+        await Preferences.set({ key: SESSION_TOKEN_KEY, value: token });
+        console.log("[AUTH-STORAGE] Token saved to Capacitor Preferences");
+      } else {
+        await Preferences.remove({ key: SESSION_TOKEN_KEY });
+        console.log("[AUTH-STORAGE] Token removed from Capacitor Preferences");
+      }
+    } catch (e) {
+      console.log("[AUTH-STORAGE] Capacitor Preferences error:", e);
+    }
   }
 }
 
