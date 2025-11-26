@@ -89,11 +89,11 @@ function AppContent() {
     );
   }
   
-  // Riders get a simplified layout without sidebar
+  // Riders get a simplified layout without sidebar - NO SidebarProvider
   if (isRiderPage) {
     return (
-      <div className="flex flex-col h-screen w-full">
-        <header className="flex items-center justify-between p-4 border-b">
+      <div className="flex flex-col h-screen w-full bg-background">
+        <header className="flex items-center justify-between p-4 border-b bg-background">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-bold">
               BB
@@ -105,46 +105,47 @@ function AppContent() {
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-4" key={user?.id || 'anonymous'}>
+        <main className="flex-1 overflow-auto" key={user?.id || 'anonymous'}>
           <Router />
         </main>
       </div>
     );
   }
   
+  // Admin/Driver pages get the full sidebar layout
+  const sidebarStyle = {
+    "--sidebar-width": "20rem",
+    "--sidebar-width-icon": "4rem",
+  };
+  
   return (
-    <div className="flex h-screen w-full">
-      <AppSidebar />
-      <div className="flex flex-col flex-1">
-        <header className="flex items-center justify-between p-4 border-b">
-          <SidebarTrigger data-testid="button-sidebar-toggle" />
-          <div className="flex items-center gap-2">
-            <UserMenu />
-            <ThemeToggle />
-          </div>
-        </header>
-        <main className="flex-1 overflow-auto p-6" key={user?.id || 'anonymous'}>
-          <Router />
-        </main>
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1">
+          <header className="flex items-center justify-between p-4 border-b">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2">
+              <UserMenu />
+              <ThemeToggle />
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto p-6" key={user?.id || 'anonymous'}>
+            <Router />
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 
 export default function App() {
-  const style = {
-    "--sidebar-width": "20rem",
-    "--sidebar-width-icon": "4rem",
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
         <ThemeProvider>
           <TooltipProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <AppContent />
-            </SidebarProvider>
+            <AppContent />
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>
