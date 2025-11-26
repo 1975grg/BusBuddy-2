@@ -32,5 +32,14 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { initializeSessionToken } from "./lib/queryClient";
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Initialize session token from persistent storage before rendering
+// This ensures the token is loaded from Capacitor Preferences on native apps
+initializeSessionToken().then(() => {
+  console.log("[APP] Session token initialized, rendering app...");
+  createRoot(document.getElementById("root")!).render(<App />);
+}).catch((e) => {
+  console.log("[APP] Session token initialization failed, rendering anyway:", e);
+  createRoot(document.getElementById("root")!).render(<App />);
+});

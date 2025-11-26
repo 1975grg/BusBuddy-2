@@ -35,13 +35,14 @@ export function AccessLogin() {
       });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       console.log("[AUTH-LOGIN] Login successful, sessionToken:", data.sessionToken ? "received" : "missing");
       
       // Store session token for native app persistence
+      // MUST await before redirect to ensure token is saved to Capacitor Preferences
       if (data.sessionToken) {
-        setStoredSessionToken(data.sessionToken);
-        console.log("[AUTH-LOGIN] Token stored in localStorage");
+        await setStoredSessionToken(data.sessionToken);
+        console.log("[AUTH-LOGIN] Token stored in Capacitor Preferences");
       }
       
       toast({
@@ -96,10 +97,11 @@ export function AccessLogin() {
       const response = await apiRequest("POST", "/api/auth/magic-link/verify", { token });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       // Store session token for native app persistence
+      // MUST await before redirect to ensure token is saved to Capacitor Preferences
       if (data.sessionToken) {
-        setStoredSessionToken(data.sessionToken);
+        await setStoredSessionToken(data.sessionToken);
       }
       
       toast({

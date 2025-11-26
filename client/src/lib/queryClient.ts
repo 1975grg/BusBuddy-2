@@ -1,27 +1,107 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { Preferences } from "@capacitor/preferences";
+import { Capacitor } from "@capacitor/core";
 
 // Session token storage key for native app persistence
 const SESSION_TOKEN_KEY = "busbuddy_session_token";
 
-// Get stored session token (for native/PWA contexts where cookies may not persist)
-export function getStoredSessionToken(): string | null {
+// In-memory cache of the token for synchronous access
+let cachedToken: string | null = null;
+let tokenInitialized = false;
+
+// Check if running on native platform (iOS/Android) vs web
+function isNativePlatform(): boolean {
   try {
-    return localStorage.getItem(SESSION_TOKEN_KEY);
+    return Capacitor.isNativePlatform();
   } catch {
-    return null;
+    return false;
   }
 }
 
+// Initialize token from persistent storage (call this on app start)
+// Only needed for native apps - web uses HttpOnly cookies
+export async function initializeSessionToken(): Promise<string | null> {
+  const isNative = isNativePlatform();
+  console.log("[AUTH-STORAGE] Initializing session token, isNative:", isNative);
+  
+  // On web, we don't need to load tokens from storage - HttpOnly cookies handle auth
+  if (!isNative) {
+    console.log("[AUTH-STORAGE] Web platform detected, using HttpOnly cookies");
+    tokenInitialized = true;
+    return null;
+  }
+  
+  // On native, load token from Capacitor Preferences
+  try {
+    const { value } = await Preferences.get({ key: SESSION_TOKEN_KEY });
+    if (value) {
+      console.log("[AUTH-STORAGE] Found token in Capacitor Preferences");
+      cachedToken = value;
+      tokenInitialized = true;
+      return value;
+    }
+  } catch (e) {
+    console.log("[AUTH-STORAGE] Capacitor Preferences error:", e);
+  }
+  
+  // Fallback to localStorage (for older native app versions)
+  try {
+    const value = localStorage.getItem(SESSION_TOKEN_KEY);
+    if (value) {
+      console.log("[AUTH-STORAGE] Found token in localStorage (legacy)");
+      cachedToken = value;
+      tokenInitialized = true;
+      // Migrate to Capacitor Preferences
+      try {
+        await Preferences.set({ key: SESSION_TOKEN_KEY, value });
+        localStorage.removeItem(SESSION_TOKEN_KEY); // Clean up
+      } catch {}
+      return value;
+    }
+  } catch {}
+  
+  console.log("[AUTH-STORAGE] No stored token found");
+  tokenInitialized = true;
+  return null;
+}
+
+// Get stored session token (synchronous, uses cached value)
+// Only returns token on native - web relies on HttpOnly cookies
+export function getStoredSessionToken(): string | null {
+  // On web, never return a Bearer token - let cookies handle auth
+  if (!isNativePlatform()) {
+    return null;
+  }
+  return cachedToken;
+}
+
 // Store session token for native app persistence
-export function setStoredSessionToken(token: string | null): void {
+// Only stores on native platforms - web uses HttpOnly cookies
+export async function setStoredSessionToken(token: string | null): Promise<void> {
+  const isNative = isNativePlatform();
+  console.log("[AUTH-STORAGE] Setting session token, isNative:", isNative, "token:", token ? "present" : "null");
+  
+  // Update in-memory cache
+  cachedToken = token;
+  tokenInitialized = true;
+  
+  // On web, don't store token - HttpOnly cookies handle auth
+  if (!isNative) {
+    console.log("[AUTH-STORAGE] Web platform, skipping token storage (using cookies)");
+    return;
+  }
+  
+  // On native, save to Capacitor Preferences (persistent across app restarts)
   try {
     if (token) {
-      localStorage.setItem(SESSION_TOKEN_KEY, token);
+      await Preferences.set({ key: SESSION_TOKEN_KEY, value: token });
+      console.log("[AUTH-STORAGE] Token saved to Capacitor Preferences");
     } else {
-      localStorage.removeItem(SESSION_TOKEN_KEY);
+      await Preferences.remove({ key: SESSION_TOKEN_KEY });
+      console.log("[AUTH-STORAGE] Token removed from Capacitor Preferences");
     }
-  } catch {
-    // localStorage may not be available in some contexts
+  } catch (e) {
+    console.log("[AUTH-STORAGE] Capacitor Preferences error:", e);
   }
 }
 
@@ -29,14 +109,13 @@ export function setStoredSessionToken(token: string | null): void {
 function getAuthHeaders(includeContentType: boolean = false): HeadersInit {
   const headers: HeadersInit = {};
   
-  // Add Bearer token if available (for native apps where cookies don't persist)
+  // Add Bearer token if available (only on native - web uses cookies)
   const token = getStoredSessionToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-    console.log("[AUTH-CLIENT] Including Bearer token in request");
-  } else {
-    console.log("[AUTH-CLIENT] No stored token found in localStorage");
+    console.log("[AUTH-CLIENT] Native: Including Bearer token in request");
   }
+  // On web, no log needed - cookies handle auth silently
   
   if (includeContentType) {
     headers["Content-Type"] = "application/json";

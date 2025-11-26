@@ -24,9 +24,10 @@ export function UserMenu() {
     mutationFn: async () => {
       return apiRequest("POST", "/api/auth/logout", {});
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       // Clear stored session token (for native apps)
-      setStoredSessionToken(null);
+      // MUST await to ensure token is cleared from Capacitor Preferences
+      await setStoredSessionToken(null);
       
       // Invalidate all queries to clear the cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });

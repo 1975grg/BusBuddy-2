@@ -75,10 +75,11 @@ export default function LoginPage() {
       });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       // Store session token for native app persistence (cookies may not work in WebView)
+      // MUST await before redirect to ensure token is saved to Capacitor Preferences
       if (data.sessionToken) {
-        setStoredSessionToken(data.sessionToken);
+        await setStoredSessionToken(data.sessionToken);
       }
       
       toast({
@@ -130,10 +131,11 @@ export default function LoginPage() {
       const response = await apiRequest("POST", "/api/auth/magic-link/verify", { token });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       // Store session token for native app persistence (cookies may not work in WebView)
+      // MUST await before redirect to ensure token is saved to Capacitor Preferences
       if (data.sessionToken) {
-        setStoredSessionToken(data.sessionToken);
+        await setStoredSessionToken(data.sessionToken);
       }
       
       toast({
