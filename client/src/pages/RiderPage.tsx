@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RiderTracker } from "@/components/RiderTracker";
 import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
+import { MessageHistory } from "@/components/MessageHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
@@ -77,11 +78,12 @@ export default function RiderPage() {
   }
 
   // Use real route data from database, with fallback for loading state
+  // Default status is "offline" - will be overridden by active session if one exists
   const currentRoute = realRoute ? {
     id: realRoute.id,
     name: realRoute.name,
     busName: realRoute.vehicleNumber || `${realRoute.type?.toUpperCase() || 'BUS'}-001`,
-    status: "active" as const,
+    status: "offline" as const,
     isFavorite: false,
     organizationId: realRoute.organizationId,
     stops: realRoute.stops?.length > 0 
@@ -91,15 +93,15 @@ export default function RiderPage() {
           eta: "-- min",
           isNext: index === 0
         }))
-      : [{ id: "1", name: "Route Stop", eta: "-- min", isNext: true }]
+      : []
   } : {
     id: selectedRoute,
     name: "Loading route...",
     busName: "BUS-001",
-    status: "active" as const,
+    status: "offline" as const,
     isFavorite: false,
     organizationId: user?.organizationId || "",
-    stops: [{ id: "1", name: "Loading...", eta: "-- min", isNext: true }]
+    stops: []
   };
 
 
@@ -124,7 +126,7 @@ export default function RiderPage() {
         serviceAlerts={serviceAlerts}
       />
 
-      {/* Contact Support Section */}
+      {/* Contact Support Section - Above Messages */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -146,6 +148,9 @@ export default function RiderPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Message History - Below Need Help */}
+      <MessageHistory userType="rider" routeId={currentRoute.id} />
 
       {/* Contact Support Dialog */}
       <SendRiderMessageDialog

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 interface Bus {
   id: string;
   name: string;
-  status: "active" | "offline";
+  status: "active" | "delayed" | "offline";
   lat: number | string;
   lng: number | string;
   eta: string;
@@ -116,6 +116,7 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         // Set color based on status
         const statusColors = {
           active: '#22c55e',
+          delayed: '#f59e0b',
           offline: '#ef4444',
         };
         el.style.backgroundColor = statusColors[bus.status];
@@ -154,6 +155,7 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         const el = marker.getElement();
         const statusColors = {
           active: '#22c55e',
+          delayed: '#f59e0b',
           offline: '#ef4444',
         };
         el.style.backgroundColor = statusColors[bus.status];
