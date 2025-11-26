@@ -46,6 +46,13 @@ export function DriverControls({
 
   // Initialize state from existing session - handle all session statuses
   useEffect(() => {
+    console.log("DriverControls useEffect - existingSession:", {
+      hasSession: !!existingSession,
+      sessionId: existingSession?.id,
+      status: existingSession?.status,
+      watchIdExists: !!watchIdRef.current
+    });
+    
     if (existingSession) {
       setSessionId(existingSession.id);
       
@@ -53,11 +60,18 @@ export function DriverControls({
       switch (existingSession.status) {
         case "active":
           setTripStatus("active");
-          // CRITICAL: Start GPS tracking for existing active sessions
-          // This ensures GPS resumes when driver refreshes page or returns to app
+          // CRITICAL: Update refs IMMEDIATELY before starting GPS tracking
+          // This fixes the race condition where GPS callback fires before React state updates
+          sessionIdRef.current = existingSession.id;
+          tripStatusRef.current = "active";
+          
+          // Start GPS tracking for existing active sessions
           // Guard: Only start if not already tracking to prevent duplicate watchers
           if (!watchIdRef.current) {
+            console.log("DriverControls: Starting GPS tracking for active session", existingSession.id);
             startGPSTracking(existingSession.id);
+          } else {
+            console.log("DriverControls: GPS already tracking, skipping start");
           }
           break;
         case "pending":
@@ -227,12 +241,15 @@ export function DriverControls({
 
   // GPS tracking functions with fail-safe logic
   const startGPSTracking = async (activeSessionId: string) => {
+    console.log("startGPSTracking called with sessionId:", activeSessionId);
+    
     // Reset GPS state when starting tracking
     gpsErrorShownRef.current = false;
     watchPositionSucceededRef.current = false;
     
     // Check if geolocation is available
     if (!navigator.geolocation) {
+      console.log("Geolocation not available!");
       toast({
         variant: "destructive",
         title: "GPS not available",
@@ -257,11 +274,12 @@ export function DriverControls({
       return;
     }
 
+    console.log("Setting up watchPosition...");
     // Start watching position with fail-safe logic
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        console.log("GPS update:", latitude, longitude);
+        console.log("GPS watchPosition success:", latitude, longitude, "sessionRef:", sessionIdRef.current, "statusRef:", tripStatusRef.current);
         
         // On first successful GPS reading, start the backup interval
         if (!watchPositionSucceededRef.current) {
