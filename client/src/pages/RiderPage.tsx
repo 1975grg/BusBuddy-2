@@ -13,11 +13,20 @@ export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
 
+  // Debug logging
+  console.log("RiderPage Debug:", {
+    user: user?.email,
+    authLoading,
+    routeAssignments: user?.routeAssignments,
+  });
+
   // Get the rider's assigned route from their route assignments
   // Prefer the default route, or the first assigned route
   const defaultAssignment = user?.routeAssignments?.find(a => a.isDefault);
   const firstAssignment = user?.routeAssignments?.[0];
   const selectedRoute = defaultAssignment?.routeId || firstAssignment?.routeId || null;
+  
+  console.log("RiderPage selectedRoute:", selectedRoute);
 
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Fetch route data directly by ID (public endpoint)
