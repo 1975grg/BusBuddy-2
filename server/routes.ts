@@ -51,6 +51,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/me", authenticateUser, async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
+      console.log("DEBUG /api/me - user email:", user.email);
+      console.log("DEBUG /api/me - routeAssignments:", JSON.stringify(user.routeAssignments, null, 2));
       res.json(user);
     } catch (error) {
       console.error("Error fetching current user:", error);
