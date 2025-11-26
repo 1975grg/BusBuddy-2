@@ -1103,18 +1103,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Org admins can ONLY see routes from their own organization
         // Never trust client-provided organizationId
         routes = await storage.getRoutesByOrganization(user.organizationId);
-      } else if (user.role === "driver") {
-        // Drivers can only see routes they're assigned to
+      } else if (user.role === "driver" || user.role === "rider") {
+        // Drivers and riders can only see routes they're assigned to
         const assignedRouteIds = user.routeAssignments?.map(a => a.routeId) || [];
         if (assignedRouteIds.length === 0) {
           return res.json([]); // No assigned routes
         }
         
-        // Get all routes for the driver's organization, then filter to assigned ones
+        // Get all routes for the user's organization, then filter to assigned ones
         const orgRoutes = await storage.getRoutesByOrganization(user.organizationId);
         routes = orgRoutes.filter(route => assignedRouteIds.includes(route.id));
       } else {
-        // Riders should not access this endpoint
         return res.status(403).json({ error: "Access denied" });
       }
       
