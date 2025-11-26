@@ -53,13 +53,22 @@ export function DriverControls({
       switch (existingSession.status) {
         case "active":
           setTripStatus("active");
+          // CRITICAL: Start GPS tracking for existing active sessions
+          // This ensures GPS resumes when driver refreshes page or returns to app
+          // Guard: Only start if not already tracking to prevent duplicate watchers
+          if (!watchIdRef.current) {
+            startGPSTracking(existingSession.id);
+          }
           break;
         case "pending":
           // Treat pending sessions as paused - driver can resume
+          // Stop GPS tracking if it was running (e.g., server-side pause)
+          stopGPSTracking();
           setTripStatus("paused");
           break;
         case "completed":
         case "cancelled":
+          stopGPSTracking();
           setTripStatus("stopped");
           setSessionId(null);
           break;
@@ -67,6 +76,8 @@ export function DriverControls({
           setTripStatus("stopped");
       }
     } else {
+      // Clean up GPS tracking if session is cleared
+      stopGPSTracking();
       setTripStatus("stopped");
       setSessionId(null);
     }
@@ -287,8 +298,9 @@ export function DriverControls({
           }, 5000);
         }
         
-        // Don't send update if previous mutation is still pending (prevents pile-up)
-        if (!updateLocationMutation.isPending) {
+        // Only send update if session is still active and previous mutation is not pending
+        // This prevents updates during paused state and pile-up of pending requests
+        if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
           updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
         }
       },
