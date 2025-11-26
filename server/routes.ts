@@ -1161,12 +1161,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/routes/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log("DEBUG GET /api/routes/:id - requesting route:", id);
       const route = await storage.getRoute(id);
       
       if (!route) {
+        console.log("DEBUG GET /api/routes/:id - route not found for id:", id);
         return res.status(404).json({ error: "Route not found" });
       }
       
+      console.log("DEBUG GET /api/routes/:id - found route:", route.name);
       const stops = await storage.getRouteStopsByRoute(id);
       res.json({ ...route, stops });
     } catch (error) {
