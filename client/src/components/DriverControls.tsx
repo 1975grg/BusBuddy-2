@@ -3,11 +3,21 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Square, MapPin, Clock, AlertTriangle } from "lucide-react";
+import { Play, Pause, Square, MapPin, Clock, AlertTriangle, Navigation, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
 import { Capacitor } from "@capacitor/core";
 import type { RouteSession } from "@shared/schema";
+
+// GPS status for debugging
+interface GPSStatus {
+  lastLat: number | null;
+  lastLng: number | null;
+  lastUpdate: Date | null;
+  updateCount: number;
+  errorCount: number;
+  lastError: string | null;
+}
 
 interface DriverControlsProps {
   routeId: string;
@@ -30,6 +40,14 @@ export function DriverControls({
 }: DriverControlsProps) {
   const [tripStatus, setTripStatus] = useState<"stopped" | "active" | "paused">("stopped");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<GPSStatus>({
+    lastLat: null,
+    lastLng: null,
+    lastUpdate: null,
+    updateCount: 0,
+    errorCount: 0,
+    lastError: null,
+  });
   const { toast } = useToast();
   
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -144,9 +162,23 @@ export function DriverControls({
       console.log("[GPS] Location update SUCCESS - server stored coordinates");
       // Reset auth failure count on success
       authFailureCountRef.current = 0;
+      // Update GPS status to show success
+      setGpsStatus(prev => ({
+        ...prev,
+        lastUpdate: new Date(),
+        updateCount: prev.updateCount + 1,
+        lastError: null,
+      }));
     },
     onError: (error: any) => {
       console.error("[GPS] Location update FAILED:", error?.message || error);
+      
+      // Update GPS status to show error
+      setGpsStatus(prev => ({
+        ...prev,
+        errorCount: prev.errorCount + 1,
+        lastError: error?.message || "Unknown error",
+      }));
       
       // Check if this is a 401 authentication error
       const errorMessage = error?.message || "";
@@ -337,6 +369,13 @@ export function DriverControls({
         (position) => {
           const { latitude, longitude } = position.coords;
           console.log("[GPS] Interval success:", latitude, longitude);
+          
+          // Update GPS status with received coordinates
+          setGpsStatus(prev => ({
+            ...prev,
+            lastLat: latitude,
+            lastLng: longitude,
+          }));
           
           // Double-check session is still active before sending update
           if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
@@ -536,6 +575,46 @@ export function DriverControls({
               {sessionId && (
                 <div className="text-xs text-muted-foreground">
                   Session ID: {sessionId.slice(0, 8)}...
+                </div>
+              )}
+              
+              {/* GPS Status Indicator */}
+              {tripStatus === "active" && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">GPS Tracking</span>
+                    {gpsStatus.lastUpdate ? (
+                      <Badge variant="outline" className="ml-auto text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                        <Wifi className="w-3 h-3 mr-1" />
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="ml-auto text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                        <WifiOff className="w-3 h-3 mr-1" />
+                        Waiting...
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {gpsStatus.lastLat && gpsStatus.lastLng && (
+                    <div className="text-xs text-muted-foreground">
+                      Last: {gpsStatus.lastLat.toFixed(4)}, {gpsStatus.lastLng.toFixed(4)}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>Updates: {gpsStatus.updateCount}</span>
+                    {gpsStatus.errorCount > 0 && (
+                      <span className="text-red-500">Errors: {gpsStatus.errorCount}</span>
+                    )}
+                  </div>
+                  
+                  {gpsStatus.lastError && (
+                    <div className="text-xs text-red-500 truncate">
+                      Error: {gpsStatus.lastError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
