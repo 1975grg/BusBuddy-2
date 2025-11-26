@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, LogOut } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export function UserMenu() {
@@ -25,6 +25,9 @@ export function UserMenu() {
       return apiRequest("POST", "/api/auth/logout", {});
     },
     onSuccess: () => {
+      // Clear stored session token (for native apps)
+      setStoredSessionToken(null);
+      
       // Invalidate all queries to clear the cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       queryClient.clear();

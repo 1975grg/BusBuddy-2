@@ -109,15 +109,19 @@ export function LiveMap({ buses, className, followBus = false }: LiveMapProps) {
       let marker = markers.current.get(bus.id);
 
       if (!marker) {
-        // Create new marker
+        // Create new marker - a visible bus icon
         const el = document.createElement('div');
         el.className = 'bus-marker';
-        el.style.width = '24px';
-        el.style.height = '24px';
+        el.style.width = '40px';
+        el.style.height = '40px';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
         el.style.borderRadius = '50%';
         el.style.border = '3px solid white';
-        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.boxShadow = '0 3px 8px rgba(0,0,0,0.4)';
         el.style.cursor = 'pointer';
+        el.style.transition = 'transform 0.2s ease';
         
         // Set color based on status
         const statusColors = {
@@ -126,6 +130,17 @@ export function LiveMap({ buses, className, followBus = false }: LiveMapProps) {
           offline: '#ef4444',
         };
         el.style.backgroundColor = statusColors[bus.status];
+        
+        // Add bus icon SVG inside
+        el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6v6"/>
+          <path d="M15 6v6"/>
+          <path d="M2 12h19.6"/>
+          <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/>
+          <circle cx="7" cy="18" r="2"/>
+          <path d="M9 18h5"/>
+          <circle cx="16" cy="18" r="2"/>
+        </svg>`;
 
         // Create popup with bus info
         const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`

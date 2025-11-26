@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bell, BellOff, Clock, MapPin, Star, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
+import { getStoredSessionToken } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
 
 interface Stop {
@@ -43,7 +44,17 @@ export function RiderTracker({
   const { data: activeSession } = useQuery({
     queryKey: ["/api/route-sessions/active", routeId],
     queryFn: async () => {
-      const response = await fetch(`/api/route-sessions/active/${routeId}`);
+      // Build headers with Bearer token for native app contexts (where cookies don't persist)
+      const headers: HeadersInit = {};
+      const token = getStoredSessionToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/route-sessions/active/${routeId}`, {
+        credentials: "include",
+        headers,
+      });
       if (!response.ok) {
         if (response.status === 404) {
           console.log("RiderTracker: No active session found for route", routeId);
@@ -67,14 +78,51 @@ export function RiderTracker({
     enabled: !!routeId,
   });
 
-  // Use calculated status from backend, fallback to prop status
-  const currentStatus = (activeSession?.calculatedStatus as "active" | "delayed" | "offline") || status;
+  // Use calculated status from backend, with fallback chain:
+  // 1. calculatedStatus (GPS-based calculation from server)
+  // 2. session.status (the actual session status - active/paused/ended)
+  // 3. prop status (fallback from parent)
+  // This ensures we show "Active" when a trip is running even before GPS coordinates arrive
+  const sessionStatus = activeSession?.status as "active" | "paused" | "ended" | undefined;
+  const calculatedStatus = activeSession?.calculatedStatus as "active" | "delayed" | "offline" | undefined;
+  
+  // If session is active and calculatedStatus is offline (no GPS yet), show "active" 
+  // because the trip is running, we just don't have GPS coordinates yet
+  let currentStatus: "active" | "delayed" | "offline";
+  if (sessionStatus === "active" && (!calculatedStatus || calculatedStatus === "offline")) {
+    currentStatus = "active"; // Trip is running, just waiting for GPS
+  } else if (calculatedStatus) {
+    currentStatus = calculatedStatus;
+  } else {
+    currentStatus = status; // Use prop fallback
+  }
   
   // Debug status
-  console.log("RiderTracker currentStatus:", currentStatus, "from calculatedStatus:", activeSession?.calculatedStatus, "fallback:", status);
+  console.log("RiderTracker status:", { 
+    currentStatus, 
+    calculatedStatus, 
+    sessionStatus, 
+    propStatus: status,
+    hasSession: !!activeSession 
+  });
 
   // Convert active session to bus data for LiveMap
-  const buses = activeSession?.currentLatitude && activeSession?.currentLongitude ? [
+  // Use proper null checks to handle valid 0 coordinates (equator/Greenwich)
+  const hasValidCoordinates = 
+    activeSession?.currentLatitude !== null && 
+    activeSession?.currentLatitude !== undefined &&
+    activeSession?.currentLongitude !== null && 
+    activeSession?.currentLongitude !== undefined &&
+    !isNaN(Number(activeSession.currentLatitude)) &&
+    !isNaN(Number(activeSession.currentLongitude));
+  
+  console.log("RiderTracker hasValidCoordinates:", hasValidCoordinates, {
+    lat: activeSession?.currentLatitude,
+    lng: activeSession?.currentLongitude,
+    sessionExists: !!activeSession
+  });
+  
+  const buses = hasValidCoordinates ? [
     {
       id: activeSession.id,
       name: busName,

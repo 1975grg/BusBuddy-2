@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
 import { HelpCircle, KeyRound, Mail, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
@@ -76,6 +76,11 @@ export default function LoginPage() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      // Store session token for native app persistence (cookies may not work in WebView)
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken);
+      }
+      
       toast({
         title: "Login successful!",
         description: "Welcome back",
@@ -126,6 +131,11 @@ export default function LoginPage() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      // Store session token for native app persistence (cookies may not work in WebView)
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken);
+      }
+      
       toast({
         title: "Login successful!",
         description: "Welcome back",

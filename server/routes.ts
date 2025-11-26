@@ -199,9 +199,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
       });
 
-      // Return session info
+      // Return session info (include sessionToken for native app contexts where cookies don't persist)
       res.json({
         success: true,
+        sessionToken, // For native/PWA apps to store and send as Bearer token
         user: {
           id: user.id,
           name: user.name,
@@ -300,9 +301,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
       });
 
-      // Return session info
+      // Return session info (include sessionToken for native app contexts where cookies don't persist)
       res.json({
         success: true,
+        sessionToken, // For native/PWA apps to store and send as Bearer token
         user: {
           id: user.id,
           name: user.name,
