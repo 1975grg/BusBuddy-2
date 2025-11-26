@@ -75,11 +75,16 @@ function AppContent() {
   const { user } = useUser();
   const [location] = useLocation();
   
+  // Debug logging
+  console.log("AppContent DEBUG:", { location, userRole: user?.role });
+  
   // Public pages that should not show sidebar/header
   const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/ride/");
   
   // Rider pages should have minimal UI (no sidebar)
   const isRiderPage = location.startsWith("/rider") || location.startsWith("/track");
+  
+  console.log("AppContent isRiderPage:", isRiderPage, "isPublicPage:", isPublicPage);
   
   if (isPublicPage) {
     return (
