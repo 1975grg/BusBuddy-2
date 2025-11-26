@@ -76,7 +76,7 @@ export default function DriverPage() {
       }
     },
     enabled: !!selectedRoute && !authLoading,
-    refetchInterval: 10000, // Refetch every 10 seconds to stay in sync
+    refetchInterval: 5000, // Refetch every 5 seconds for live GPS updates
   });
 
   // Early returns AFTER all hooks
@@ -101,13 +101,13 @@ export default function DriverPage() {
 
   const currentRoute = routes.find(r => r.id === selectedRoute);
   
-  // Bus data for the map - uses real GPS from active session
-  const buses = currentRoute && activeSession ? [{
+  // Bus data for the map - only show bus when we have real GPS coordinates
+  const buses = currentRoute && activeSession && activeSession.currentLatitude && activeSession.currentLongitude ? [{
     id: "current-bus", 
     name: currentRoute.vehicleNumber || "Unknown",
     status: "active" as const,
-    lat: activeSession.currentLatitude || 39.6567,
-    lng: activeSession.currentLongitude || -79.9481,
+    lat: activeSession.currentLatitude,
+    lng: activeSession.currentLongitude,
     eta: "N/A", // Would come from real GPS tracking
     nextStop: "Unknown" // Would come from route progress
   }] : [];
@@ -188,7 +188,7 @@ export default function DriverPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <LiveMap buses={buses} className="h-64" />
+              <LiveMap buses={buses} className="h-64" followBus={true} />
             </CardContent>
           </Card>
         </div>

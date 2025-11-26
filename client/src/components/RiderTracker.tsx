@@ -161,7 +161,7 @@ export function RiderTracker({
           </div>
         </CardHeader>
         <CardContent>
-          <LiveMap buses={buses} className="h-48 mb-4" />
+          <LiveMap buses={buses} className="h-48 mb-4" followBus={true} />
           
           {notificationsEnabled && (
             <div className="mb-4 space-y-3" role="region" aria-label="Notifications">

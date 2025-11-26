@@ -16,13 +16,16 @@ interface Bus {
 interface LiveMapProps {
   buses: Bus[];
   className?: string;
+  followBus?: boolean; // If true, map will follow the first active bus
 }
 
-export function LiveMap({ buses, className }: LiveMapProps) {
+export function LiveMap({ buses, className, followBus = false }: LiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<Map<string, maplibregl.Marker>>(new Map());
   const [mapError, setMapError] = useState<string | null>(null);
+  const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const hasInitializedRef = useRef(false);
 
   // Initialize map once
   useEffect(() => {
@@ -90,6 +93,9 @@ export function LiveMap({ buses, className }: LiveMapProps) {
       }
     });
 
+    // Find the first active bus to potentially follow
+    const activeBus = buses.find(b => b.status === 'active');
+
     // Add or update markers for current buses
     buses.forEach((bus) => {
       const lat = typeof bus.lat === 'string' ? parseFloat(bus.lat) : bus.lat;
@@ -139,13 +145,15 @@ export function LiveMap({ buses, className }: LiveMapProps) {
 
         markers.current.set(bus.id, marker);
 
-        // Center map on first bus
-        if (markers.current.size === 1) {
+        // Center map on first bus (initial load)
+        if (!hasInitializedRef.current) {
+          hasInitializedRef.current = true;
           map.current?.flyTo({
             center: [lng, lat],
             zoom: 14,
             duration: 1000,
           });
+          lastCenterRef.current = { lat, lng };
         }
       } else {
         // Update existing marker position
@@ -175,7 +183,31 @@ export function LiveMap({ buses, className }: LiveMapProps) {
         }
       }
     });
-  }, [buses]);
+
+    // Follow the active bus if followBus is enabled and coordinates changed significantly
+    if (followBus && activeBus) {
+      const lat = typeof activeBus.lat === 'string' ? parseFloat(activeBus.lat) : activeBus.lat;
+      const lng = typeof activeBus.lng === 'string' ? parseFloat(activeBus.lng) : activeBus.lng;
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const lastCenter = lastCenterRef.current;
+        
+        // Check if position changed significantly (more than ~100 meters)
+        const significantChange = !lastCenter || 
+          Math.abs(lastCenter.lat - lat) > 0.001 || 
+          Math.abs(lastCenter.lng - lng) > 0.001;
+        
+        if (significantChange) {
+          map.current?.flyTo({
+            center: [lng, lat],
+            zoom: 14,
+            duration: 1000,
+          });
+          lastCenterRef.current = { lat, lng };
+        }
+      }
+    }
+  }, [buses, followBus]);
 
   return (
     <div className={className}>
