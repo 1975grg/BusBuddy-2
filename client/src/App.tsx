@@ -30,7 +30,6 @@ import SystemAdminDashboard from "@/pages/SystemAdminDashboard";
 import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
 import DriverPage from "@/pages/DriverPage";
-import DriverSettingsPage from "@/pages/DriverSettingsPage";
 import RiderPage from "@/pages/RiderPage";
 import RiderOnboardingPage from "@/pages/RiderOnboardingPage";
 import AccessPage from "@/pages/AccessPage";
@@ -59,7 +58,6 @@ function Router() {
       {/* Driver Routes */}
       <Route path="/driver" component={DriverPage} />
       <Route path="/driver/control" component={DriverPage} />
-      <Route path="/driver/settings" component={DriverSettingsPage} />
       
       {/* Rider Routes */}
       <Route path="/rider" component={RiderPage} />

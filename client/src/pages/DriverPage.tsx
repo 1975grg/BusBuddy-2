@@ -8,8 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Star, StarOff, Heart, MessageSquare, Settings } from "lucide-react";
-import { Link } from "wouter";
+import { Route, MapPin, Star, StarOff, Heart, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
@@ -152,11 +151,6 @@ export default function DriverPage() {
             Welcome back, {currentUser?.name || "Driver"}
           </p>
         </div>
-        <Link href="/driver/settings">
-          <Button variant="outline" size="icon" data-testid="button-driver-settings">
-            <Settings className="w-5 h-5" />
-          </Button>
-        </Link>
       </div>
 
       {/* Favorite Route Card */}
