@@ -40,7 +40,7 @@ export default function RiderPage() {
   });
 
   // Early return AFTER all hooks
-  if (authLoading || routeLoading) {
+  if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
@@ -67,7 +67,7 @@ export default function RiderPage() {
     );
   }
 
-  // Use real route data from database
+  // Use real route data from database, with fallback for loading state
   const currentRoute = realRoute ? {
     id: realRoute.id,
     name: realRoute.name,
@@ -83,7 +83,15 @@ export default function RiderPage() {
           isNext: index === 0
         }))
       : [{ id: "1", name: "Route Stop", eta: "-- min", isNext: true }]
-  } : null;
+  } : {
+    id: selectedRoute,
+    name: "Loading route...",
+    busName: "BUS-001",
+    status: "active" as const,
+    isFavorite: false,
+    organizationId: user?.organizationId || "",
+    stops: [{ id: "1", name: "Loading...", eta: "-- min", isNext: true }]
+  };
 
 
   return (
@@ -96,18 +104,16 @@ export default function RiderPage() {
         <p className="text-muted-foreground">Real-time location and arrival estimates for your route</p>
       </div>
 
-      {currentRoute && (
-        <RiderTracker
-          routeId={currentRoute.id}
-          routeName={currentRoute.name}
-          busName={currentRoute.busName}
-          status={currentRoute.status}
-          stops={currentRoute.stops}
-          defaultStop="1"
-          isNotificationsEnabled={true}
-          serviceAlerts={serviceAlerts}
-        />
-      )}
+      <RiderTracker
+        routeId={currentRoute.id}
+        routeName={currentRoute.name}
+        busName={currentRoute.busName}
+        status={currentRoute.status}
+        stops={currentRoute.stops}
+        defaultStop="1"
+        isNotificationsEnabled={true}
+        serviceAlerts={serviceAlerts}
+      />
 
       {/* Contact Support Section */}
       <Card>
@@ -133,22 +139,20 @@ export default function RiderPage() {
       </Card>
 
       {/* Contact Support Dialog */}
-      {currentRoute && (
-        <SendRiderMessageDialog
-          route={{
-            id: currentRoute.id,
-            name: currentRoute.name,
-            organizationId: currentRoute.organizationId || user?.organizationId || "",
-            vehicleNumber: currentRoute.busName,
-            type: "shuttle",
-            status: "active",
-            isActive: true,
-            createdAt: new Date()
-          }}
-          open={messageDialogOpen}
-          onOpenChange={setMessageDialogOpen}
-        />
-      )}
+      <SendRiderMessageDialog
+        route={{
+          id: currentRoute.id,
+          name: currentRoute.name,
+          organizationId: currentRoute.organizationId || user?.organizationId || "",
+          vehicleNumber: currentRoute.busName,
+          type: "shuttle",
+          status: "active",
+          isActive: true,
+          createdAt: new Date()
+        }}
+        open={messageDialogOpen}
+        onOpenChange={setMessageDialogOpen}
+      />
     </div>
   );
 }
