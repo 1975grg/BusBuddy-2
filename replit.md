@@ -30,7 +30,10 @@ Preferred communication style: Simple, everyday language.
 - **Strategy**: Multi-tenant architecture for organization isolation.
 
 ### Authentication & Authorization
-- **Authentication**: Session-based with database persistence (90-day sessions).
+- **Authentication**: Dual authentication strategy:
+  - **Web**: HttpOnly cookie sessions (90-day expiry, secure, auto-refresh)
+  - **Native Apps**: Bearer tokens stored in Capacitor Preferences for persistence across app restarts
+- **Platform Detection**: Automatic via `Capacitor.isNativePlatform()` - web never stores tokens in localStorage (XSS protection)
 - **Access Control**: Role-based (Admin, Driver, Rider).
 - **Login Methods**: Password login (primary) and magic links (fallback).
 - **Rider Onboarding**: QR codes, magic links, password-based access.
