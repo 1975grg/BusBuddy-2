@@ -1,35 +1,161 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, Link2, Key, Smartphone } from "lucide-react";
+import { QrCode, Link2, Key, Smartphone, LogIn } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient, setStoredSessionToken, ApiError } from "@/lib/queryClient";
 
-interface AccessLoginProps {
-  onAccessGranted: (method: string, value: string) => void;
-}
+export function AccessLogin() {
+  const [accessMethod, setAccessMethod] = useState<"password" | "link">("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [magicLinkInput, setMagicLinkInput] = useState("");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-export function AccessLogin({ onAccessGranted }: AccessLoginProps) {
-  const [accessMethod, setAccessMethod] = useState<"qr" | "link" | "password">("qr");
-  const [inputValue, setInputValue] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
+  // Check for magic link token in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      verifyMagicLinkMutation.mutate(token);
+    }
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Password login mutation
+  const passwordLoginMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/password/login", {
+        email,
+        password,
+      });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      // Store session token for native app persistence
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken);
+      }
+      
+      toast({
+        title: "Welcome!",
+        description: "You're now logged in.",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      
+      // Redirect based on role
+      if (data.user.role === "rider") {
+        window.location.href = "/access";
+      } else if (data.user.role === "driver") {
+        window.location.href = "/driver";
+      } else if (data.user.role === "org_admin") {
+        window.location.href = "/admin";
+      } else if (data.user.role === "system_admin") {
+        window.location.href = "/system";
+      } else {
+        window.location.href = "/";
+      }
+    },
+    onError: (error: ApiError | Error) => {
+      const code = (error as ApiError).code;
+      
+      if (code === "PASSWORD_EXPIRED") {
+        toast({
+          variant: "destructive",
+          title: "Access Expired",
+          description: "Your access has expired. Please contact your school for a new access code.",
+        });
+      } else if (code === "NO_PASSWORD_SET") {
+        toast({
+          variant: "destructive",
+          title: "No Password Set",
+          description: "Please use the magic link option or contact your school administrator.",
+        });
+        setAccessMethod("link");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: "Invalid email or password. Please try again.",
+        });
+      }
+    },
+  });
+
+  // Magic link verification mutation
+  const verifyMagicLinkMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const response = await apiRequest("POST", "/api/auth/magic-link/verify", { token });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      // Store session token for native app persistence
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken);
+      }
+      
+      toast({
+        title: "Welcome!",
+        description: "You're now logged in.",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      
+      // Clear URL params and reload
+      window.history.replaceState({}, document.title, "/access");
+      window.location.href = "/access";
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Invalid link",
+        description: "This link is expired or invalid. Please request a new one.",
+      });
+    },
+  });
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      onAccessGranted(accessMethod, inputValue.trim());
-      console.log(`Access granted via ${accessMethod}:`, inputValue);
+    if (email.trim() && password.trim()) {
+      passwordLoginMutation.mutate();
     }
   };
 
-  const startQRScan = () => {
-    setIsScanning(true);
-    // TODO: remove mock functionality - replace with real QR scanner
-    setTimeout(() => {
-      setIsScanning(false);
-      onAccessGranted("qr", "mock-qr-code-data");
-    }, 2000);
+  const handleMagicLinkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Extract token from pasted link
+    try {
+      const url = new URL(magicLinkInput);
+      const token = url.searchParams.get('token');
+      if (token) {
+        verifyMagicLinkMutation.mutate(token);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid link",
+          description: "Please paste the complete link from your email/text.",
+        });
+      }
+    } catch {
+      // Maybe they just pasted the token directly
+      if (magicLinkInput.length > 10) {
+        verifyMagicLinkMutation.mutate(magicLinkInput);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid link",
+          description: "Please paste the complete link from your email/text.",
+        });
+      }
+    }
   };
+
+  const isLoading = passwordLoginMutation.isPending || verifyMagicLinkMutation.isPending;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -38,31 +164,13 @@ export function AccessLogin({ onAccessGranted }: AccessLoginProps) {
           <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4">
             <Smartphone className="w-8 h-8 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Access Bus Tracker</CardTitle>
+          <CardTitle className="text-2xl">Student Access</CardTitle>
           <p className="text-muted-foreground">
-            Choose how you'd like to access the tracking system
+            Sign in to track your bus
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              variant={accessMethod === "qr" ? "default" : "outline"}
-              className="flex flex-col h-auto py-3"
-              onClick={() => setAccessMethod("qr")}
-              data-testid="button-access-qr"
-            >
-              <QrCode className="w-5 h-5 mb-1" />
-              <span className="text-xs">QR Code</span>
-            </Button>
-            <Button
-              variant={accessMethod === "link" ? "default" : "outline"}
-              className="flex flex-col h-auto py-3"
-              onClick={() => setAccessMethod("link")}
-              data-testid="button-access-link"
-            >
-              <Link2 className="w-5 h-5 mb-1" />
-              <span className="text-xs">Link</span>
-            </Button>
+          <div className="grid grid-cols-2 gap-2">
             <Button
               variant={accessMethod === "password" ? "default" : "outline"}
               className="flex flex-col h-auto py-3"
@@ -72,77 +180,95 @@ export function AccessLogin({ onAccessGranted }: AccessLoginProps) {
               <Key className="w-5 h-5 mb-1" />
               <span className="text-xs">Password</span>
             </Button>
+            <Button
+              variant={accessMethod === "link" ? "default" : "outline"}
+              className="flex flex-col h-auto py-3"
+              onClick={() => setAccessMethod("link")}
+              data-testid="button-access-link"
+            >
+              <Link2 className="w-5 h-5 mb-1" />
+              <span className="text-xs">Magic Link</span>
+            </Button>
           </div>
 
-          {accessMethod === "qr" && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="w-48 h-48 mx-auto bg-muted rounded-lg flex items-center justify-center mb-4">
-                  {isScanning ? (
-                    <div className="text-center">
-                      <div className="animate-pulse text-primary">
-                        <QrCode className="w-16 h-16 mx-auto mb-2" />
-                      </div>
-                      <p className="text-sm">Scanning...</p>
-                    </div>
-                  ) : (
-                    <div className="text-center text-muted-foreground">
-                      <QrCode className="w-16 h-16 mx-auto mb-2" />
-                      <p className="text-sm">Tap to scan QR code</p>
-                    </div>
-                  )}
-                </div>
-                <Button 
-                  onClick={startQRScan} 
-                  disabled={isScanning}
-                  className="w-full"
-                  data-testid="button-scan-qr"
-                >
-                  {isScanning ? "Scanning..." : "Start QR Scanner"}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {accessMethod === "link" && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+          {accessMethod === "password" && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="magic-link">Magic Link</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="magic-link"
-                  placeholder="Paste your tracking link here"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  data-testid="input-magic-link"
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  data-testid="input-email"
+                  disabled={isLoading}
                 />
               </div>
-              <Button type="submit" className="w-full" data-testid="button-submit-link">
-                Access with Link
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  data-testid="input-password"
+                  disabled={isLoading}
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                data-testid="button-submit-password"
+                disabled={isLoading || !email.trim() || !password.trim()}
+              >
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
           )}
 
-          {accessMethod === "password" && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+          {accessMethod === "link" && (
+            <form onSubmit={handleMagicLinkSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="access-password">Access Password</Label>
+                <Label htmlFor="magic-link">Magic Link</Label>
                 <Input
-                  id="access-password"
-                  type="password"
-                  placeholder="Enter access password"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  data-testid="input-access-password"
+                  id="magic-link"
+                  placeholder="Paste the link from your email or text"
+                  value={magicLinkInput}
+                  onChange={(e) => setMagicLinkInput(e.target.value)}
+                  data-testid="input-magic-link"
+                  disabled={isLoading}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Paste the complete link you received from your school
+                </p>
               </div>
-              <Button type="submit" className="w-full" data-testid="button-submit-password">
-                Access with Password
+              <Button 
+                type="submit" 
+                className="w-full" 
+                data-testid="button-submit-link"
+                disabled={isLoading || !magicLinkInput.trim()}
+              >
+                {isLoading ? "Verifying..." : "Access with Link"}
               </Button>
             </form>
           )}
 
           <div className="text-center text-xs text-muted-foreground">
-            Don't have access? Contact your organization's administrator.
+            Don't have access? Contact your school's administrator.
+          </div>
+          
+          <div className="text-center">
+            <Button 
+              variant="ghost" 
+              className="text-sm"
+              onClick={() => setLocation("/login")}
+              data-testid="button-staff-login"
+            >
+              <LogIn className="w-4 h-4 mr-1" />
+              Staff Login
+            </Button>
           </div>
         </CardContent>
       </Card>

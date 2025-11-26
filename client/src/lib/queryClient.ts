@@ -42,10 +42,35 @@ function getAuthHeaders(includeContentType: boolean = false): HeadersInit {
   return headers;
 }
 
+// Custom error class to preserve error code from backend
+export class ApiError extends Error {
+  code?: string;
+  
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    const contentType = res.headers.get("content-type");
+    
+    // Try to parse JSON error response for structured error info
+    if (contentType?.includes("application/json")) {
+      try {
+        const errorData = await res.json();
+        const message = errorData.message || errorData.error || res.statusText;
+        throw new ApiError(`${res.status}: ${message}`, errorData.code);
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        // If JSON parsing fails, fall through to text handling
+      }
+    }
+    
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new ApiError(`${res.status}: ${text}`);
   }
 }
 
