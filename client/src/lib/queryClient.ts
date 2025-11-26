@@ -33,6 +33,9 @@ function getAuthHeaders(includeContentType: boolean = false): HeadersInit {
   const token = getStoredSessionToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+    console.log("[AUTH-CLIENT] Including Bearer token in request");
+  } else {
+    console.log("[AUTH-CLIENT] No stored token found in localStorage");
   }
   
   if (includeContentType) {

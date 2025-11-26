@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bell, BellOff, Clock, MapPin, Star, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
+import { Bell, BellOff, Clock, MapPin, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
 import { getStoredSessionToken } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
@@ -38,7 +38,6 @@ export function RiderTracker({
   serviceAlerts = []
 }: RiderTrackerProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(isNotificationsEnabled);
-  const [favoriteStop, setFavoriteStop] = useState<string | undefined>(defaultStop);
 
   // Fetch active route session for live GPS tracking
   const { data: activeSession } = useQuery({
@@ -139,11 +138,6 @@ export function RiderTracker({
     console.log("Notifications", !notificationsEnabled ? "enabled" : "disabled");
   };
 
-  const setFavorite = (stopId: string) => {
-    setFavoriteStop(stopId);
-    console.log("Favorite stop set:", stopId);
-  };
-
   // Helper function to get alert type icon and styling
   const getAlertTypeInfo = (type: ServiceAlert['type']) => {
     switch (type) {
@@ -227,6 +221,12 @@ export function RiderTracker({
         <CardContent>
           <LiveMap buses={buses} className="h-48 mb-4" followBus={true} />
           
+          {currentStatus === "offline" && (
+            <p className="text-xs text-muted-foreground text-center mb-3">
+              Waiting for driver to start route...
+            </p>
+          )}
+          
           {notificationsEnabled && (
             <div className="mb-4 space-y-3" role="region" aria-label="Notifications">
               <div className="p-3 bg-primary/10 rounded-lg">
@@ -284,65 +284,6 @@ export function RiderTracker({
         </CardContent>
       </Card>
 
-      {/* Upcoming Stops - Only show if stops exist */}
-      {stops.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              Upcoming Stops
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stops.map((stop) => (
-                <div
-                  key={stop.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
-                    stop.isNext ? "bg-primary/5 border-primary/20" : "bg-muted/30"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      stop.isNext ? "bg-primary" : "bg-muted-foreground"
-                    }`} />
-                    <div>
-                      <p className={`font-medium ${stop.isNext ? "text-primary" : ""}`}>
-                        {stop.name}
-                      </p>
-                      {stop.isNext && (
-                        <p className="text-xs text-muted-foreground">Next stop</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant="outline" 
-                      className={stop.isNext ? "border-primary text-primary" : ""}
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {stop.eta}
-                    </Badge>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setFavorite(stop.id)}
-                      data-testid={`button-favorite-${stop.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <Star className={`w-4 h-4 ${
-                        favoriteStop === stop.id ? "fill-yellow-400 text-yellow-400" : ""
-                      }`} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

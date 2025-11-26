@@ -38,9 +38,12 @@ export async function authenticateUser(
 ) {
   try {
     // Check for session token in cookie or header
-    const token =
-      req.cookies?.sessionToken ||
-      req.headers.authorization?.replace("Bearer ", "");
+    const cookieToken = req.cookies?.sessionToken;
+    const headerToken = req.headers.authorization?.replace("Bearer ", "");
+    const token = cookieToken || headerToken;
+
+    // Debug logging for authentication troubleshooting
+    console.log(`[AUTH] ${req.method} ${req.path} - cookie: ${cookieToken ? 'YES' : 'NO'}, header: ${headerToken ? 'YES' : 'NO'}`);
 
     if (!token) {
       return res.status(401).json({ error: "Authentication required" });

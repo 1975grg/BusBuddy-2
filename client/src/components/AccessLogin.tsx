@@ -36,9 +36,12 @@ export function AccessLogin() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      console.log("[AUTH-LOGIN] Login successful, sessionToken:", data.sessionToken ? "received" : "missing");
+      
       // Store session token for native app persistence
       if (data.sessionToken) {
         setStoredSessionToken(data.sessionToken);
+        console.log("[AUTH-LOGIN] Token stored in localStorage");
       }
       
       toast({

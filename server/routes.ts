@@ -196,8 +196,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
+        path: "/",
         maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
       });
+      
+      console.log(`[AUTH-COOKIE] Set for user ${user.email}, token starts: ${sessionToken.substring(0, 8)}...`);
 
       // Return session info (include sessionToken for native app contexts where cookies don't persist)
       res.json({
@@ -298,8 +301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
+        path: "/",
         maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
       });
+      
+      console.log(`[AUTH-COOKIE] Set for user ${user.email}, token starts: ${sessionToken.substring(0, 8)}...`);
 
       // Return session info (include sessionToken for native app contexts where cookies don't persist)
       res.json({
