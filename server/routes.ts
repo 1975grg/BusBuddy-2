@@ -513,13 +513,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if email already exists
       const existingUser = await storage.getUserByEmail(validatedData.email);
       if (existingUser) {
-        return res.status(400).json({ error: "An account with this email already exists. Please log in instead." });
+        return res.status(409).json({ 
+          error: "An account with this email already exists. Please log in instead.",
+          code: "EMAIL_IN_USE"
+        });
       }
 
       // Check if phone number already has a rider profile for this organization
       const existingProfile = await storage.getRiderProfileByPhone(validatedData.phoneNumber, validatedData.organizationId);
       if (existingProfile) {
-        return res.status(400).json({ error: "This phone number is already registered. Please log in instead." });
+        return res.status(409).json({ 
+          error: "This phone number is already registered. Please log in instead.",
+          code: "PHONE_IN_USE"
+        });
       }
 
       // Hash password
@@ -1559,8 +1565,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { latitude, longitude } = req.body;
       
+      console.log(`[GPS] Location update received for session ${id}: lat=${latitude}, lng=${longitude}`);
+      
       // Validate latitude and longitude are provided and are numbers
       if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {
+        console.log(`[GPS] Missing coordinates for session ${id}`);
         return res.status(400).json({ error: "latitude and longitude are required" });
       }
 

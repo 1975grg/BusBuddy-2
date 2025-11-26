@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapPin, Clock, Smartphone, MessageSquare, QrCode, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { MapPin, Clock, Smartphone, MessageSquare, QrCode, CheckCircle, Eye, EyeOff, LogIn } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Route, RouteStop, Organization } from "@shared/schema";
+import type { Route, RouteStop, Organization, User } from "@shared/schema";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
 
 interface RouteWithStops extends Route {
@@ -20,6 +20,7 @@ interface RouteWithStops extends Route {
 
 export default function RiderOnboardingPage() {
   const { organizationId, routeId } = useParams();
+  const [, setLocation] = useLocation();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,6 +34,29 @@ export default function RiderOnboardingPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check if user is already logged in (silent - don't error for unauthenticated)
+  const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
+    queryKey: ["/api/me"],
+    retry: false,
+    staleTime: 0,
+    queryFn: async () => {
+      try {
+        const response = await fetch("/api/me", { credentials: "include" });
+        if (!response.ok) return null;
+        return response.json();
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  // Redirect authenticated riders to their dashboard
+  useEffect(() => {
+    if (currentUser && currentUser.role === "rider") {
+      setLocation("/rider");
+    }
+  }, [currentUser, setLocation]);
 
   // Get route information
   const { data: route, isLoading: routeLoading } = useQuery<RouteWithStops>({
@@ -76,7 +100,10 @@ export default function RiderOnboardingPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Registration failed");
+        // Attach the error code to the thrown error for better handling
+        const err = new Error(error.error || "Registration failed");
+        (err as any).code = error.code;
+        throw err;
       }
 
       return await response.json();
@@ -88,13 +115,29 @@ export default function RiderOnboardingPage() {
         description: `You can now log in with your email and password to track the ${route?.name} route.`,
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error & { code?: string }) => {
       console.error("Error creating rider account:", error);
-      toast({
-        title: "Registration failed",
-        description: error.message || "Please check your information and try again.",
-        variant: "destructive",
-      });
+      
+      // Check if this is a duplicate account error using structured error code
+      const isAccountExists = error.code === "EMAIL_IN_USE" || error.code === "PHONE_IN_USE";
+      
+      if (isAccountExists) {
+        toast({
+          title: "Account already exists",
+          description: "You already have an account. Redirecting to login...",
+          variant: "default",
+        });
+        // Redirect to login after a brief delay
+        setTimeout(() => {
+          setLocation("/login");
+        }, 1500);
+      } else {
+        toast({
+          title: "Registration failed",
+          description: error.message || "Please check your information and try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -201,7 +244,7 @@ export default function RiderOnboardingPage() {
     setPhoneNumber(formatted);
   };
 
-  if (routeLoading) {
+  if (routeLoading || userLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -283,6 +326,26 @@ export default function RiderOnboardingPage() {
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4 text-muted-foreground" />
               <span>{route.stops.length} stops on this route</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Already Registered - Login Card */}
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-full">
+                <LogIn className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Already have an account?</p>
+                <p className="text-sm text-muted-foreground">Log in to track your bus</p>
+              </div>
+              <Link href="/login">
+                <Button data-testid="button-login-existing">
+                  Log In
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
