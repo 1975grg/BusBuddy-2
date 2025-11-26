@@ -20,14 +20,13 @@ export default function RiderPage() {
   const selectedRoute = defaultAssignment?.routeId || firstAssignment?.routeId || null;
 
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
-  // Always fetch real route data from database
-  const { data: realRoute } = useQuery({
+  // Fetch route data directly by ID (public endpoint)
+  const { data: realRoute, isLoading: routeLoading } = useQuery({
     queryKey: ["/api/routes", selectedRoute],
     queryFn: async () => {
-      const response = await fetch("/api/routes");
-      const routes = await response.json();
-      // Try to find by ID first, then by name slug
-      return routes.find((r: any) => r.id === selectedRoute || r.name.toLowerCase().replace(/\s+/g, '-') === selectedRoute);
+      const response = await fetch(`/api/routes/${selectedRoute}`);
+      if (!response.ok) return null;
+      return response.json();
     },
     enabled: !!selectedRoute && !authLoading,
   });
@@ -41,7 +40,7 @@ export default function RiderPage() {
   });
 
   // Early return AFTER all hooks
-  if (authLoading) {
+  if (authLoading || routeLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
@@ -68,17 +67,22 @@ export default function RiderPage() {
     );
   }
 
-  // Use real route data from database (ignore mock data to ensure consistency)
+  // Use real route data from database
   const currentRoute = realRoute ? {
     id: realRoute.id,
     name: realRoute.name,
-    busName: realRoute.vehicleNumber || `${realRoute.type.toUpperCase()}-001`,
+    busName: realRoute.vehicleNumber || `${realRoute.type?.toUpperCase() || 'BUS'}-001`,
     status: "active" as const,
     isFavorite: false,
-    stops: [
-      { id: "1", name: "Main Entrance", eta: "5 min", isNext: true },
-      { id: "2", name: "Next Stop", eta: "10 min", isNext: false }
-    ]
+    organizationId: realRoute.organizationId,
+    stops: realRoute.stops?.length > 0 
+      ? realRoute.stops.map((stop: any, index: number) => ({
+          id: stop.id,
+          name: stop.name,
+          eta: "-- min",
+          isNext: index === 0
+        }))
+      : [{ id: "1", name: "Route Stop", eta: "-- min", isNext: true }]
   } : null;
 
 
@@ -134,7 +138,7 @@ export default function RiderPage() {
           route={{
             id: currentRoute.id,
             name: currentRoute.name,
-            organizationId: "org-1", // TODO: Get from context  
+            organizationId: currentRoute.organizationId || user?.organizationId || "",
             vehicleNumber: currentRoute.busName,
             type: "shuttle",
             status: "active",
