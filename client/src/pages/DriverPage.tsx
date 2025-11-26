@@ -101,15 +101,35 @@ export default function DriverPage() {
 
   const currentRoute = routes.find(r => r.id === selectedRoute);
   
+  // Debug active session data
+  console.log("DriverPage activeSession:", {
+    hasSession: !!activeSession,
+    sessionId: activeSession?.id,
+    status: activeSession?.status,
+    calculatedStatus: activeSession?.calculatedStatus,
+    lat: activeSession?.currentLatitude,
+    lng: activeSession?.currentLongitude,
+    lastUpdate: activeSession?.lastLocationUpdate
+  });
+  
   // Bus data for the map - only show bus when we have real GPS coordinates
-  const buses = currentRoute && activeSession && activeSession.currentLatitude && activeSession.currentLongitude ? [{
+  // Convert decimal strings to numbers for the map
+  const lat = activeSession?.currentLatitude !== null && activeSession?.currentLatitude !== undefined 
+    ? Number(activeSession.currentLatitude) 
+    : null;
+  const lng = activeSession?.currentLongitude !== null && activeSession?.currentLongitude !== undefined 
+    ? Number(activeSession.currentLongitude) 
+    : null;
+  
+  // Use proper null checks to handle valid 0 coordinates (equator/Greenwich)
+  const buses = currentRoute && activeSession && lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) ? [{
     id: "current-bus", 
     name: currentRoute.vehicleNumber || "Unknown",
-    status: "active" as const,
-    lat: activeSession.currentLatitude,
-    lng: activeSession.currentLongitude,
-    eta: "N/A", // Would come from real GPS tracking
-    nextStop: "Unknown" // Would come from route progress
+    status: (activeSession.calculatedStatus || "active") as "active" | "delayed" | "offline",
+    lat: lat,
+    lng: lng,
+    eta: "N/A",
+    nextStop: "Unknown"
   }] : [];
 
   return (

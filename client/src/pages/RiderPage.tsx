@@ -162,7 +162,9 @@ export default function RiderPage() {
           type: "shuttle",
           status: "active",
           isActive: true,
-          createdAt: new Date()
+          createdAt: new Date(),
+          archivedAt: null,
+          archivedByUserId: null
         }}
         open={messageDialogOpen}
         onOpenChange={setMessageDialogOpen}

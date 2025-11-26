@@ -45,10 +45,23 @@ export function RiderTracker({
     queryFn: async () => {
       const response = await fetch(`/api/route-sessions/active/${routeId}`);
       if (!response.ok) {
-        if (response.status === 404) return null;
+        if (response.status === 404) {
+          console.log("RiderTracker: No active session found for route", routeId);
+          return null;
+        }
         throw new Error("Failed to fetch active session");
       }
-      return response.json();
+      const data = await response.json();
+      console.log("RiderTracker activeSession:", {
+        routeId,
+        sessionId: data?.id,
+        status: data?.status,
+        calculatedStatus: data?.calculatedStatus,
+        lat: data?.currentLatitude,
+        lng: data?.currentLongitude,
+        lastUpdate: data?.lastLocationUpdate
+      });
+      return data;
     },
     refetchInterval: 5000, // Refresh GPS location every 5 seconds
     enabled: !!routeId,
@@ -56,6 +69,9 @@ export function RiderTracker({
 
   // Use calculated status from backend, fallback to prop status
   const currentStatus = (activeSession?.calculatedStatus as "active" | "delayed" | "offline") || status;
+  
+  // Debug status
+  console.log("RiderTracker currentStatus:", currentStatus, "from calculatedStatus:", activeSession?.calculatedStatus, "fallback:", status);
 
   // Convert active session to bus data for LiveMap
   const buses = activeSession?.currentLatitude && activeSession?.currentLongitude ? [

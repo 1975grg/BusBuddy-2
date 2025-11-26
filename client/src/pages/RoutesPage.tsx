@@ -42,14 +42,29 @@ export default function RoutesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-  
   // Get the default organization for now - in a real app this would be from user context
   const { data: routes = [], isLoading, error } = useQuery<RouteWithStops[]>({
     queryKey: ["/api/routes"],
   });
+
+  // Fetch active sessions to show which routes have trips in progress
+  interface ActiveSession {
+    routeId: string;
+    sessionId: string;
+    status: string;
+  }
+  const { data: activeSessions = [] } = useQuery<ActiveSession[]>({
+    queryKey: ["/api/route-sessions/all-active"],
+    refetchInterval: 10000, // Refresh every 10 seconds
+    enabled: !authLoading,
+  });
+
+  // Create a Set of route IDs that have active trips
+  const routesWithActiveTrips = new Set(activeSessions.map(s => s.routeId));
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
 
   const filteredAndSortedRoutes = routes
     .filter(route => {
@@ -255,6 +270,7 @@ export default function RoutesPage() {
                     stops={transformedStops}
                     ridersCount={0} // TODO: Add riders count to API
                     isArchived={!!route.archivedAt}
+                    hasTripInProgress={routesWithActiveTrips.has(route.id)}
                     onEdit={() => handleEditRoute(route.id)}
                     onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
                     onSendAlert={() => handleSendAlert(route)}
@@ -287,11 +303,18 @@ export default function RoutesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {route.status === "active" ? (
-                          <Badge className="bg-bus-active text-white">Active</Badge>
-                        ) : (
-                          <Badge variant="secondary">Inactive</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {route.status === "active" ? (
+                            <Badge className="bg-bus-active text-white">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                          {routesWithActiveTrips.has(route.id) && (
+                            <Badge className="bg-primary text-primary-foreground animate-pulse">
+                              Trip Running
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{route.vehicleNumber || "—"}</TableCell>
                       <TableCell>{route.stops.length} stops</TableCell>

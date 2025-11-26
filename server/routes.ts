@@ -1743,14 +1743,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/route-sessions/active/:routeId", async (req, res) => {
     try {
       const { routeId } = req.params;
+      console.log(`[Session] Looking for active session for route: ${routeId}`);
+      
       const session = await storage.getActiveRouteSession(routeId);
       
       if (!session) {
+        console.log(`[Session] No active session found for route: ${routeId}`);
         return res.status(404).json({ error: "No active session found for this route" });
       }
       
+      console.log(`[Session] Found session ${session.id} for route ${routeId}:`, {
+        status: session.status,
+        lat: session.currentLatitude,
+        lng: session.currentLongitude,
+        lastUpdate: session.lastLocationUpdate
+      });
+      
       const stops = await storage.getRouteStopsByRoute(routeId);
       const { status } = calculateBusStatus(session, stops);
+      
+      console.log(`[Session] Calculated status: ${status} for session ${session.id}`);
       
       res.json({
         ...session,
@@ -1758,6 +1770,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching active session:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get all active sessions (for admin to see which routes have trips running)
+  // NOTE: This route MUST come before /api/route-sessions/:id to avoid matching "all-active" as an ID
+  app.get("/api/route-sessions/all-active", authenticateUser, requireRole('org_admin'), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      if (!user.organizationId) {
+        return res.status(403).json({ error: "No organization associated with user" });
+      }
+
+      // Get all routes for this organization
+      const routes = await storage.getRoutesByOrganization(user.organizationId);
+      const routeIds = routes.map(r => r.id);
+
+      // Get active sessions for these routes
+      const activeSessions: Array<{ routeId: string; sessionId: string; status: string }> = [];
+      
+      for (const routeId of routeIds) {
+        const session = await storage.getActiveRouteSession(routeId);
+        if (session) {
+          activeSessions.push({
+            routeId: session.routeId,
+            sessionId: session.id,
+            status: session.status
+          });
+        }
+      }
+
+      res.json(activeSessions);
+    } catch (error) {
+      console.error("Error fetching all active sessions:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

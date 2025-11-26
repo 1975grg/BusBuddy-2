@@ -18,6 +18,7 @@ interface RouteCardProps {
   stops: Stop[];
   ridersCount?: number;
   isArchived?: boolean;
+  hasTripInProgress?: boolean;
   onEdit?: () => void;
   onToggleStatus?: () => void;
   onSendAlert?: () => void;
@@ -33,6 +34,7 @@ export function RouteCard({
   stops, 
   ridersCount,
   isArchived,
+  hasTripInProgress,
   onEdit,
   onToggleStatus,
   onSendAlert,
@@ -48,6 +50,11 @@ export function RouteCard({
             <Badge variant={type === "shuttle" ? "secondary" : "outline"}>
               {type}
             </Badge>
+            {hasTripInProgress && (
+              <Badge className="bg-primary text-primary-foreground animate-pulse">
+                Trip Running
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {isArchived ? (
