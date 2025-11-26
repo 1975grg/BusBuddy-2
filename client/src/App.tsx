@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -9,6 +9,19 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { UserProvider, useUser } from "@/contexts/UserContext";
+
+// Generate abbreviation from organization name (up to 3 characters)
+function getOrgAbbreviation(orgName: string | undefined): string {
+  if (!orgName) return "BB";
+  
+  const words = orgName.trim().split(/\s+/);
+  
+  if (words.length === 1) {
+    return words[0].slice(0, 3).toUpperCase();
+  }
+  
+  return words.slice(0, 3).map(word => word[0]).join('').toUpperCase() || "BB";
+}
 
 // Pages
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
@@ -78,6 +91,17 @@ function AppContent() {
   // Debug logging
   console.log("AppContent DEBUG:", { location, userRole: user?.role });
   
+  // Fetch organization data for branding
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/organization"],
+    queryFn: async () => {
+      const response = await fetch("/api/organization");
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!user, // Only fetch when user is logged in
+  });
+  
   // Public pages that should not show sidebar/header
   const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/ride/");
   
@@ -96,14 +120,36 @@ function AppContent() {
   
   // Riders get a simplified layout without sidebar - NO SidebarProvider
   if (isRiderPage) {
+    const orgColor = orgSettings?.primaryColor || "#0080FF";
+    const orgAbbreviation = getOrgAbbreviation(orgSettings?.name);
+    
     return (
       <div className="flex flex-col h-screen w-full bg-background">
-        <header className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-primary text-xs font-bold">
-              BB
+        <header 
+          className="flex items-center justify-between p-4 border-b text-white"
+          style={{ backgroundColor: orgColor }}
+        >
+          <div className="flex items-center gap-3">
+            {orgSettings?.logoUrl ? (
+              <img 
+                src={orgSettings.logoUrl} 
+                alt={orgSettings?.name || "Organization"} 
+                className="w-8 h-8 rounded-lg object-cover bg-white"
+              />
+            ) : (
+              <div 
+                className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-bold"
+                style={{ color: orgColor }}
+              >
+                {orgAbbreviation}
+              </div>
+            )}
+            <div className="flex flex-col">
+              <span className="font-bold text-white leading-tight">Bus Buddy</span>
+              {orgSettings?.name && (
+                <span className="text-xs text-white/80 leading-tight">{orgSettings.name}</span>
+              )}
             </div>
-            <span className="font-bold text-white">Bus Buddy - Rider View</span>
           </div>
           <div className="flex items-center gap-2">
             <UserMenu />
