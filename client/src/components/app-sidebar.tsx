@@ -122,12 +122,12 @@ export function AppSidebar() {
     return "admin"; // default fallback
   }, [location]);
   
-  // Fetch organization settings for branding
+  // Fetch organization data for branding (uses same endpoint as SettingsPage)
   const { data: orgSettings } = useQuery({
-    queryKey: ["/api/org-settings"],
+    queryKey: ["/api/organization"],
     queryFn: async () => {
-      const response = await fetch("/api/org-settings");
-      if (!response.ok) throw new Error("Failed to fetch settings");
+      const response = await fetch("/api/organization");
+      if (!response.ok) throw new Error("Failed to fetch organization");
       return response.json();
     }
   });
