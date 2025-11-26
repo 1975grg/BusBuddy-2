@@ -125,29 +125,26 @@ function AppContent() {
     
     return (
       <div className="flex flex-col h-screen w-full bg-background">
-        <header 
-          className="flex items-center justify-between p-4 border-b text-white"
-          style={{ backgroundColor: orgColor }}
-        >
+        <header className="flex items-center justify-between p-4 border-b bg-background">
           <div className="flex items-center gap-3">
             {orgSettings?.logoUrl ? (
               <img 
                 src={orgSettings.logoUrl} 
                 alt={orgSettings?.name || "Organization"} 
-                className="w-8 h-8 rounded-lg object-cover bg-white"
+                className="w-8 h-8 rounded-lg object-cover"
               />
             ) : (
               <div 
-                className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-bold"
-                style={{ color: orgColor }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: orgColor }}
               >
                 {orgAbbreviation}
               </div>
             )}
             <div className="flex flex-col">
-              <span className="font-bold text-white leading-tight">Bus Buddy</span>
+              <span className="font-bold leading-tight">Bus Buddy</span>
               {orgSettings?.name && (
-                <span className="text-xs text-white/80 leading-tight">{orgSettings.name}</span>
+                <span className="text-xs text-muted-foreground leading-tight">{orgSettings.name}</span>
               )}
             </div>
           </div>
