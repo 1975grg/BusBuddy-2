@@ -78,11 +78,37 @@ function AppContent() {
   // Public pages that should not show sidebar/header
   const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/ride/");
   
+  // Rider pages should have minimal UI (no sidebar)
+  const isRiderPage = location.startsWith("/rider") || location.startsWith("/track");
+  
   if (isPublicPage) {
     return (
       <main className="w-full h-screen overflow-auto" key={user?.id || 'anonymous'}>
         <Router />
       </main>
+    );
+  }
+  
+  // Riders get a simplified layout without sidebar
+  if (isRiderPage) {
+    return (
+      <div className="flex flex-col h-screen w-full">
+        <header className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white text-xs font-bold">
+              BB
+            </div>
+            <span className="font-bold">Bus Buddy</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <UserMenu />
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto p-4" key={user?.id || 'anonymous'}>
+          <Router />
+        </main>
+      </div>
     );
   }
   
