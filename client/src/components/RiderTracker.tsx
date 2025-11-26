@@ -126,7 +126,7 @@ export function RiderTracker({
   const getStatusBadge = () => {
     switch (currentStatus) {
       case "active":
-        return <Badge className="bg-bus-active text-white" data-testid="badge-bus-active">On Time</Badge>;
+        return <Badge className="bg-bus-active text-white" data-testid="badge-bus-active">Active</Badge>;
       case "delayed":
         return <Badge className="bg-bus-delayed text-white" data-testid="badge-bus-delayed">Delayed</Badge>;
       case "offline":
