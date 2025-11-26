@@ -13,13 +13,11 @@ export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
 
-  // Extract route ID from URL query parameter - riders are locked to their assigned route
-  const urlParams = new URLSearchParams(window.location.search);
-  const routeId = urlParams.get('route');
-  
-  // No route switching allowed - riders only see their assigned route
-  // Default to Cheat lake Test route for mock testing (matches driver route)
-  const selectedRoute = routeId || "4fde6b54-ff96-4aa8-bb26-7c80aaea7221";
+  // Get the rider's assigned route from their route assignments
+  // Prefer the default route, or the first assigned route
+  const defaultAssignment = user?.routeAssignments?.find(a => a.isDefault);
+  const firstAssignment = user?.routeAssignments?.[0];
+  const selectedRoute = defaultAssignment?.routeId || firstAssignment?.routeId || null;
 
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Always fetch real route data from database
@@ -45,6 +43,29 @@ export default function RiderPage() {
   // Early return AFTER all hooks
   if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  // Show message if rider has no assigned route
+  if (!selectedRoute) {
+    return (
+      <div className="space-y-6">
+        <SmartAppBanner />
+        <div>
+          <h1 className="text-2xl font-bold">Track Your Bus</h1>
+          <p className="text-muted-foreground">Real-time location and arrival estimates for your route</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>No Route Assigned</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              You don't have a route assigned yet. Please contact your administrator or scan the QR code for your route to get started.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Use real route data from database (ignore mock data to ensure consistency)
