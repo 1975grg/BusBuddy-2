@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Pause, Square, MapPin, Clock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
+import { Capacitor } from "@capacitor/core";
 import type { RouteSession } from "@shared/schema";
 
 interface DriverControlsProps {
@@ -124,6 +125,10 @@ export function DriverControls({
     },
   });
 
+  // Track consecutive auth failures to avoid spamming the user
+  const authFailureCountRef = useRef<number>(0);
+  const authErrorShownRef = useRef<boolean>(false);
+
   // Update location mutation
   const updateLocationMutation = useMutation({
     mutationFn: async ({ sessionId, latitude, longitude }: { sessionId: string; latitude: number; longitude: number }) => {
@@ -137,9 +142,30 @@ export function DriverControls({
     },
     onSuccess: (data: any) => {
       console.log("[GPS] Location update SUCCESS - server stored coordinates");
+      // Reset auth failure count on success
+      authFailureCountRef.current = 0;
     },
     onError: (error: any) => {
       console.error("[GPS] Location update FAILED:", error?.message || error);
+      
+      // Check if this is a 401 authentication error
+      const errorMessage = error?.message || "";
+      if (errorMessage.includes("401") || errorMessage.includes("Authentication")) {
+        authFailureCountRef.current++;
+        console.log("[GPS] Auth failure count:", authFailureCountRef.current);
+        
+        // After 3 consecutive auth failures, stop GPS and show error
+        if (authFailureCountRef.current >= 3 && !authErrorShownRef.current) {
+          authErrorShownRef.current = true;
+          console.log("[GPS] Too many auth failures, stopping GPS and prompting re-login");
+          stopGPSTracking();
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Please log out and log back in to continue tracking.",
+          });
+        }
+      }
     },
   });
 
@@ -246,6 +272,30 @@ export function DriverControls({
   // GPS tracking functions with fail-safe logic
   const startGPSTracking = async (activeSessionId: string) => {
     console.log("[GPS] startGPSTracking called with sessionId:", activeSessionId);
+    
+    // Check if we're on native and need a token for auth
+    const isNative = Capacitor.isNativePlatform();
+    console.log("[GPS] Platform check - isNative:", isNative);
+    
+    if (isNative) {
+      const token = getStoredSessionToken();
+      console.log("[GPS] Native token check:", token ? "present" : "missing");
+      
+      if (!token) {
+        console.log("[GPS] CRITICAL: No auth token on native platform! GPS updates will fail.");
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Please log out and log back in to enable GPS tracking.",
+        });
+        // Don't start GPS tracking without auth - it will just fail silently
+        return;
+      }
+    }
+    
+    // Reset auth failure tracking
+    authFailureCountRef.current = 0;
+    authErrorShownRef.current = false;
     
     // Guard: Clean up any existing tracking before starting new
     stopGPSTracking();
@@ -404,7 +454,24 @@ export function DriverControls({
     }
   }, [tripStatus, sessionId]);
   
+  // Helper to check if we have valid auth for native platform
+  const checkNativeAuth = (): boolean => {
+    const isNative = Capacitor.isNativePlatform();
+    if (isNative && !getStoredSessionToken()) {
+      console.log("[AUTH] Native platform but no token - prompting re-login");
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Please log out and log back in to continue.",
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleStartTrip = () => {
+    // Check auth before starting trip on native
+    if (!checkNativeAuth()) return;
     startTripMutation.mutate();
   };
   
@@ -413,6 +480,8 @@ export function DriverControls({
   };
   
   const handleResumeTrip = () => {
+    // Check auth before resuming trip on native
+    if (!checkNativeAuth()) return;
     resumeTripMutation.mutate();
   };
   
