@@ -273,7 +273,7 @@ export const proximityAlerts = pgTable("proximity_alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   riderProfileId: varchar("rider_profile_id").notNull().references(() => riderProfiles.id),
   routeId: varchar("route_id").notNull().references(() => routes.id),
-  sessionId: varchar("session_id").notNull().references(() => routeSessions.id),
+  sessionId: varchar("session_id").references(() => routeSessions.id), // Optional - may be null for test alerts
   stopId: varchar("stop_id").notNull().references(() => routeStops.id),
   alertType: text("alert_type").notNull(), // 'approaching' or 'arrived'
   message: text("message").notNull(),
