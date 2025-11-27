@@ -21,13 +21,14 @@ export function getSessionExpirationDate(): Date {
   return new Date(Date.now() + SESSION_DURATION_MS);
 }
 
-// Extend user type to include route assignments
+// Extend user type to include route assignments and rider profile
 export interface AuthUser extends User {
   routeAssignments?: Array<{
     id: string;
     routeId: string;
     isDefault: boolean;
   }>;
+  riderProfileId?: string | null;
 }
 
 // Express middleware to authenticate requests
@@ -73,6 +74,19 @@ export async function authenticateUser(
     // Get user's route assignments
     const routeAssignments = await storage.getUserRouteAssignments(user.id);
 
+    // For riders, look up their rider profile ID by matching phone number
+    let riderProfileId: string | null = null;
+    if (user.role === 'rider' && user.phoneNumber && user.organizationId) {
+      try {
+        const riderProfile = await storage.getRiderProfileByPhone(user.phoneNumber, user.organizationId);
+        if (riderProfile) {
+          riderProfileId = riderProfile.id;
+        }
+      } catch (err) {
+        console.error("Error looking up rider profile:", err);
+      }
+    }
+
     // Attach user to request
     (req as any).user = {
       ...user,
@@ -81,6 +95,7 @@ export async function authenticateUser(
         routeId: a.routeId,
         isDefault: a.isDefault,
       })),
+      riderProfileId,
     } as AuthUser;
 
     next();

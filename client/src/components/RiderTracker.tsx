@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bell, BellOff, Clock, MapPin, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
-import { getStoredSessionToken } from "@/lib/queryClient";
-import type { ServiceAlert } from "@shared/schema";
+import { apiRequest, getStoredSessionToken } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { ServiceAlert, ProximityAlert } from "@shared/schema";
 
 interface Stop {
   id: string;
@@ -25,6 +26,7 @@ interface RiderTrackerProps {
   defaultStop?: string;
   isNotificationsEnabled?: boolean;
   serviceAlerts?: ServiceAlert[];
+  riderProfileId?: string | null;
 }
 
 export function RiderTracker({ 
@@ -35,9 +37,68 @@ export function RiderTracker({
   stops, 
   defaultStop,
   isNotificationsEnabled = false,
-  serviceAlerts = []
+  serviceAlerts = [],
+  riderProfileId
 }: RiderTrackerProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(isNotificationsEnabled);
+  const { toast } = useToast();
+  const shownAlertIds = useRef<Set<string>>(new Set());
+
+  // Poll for proximity alerts (in-app notifications)
+  const { data: proximityAlerts } = useQuery<ProximityAlert[]>({
+    queryKey: ["/api/proximity-alerts", riderProfileId],
+    queryFn: async () => {
+      if (!riderProfileId) return [];
+      const headers: HeadersInit = {};
+      const token = getStoredSessionToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await fetch(`/api/proximity-alerts/${riderProfileId}`, {
+        credentials: "include",
+        headers,
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    refetchInterval: 5000, // Poll every 5 seconds
+    enabled: !!riderProfileId && notificationsEnabled,
+  });
+
+  // Show toast for new proximity alerts
+  useEffect(() => {
+    if (!proximityAlerts || proximityAlerts.length === 0) return;
+
+    proximityAlerts.forEach((alert) => {
+      if (shownAlertIds.current.has(alert.id)) return;
+      shownAlertIds.current.add(alert.id);
+
+      // Show toast notification
+      toast({
+        title: alert.alertType === 'approaching' ? 'Bus Approaching!' : 'Bus Arrived!',
+        description: alert.message,
+        duration: 10000,
+      });
+
+      // Mark alert as read after showing
+      (async () => {
+        try {
+          const headers: HeadersInit = { "Content-Type": "application/json" };
+          const token = getStoredSessionToken();
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+          await fetch(`/api/proximity-alerts/${alert.id}/read`, {
+            method: "PATCH",
+            credentials: "include",
+            headers,
+          });
+        } catch (err) {
+          console.error("Failed to mark alert as read:", err);
+        }
+      })();
+    });
+  }, [proximityAlerts, toast]);
 
   // Fetch active route session for live GPS tracking
   const { data: activeSession } = useQuery({

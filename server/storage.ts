@@ -2047,15 +2047,15 @@ export class MemStorage implements IStorage {
   }
 
   async getRiderProfileByPhone(phoneNumber: string, organizationId: string): Promise<RiderProfile | undefined> {
-    throw new Error("Rider profiles not implemented in MemStorage");
+    return undefined;
   }
 
   async getRiderProfile(id: string): Promise<RiderProfile | undefined> {
-    throw new Error("Rider profiles not implemented in MemStorage");
+    return undefined;
   }
 
   async updateRiderProfile(id: string, profile: Partial<InsertRiderProfile>): Promise<RiderProfile | undefined> {
-    throw new Error("Rider profiles not implemented in MemStorage");
+    return undefined;
   }
 
   async getRidersForRoute(routeId: string): Promise<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>> {

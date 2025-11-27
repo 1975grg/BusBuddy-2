@@ -2,13 +2,14 @@ import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
-// Extended user type with route assignments
+// Extended user type with route assignments and rider profile
 interface UserWithAssignments extends User {
   routeAssignments?: Array<{
     id: string;
     routeId: string;
     isDefault: boolean;
   }>;
+  riderProfileId?: string | null;
 }
 
 interface UserContextType {

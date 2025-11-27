@@ -144,6 +144,7 @@ export default function RiderPage() {
         defaultStop="1"
         isNotificationsEnabled={true}
         serviceAlerts={serviceAlerts}
+        riderProfileId={user?.riderProfileId}
       />
 
       {/* Contact Support Section - Above Messages */}
