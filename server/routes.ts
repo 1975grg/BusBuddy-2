@@ -1684,45 +1684,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`[Notification] SENDING ${notificationType} notification to ${rider.name} (${rider.phoneNumber}) for stop ${stop.name}`);
 
-          // Send notification
+          // Build notification message
           const message = notificationType === 'approaching'
-            ? `Bus Buddy: Your bus is approximately 5 minutes away from ${stop.name}`
-            : `Bus Buddy: Your bus has arrived at ${stop.name}`;
+            ? `Your bus is approximately 5 minutes away from ${stop.name}`
+            : `Your bus has arrived at ${stop.name}`;
 
+          notificationSent = true;
+
+          // ALWAYS create in-app proximity alert (works without SMS/Twilio)
           try {
-            await smsService.sendSms(rider.phoneNumber, message);
-
-            notificationSent = true;
-
-            // Log the notification
-            await storage.createNotificationLog({
-              organizationId: route.organizationId,
+            await storage.createProximityAlert({
+              riderProfileId: rider.id,
               routeId: session.routeId,
-              userId: null,
-              recipientPhone: rider.phoneNumber,
-              recipientName: rider.name || undefined,
-              notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
-              deliveryMethod: 'sms',
-              title: undefined,
-              message,
-              status: 'sent',
+              sessionId: session.id,
+              stopId: stopId,
+              alertType: notificationType,
+              message: message,
+              isRead: false,
+              readAt: null,
             });
-          } catch (smsError) {
-            console.error(`Failed to send ${notificationType} SMS to ${rider.phoneNumber}:`, smsError);
-            // Log failed notification
-            await storage.createNotificationLog({
-              organizationId: route.organizationId,
-              routeId: session.routeId,
-              userId: null,
-              recipientPhone: rider.phoneNumber,
-              recipientName: rider.name || undefined,
-              notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
-              deliveryMethod: 'sms',
-              title: undefined,
-              message,
-              status: 'failed',
-              errorMessage: smsError instanceof Error ? smsError.message : 'Unknown error',
-            });
+            console.log(`[Notification] Created in-app alert for ${rider.name}`);
+          } catch (alertError) {
+            console.error(`Failed to create in-app alert for ${rider.name}:`, alertError);
+          }
+
+          // ALSO try to send SMS if Twilio is configured (optional enhancement)
+          if (smsService.isConfigured() && rider.smsConsent) {
+            try {
+              await smsService.sendSms(rider.phoneNumber, `Bus Buddy: ${message}`);
+              console.log(`[Notification] SMS sent to ${rider.phoneNumber}`);
+
+              // Log the SMS notification
+              await storage.createNotificationLog({
+                organizationId: route.organizationId,
+                routeId: session.routeId,
+                userId: null,
+                recipientPhone: rider.phoneNumber,
+                recipientName: rider.name || undefined,
+                notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
+                deliveryMethod: 'sms',
+                title: undefined,
+                message: `Bus Buddy: ${message}`,
+                status: 'sent',
+              });
+            } catch (smsError) {
+              console.error(`Failed to send ${notificationType} SMS to ${rider.phoneNumber}:`, smsError);
+              // Log failed SMS (but in-app alert was still created)
+              await storage.createNotificationLog({
+                organizationId: route.organizationId,
+                routeId: session.routeId,
+                userId: null,
+                recipientPhone: rider.phoneNumber,
+                recipientName: rider.name || undefined,
+                notificationType: notificationType === 'approaching' ? 'approaching_stop' : 'arrived_at_stop',
+                deliveryMethod: 'sms',
+                title: undefined,
+                message: `Bus Buddy: ${message}`,
+                status: 'failed',
+                errorMessage: smsError instanceof Error ? smsError.message : 'Unknown error',
+              });
+            }
           }
         }
 
