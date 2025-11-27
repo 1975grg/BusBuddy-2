@@ -268,6 +268,20 @@ export const stopNotificationTracking = pgTable("stop_notification_tracking", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// In-app proximity alerts for riders (toasts/visual notifications without requiring SMS)
+export const proximityAlerts = pgTable("proximity_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  riderProfileId: varchar("rider_profile_id").notNull().references(() => riderProfiles.id),
+  routeId: varchar("route_id").notNull().references(() => routes.id),
+  sessionId: varchar("session_id").notNull().references(() => routeSessions.id),
+  stopId: varchar("stop_id").notNull().references(() => routeStops.id),
+  alertType: text("alert_type").notNull(), // 'approaching' or 'arrived'
+  message: text("message").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Notification log for tracking sent messages
 
 // Relations
@@ -605,6 +619,13 @@ export const insertStopNotificationTrackingSchema = createInsertSchema(stopNotif
   arrivalNotificationSentAt: true,
 });
 
+export const insertProximityAlertSchema = createInsertSchema(proximityAlerts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const proximityAlertTypeEnum = z.enum(['approaching', 'arrived']);
+
 export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({
   id: true,
   createdAt: true,
@@ -679,6 +700,9 @@ export type InsertDriverSchedule = z.infer<typeof insertDriverScheduleSchema>;
 export type DriverSchedule = typeof driverSchedules.$inferSelect;
 export type InsertStopNotificationTracking = z.infer<typeof insertStopNotificationTrackingSchema>;
 export type StopNotificationTracking = typeof stopNotificationTracking.$inferSelect;
+export type InsertProximityAlert = z.infer<typeof insertProximityAlertSchema>;
+export type ProximityAlert = typeof proximityAlerts.$inferSelect;
+export type ProximityAlertType = z.infer<typeof proximityAlertTypeEnum>;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLog = typeof notificationLogs.$inferSelect;
 export type InsertInviteToken = z.infer<typeof insertInviteTokenSchema>;
