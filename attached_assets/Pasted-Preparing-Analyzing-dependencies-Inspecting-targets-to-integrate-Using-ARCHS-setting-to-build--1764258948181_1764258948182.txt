@@ -1,0 +1,141 @@
+Preparing
+
+Analyzing dependencies
+
+Inspecting targets to integrate
+  Using `ARCHS` setting to build architectures of target `Pods-App`: (``)
+
+Finding Podfile changes
+  - Capacitor
+  - CapacitorCordova
+  - CapacitorGeolocation
+  - CapacitorPreferences
+  - CapacitorPushNotifications
+
+Fetching external sources
+-> Fetching podspec for `Capacitor` from `../../node_modules/@capacitor/ios`
+-> Fetching podspec for `CapacitorCordova` from `../../node_modules/@capacitor/ios`
+-> Fetching podspec for `CapacitorGeolocation` from `../../node_modules/@capacitor/geolocation`
+-> Fetching podspec for `CapacitorPreferences` from `../../node_modules/@capacitor/preferences`
+-> Fetching podspec for `CapacitorPushNotifications` from `../../node_modules/@capacitor/push-notifications`
+
+Resolving dependencies of `Podfile`
+  CDN: trunk Relative path: CocoaPods-version.yml exists! Returning local
+  because checking is only performed in repo update
+  CDN: trunk Relative path: all_pods_versions_f_1_3.txt exists! Returning local
+  because checking is only performed in repo update
+  CDN: trunk Relative path:
+  Specs/f/1/3/IONGeolocationLib/2.0.0/IONGeolocationLib.podspec.json exists!
+  Returning local because checking is only performed in repo update
+  CDN: trunk Relative path:
+  Specs/f/1/3/IONGeolocationLib/1.0.1/IONGeolocationLib.podspec.json exists!
+  Returning local because checking is only performed in repo update
+
+Comparing resolved specification to the sandbox manifest
+  - Capacitor
+  - CapacitorCordova
+  - CapacitorGeolocation
+  - CapacitorPreferences
+  - CapacitorPushNotifications
+  - IONGeolocationLib
+
+Downloading dependencies
+
+-> Using Capacitor (7.4.4)
+
+-> Using CapacitorCordova (7.4.4)
+
+-> Using CapacitorGeolocation (7.1.6)
+
+-> Using CapacitorPreferences (7.0.2)
+
+-> Using CapacitorPushNotifications (7.0.3)
+
+-> Using IONGeolocationLib (1.0.1)
+  - Running pre install hooks
+  - Running pre integrate hooks
+
+Generating Pods project
+  - Creating Pods project
+  - Installing files into Pods project
+    - Adding source files
+    - Adding frameworks
+    - Adding libraries
+    - Adding resources
+    - Adding development pod helper files
+    - Linking headers
+  - Installing Pod Targets
+    - Installing target `Capacitor` iOS 14.0
+      - Copying module map file to `Pods/Target Support
+      Files/Capacitor/Capacitor.modulemap`
+      - Generating Info.plist file at `Pods/Target Support
+      Files/Capacitor/Capacitor-Info.plist`
+      - Generating dummy source at `Pods/Target Support
+      Files/Capacitor/Capacitor-dummy.m`
+    - Installing target `CapacitorCordova` iOS 14.0
+      - Copying module map file to `Pods/Target Support
+      Files/CapacitorCordova/CapacitorCordova.modulemap`
+      - Generating Info.plist file at `Pods/Target Support
+      Files/CapacitorCordova/CapacitorCordova-Info.plist`
+      - Generating dummy source at `Pods/Target Support
+      Files/CapacitorCordova/CapacitorCordova-dummy.m`
+    - Installing target `CapacitorGeolocation` iOS 14.0
+      - Generating module map file at `Pods/Target Support
+      Files/CapacitorGeolocation/CapacitorGeolocation.modulemap`
+      - Generating umbrella header at `Pods/Target Support
+      Files/CapacitorGeolocation/CapacitorGeolocation-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support
+      Files/CapacitorGeolocation/CapacitorGeolocation-Info.plist`
+      - Generating dummy source at `Pods/Target Support
+      Files/CapacitorGeolocation/CapacitorGeolocation-dummy.m`
+    - Installing target `CapacitorPreferences` iOS 14.0
+      - Generating module map file at `Pods/Target Support
+      Files/CapacitorPreferences/CapacitorPreferences.modulemap`
+      - Generating umbrella header at `Pods/Target Support
+      Files/CapacitorPreferences/CapacitorPreferences-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support
+      Files/CapacitorPreferences/CapacitorPreferences-Info.plist`
+      - Generating dummy source at `Pods/Target Support
+      Files/CapacitorPreferences/CapacitorPreferences-dummy.m`
+    - Installing target `CapacitorPushNotifications` iOS 14.0
+      - Generating module map file at `Pods/Target Support
+      Files/CapacitorPushNotifications/CapacitorPushNotifications.modulemap`
+      - Generating umbrella header at `Pods/Target Support
+      Files/CapacitorPushNotifications/CapacitorPushNotifications-umbrella.h`
+      - Generating Info.plist file at `Pods/Target Support
+      Files/CapacitorPushNotifications/CapacitorPushNotifications-Info.plist`
+      - Generating dummy source at `Pods/Target Support
+      Files/CapacitorPushNotifications/CapacitorPushNotifications-dummy.m`
+    - Installing target `IONGeolocationLib` iOS 14.0
+  - Installing Aggregate Targets
+    - Installing target `Pods-App` iOS 14.0
+      - Generating Info.plist file at `Pods/Target Support
+      Files/Pods-App/Pods-App-Info.plist`
+      - Generating module map file at `Pods/Target Support
+      Files/Pods-App/Pods-App.modulemap`
+      - Generating umbrella header at `Pods/Target Support
+      Files/Pods-App/Pods-App-umbrella.h`
+      - Generating dummy source at `Pods/Target Support
+      Files/Pods-App/Pods-App-dummy.m`
+  - Integrating targets
+
+Integrating target `IONGeolocationLib`
+    Adding Build Phase '[CP] Copy XCFrameworks' to project.
+  - Generating deterministic UUIDs
+  - Stabilizing target UUIDs
+  - Running post install hooks
+    - Podfile
+  - Writing Xcode project file to `Pods/Pods.xcodeproj`
+  Cleaning up sandbox directory
+
+Integrating client project
+
+Integrating target `Pods-App` (`App.xcodeproj` project)
+  - Running post integrate hooks
+  - Writing Lockfile in `Podfile.lock`
+  - Writing Manifest in `Pods/Manifest.lock`
+  CDN: trunk Relative path: CocoaPods-version.yml exists! Returning local
+  because checking is only performed in repo update
+
+-> Pod installation complete! There are 5 dependencies from the Podfile and 6 total pods installed.
+ghassanghorayeb@Ghassans-MacBook-Air App % 
