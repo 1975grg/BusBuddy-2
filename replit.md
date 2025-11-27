@@ -108,3 +108,4 @@ Preferred communication style: Simple, everyday language.
 ### Recent Bug Fixes (November 27, 2025)
 - **Proximity Notifications**: Fixed bug where ALL riders got notifications instead of only those who selected the stop as their home stop
 - **SMS Type Error**: Fixed `to.startsWith is not a function` error by adding defensive string conversion for phone numbers
+- **In-App Proximity Alerts**: Added new `proximity_alerts` table and API endpoints for in-app notifications. Riders now receive toast notifications when their bus is approaching or arriving at their selected stop, even without SMS configured. Alerts are stored in the database and marked as read after being shown.
