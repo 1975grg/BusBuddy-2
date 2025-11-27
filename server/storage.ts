@@ -26,6 +26,8 @@ import {
   type InsertRouteSession,
   type StopNotificationTracking,
   type InsertStopNotificationTracking,
+  type ProximityAlert,
+  type InsertProximityAlert,
   type NotificationLog,
   type InsertNotificationLog,
   type InviteToken,
@@ -49,6 +51,7 @@ import {
   stopPreferences,
   routeSessions,
   stopNotificationTracking,
+  proximityAlerts,
   notificationLogs,
   inviteTokens,
   userRouteAssignments,
@@ -209,6 +212,12 @@ export interface IStorage {
     offset?: number;
   }): Promise<NotificationLog[]>;
   getNotificationLogCount(organizationId: string): Promise<number>;
+  
+  // In-app proximity alerts (for riders without SMS)
+  createProximityAlert(alert: InsertProximityAlert): Promise<ProximityAlert>;
+  getUnreadProximityAlerts(riderProfileId: string): Promise<ProximityAlert[]>;
+  markProximityAlertAsRead(alertId: string): Promise<ProximityAlert | undefined>;
+  markAllProximityAlertsAsRead(riderProfileId: string): Promise<void>;
   
   // Additional route methods
   getRouteById(id: string): Promise<Route | undefined>;
@@ -1322,6 +1331,42 @@ export class DatabaseStorage implements IStorage {
     return result?.count || 0;
   }
 
+  // In-app proximity alerts
+  async createProximityAlert(alert: InsertProximityAlert): Promise<ProximityAlert> {
+    const [created] = await db.insert(proximityAlerts).values(alert).returning();
+    return created;
+  }
+
+  async getUnreadProximityAlerts(riderProfileId: string): Promise<ProximityAlert[]> {
+    return await db
+      .select()
+      .from(proximityAlerts)
+      .where(and(
+        eq(proximityAlerts.riderProfileId, riderProfileId),
+        eq(proximityAlerts.isRead, false)
+      ))
+      .orderBy(desc(proximityAlerts.createdAt));
+  }
+
+  async markProximityAlertAsRead(alertId: string): Promise<ProximityAlert | undefined> {
+    const [updated] = await db
+      .update(proximityAlerts)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(proximityAlerts.id, alertId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async markAllProximityAlertsAsRead(riderProfileId: string): Promise<void> {
+    await db
+      .update(proximityAlerts)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(proximityAlerts.riderProfileId, riderProfileId),
+        eq(proximityAlerts.isRead, false)
+      ));
+  }
+
   // Additional route methods
   async getRouteById(id: string): Promise<Route | undefined> {
     return this.getRoute(id);
@@ -1430,6 +1475,7 @@ export class MemStorage implements IStorage {
   private routeSessions: Map<string, RouteSession>;
   private notificationLogs: Map<string, NotificationLog>;
   private stopNotificationTracking: Map<string, StopNotificationTracking>;
+  private proximityAlertsStore: Map<string, ProximityAlert>;
   private defaultOrgId: string;
   private defaultOrgSettingsId: string;
 
@@ -1442,6 +1488,7 @@ export class MemStorage implements IStorage {
     this.routeSessions = new Map();
     this.notificationLogs = new Map();
     this.stopNotificationTracking = new Map();
+    this.proximityAlertsStore = new Map();
     
     // Create default organization
     this.defaultOrgId = randomUUID();
@@ -2361,6 +2408,54 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
       };
       this.stopNotificationTracking.set(key, tracking);
+    }
+  }
+
+  // In-app proximity alerts
+  async createProximityAlert(alert: InsertProximityAlert): Promise<ProximityAlert> {
+    const newAlert: ProximityAlert = {
+      ...alert,
+      id: randomUUID(),
+      isRead: alert.isRead ?? false,
+      readAt: alert.readAt ?? null,
+      createdAt: new Date(),
+    };
+    this.proximityAlertsStore.set(newAlert.id, newAlert);
+    return newAlert;
+  }
+
+  async getUnreadProximityAlerts(riderProfileId: string): Promise<ProximityAlert[]> {
+    const alerts: ProximityAlert[] = [];
+    for (const alert of this.proximityAlertsStore.values()) {
+      if (alert.riderProfileId === riderProfileId && !alert.isRead) {
+        alerts.push(alert);
+      }
+    }
+    return alerts.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async markProximityAlertAsRead(alertId: string): Promise<ProximityAlert | undefined> {
+    const alert = this.proximityAlertsStore.get(alertId);
+    if (!alert) return undefined;
+    
+    const updated: ProximityAlert = {
+      ...alert,
+      isRead: true,
+      readAt: new Date(),
+    };
+    this.proximityAlertsStore.set(alertId, updated);
+    return updated;
+  }
+
+  async markAllProximityAlertsAsRead(riderProfileId: string): Promise<void> {
+    for (const [id, alert] of this.proximityAlertsStore.entries()) {
+      if (alert.riderProfileId === riderProfileId && !alert.isRead) {
+        this.proximityAlertsStore.set(id, {
+          ...alert,
+          isRead: true,
+          readAt: new Date(),
+        });
+      }
     }
   }
 
