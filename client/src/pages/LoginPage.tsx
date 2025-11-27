@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
-import { HelpCircle, KeyRound, Mail, Eye, EyeOff } from "lucide-react";
+import { HelpCircle, KeyRound, Mail, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
 
@@ -17,8 +17,24 @@ type LoginMethod = "magic-link" | "password";
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { refetchUser } = useUser();
+  const { user, isLoading: userLoading, refetchUser } = useUser();
   const [email, setEmail] = useState("");
+  
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (!userLoading && user) {
+      console.log("[LOGIN] User already logged in, redirecting to dashboard:", user.role);
+      if (user.role === "system_admin") {
+        setLocation("/system");
+      } else if (user.role === "org_admin") {
+        setLocation("/admin");
+      } else if (user.role === "driver") {
+        setLocation("/driver");
+      } else if (user.role === "rider") {
+        setLocation("/rider");
+      }
+    }
+  }, [user, userLoading, setLocation]);
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [usePhone, setUsePhone] = useState(false);
@@ -183,6 +199,23 @@ export default function LoginPage() {
   };
 
   const isLoading = requestMagicLinkMutation.isPending || passwordLoginMutation.isPending || verifyTokenMutation.isPending;
+
+  // Show loading while checking if already authenticated
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If already logged in, they'll be redirected
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

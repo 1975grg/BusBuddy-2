@@ -1,10 +1,52 @@
-import { Link } from "wouter";
+import { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, Settings, ArrowRight, Bus, Shield, Bell } from "lucide-react";
+import { useUser } from "@/contexts/UserContext";
 import busIconUrl from "@assets/bus-buddy-logo.png";
 
 export default function LandingPage() {
+  const [, setLocation] = useLocation();
+  const { user, isLoading } = useUser();
+  
+  // Auto-redirect logged-in users to their dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      console.log("[LANDING] User already logged in, redirecting to dashboard:", user.role);
+      if (user.role === "system_admin") {
+        setLocation("/system");
+      } else if (user.role === "org_admin") {
+        setLocation("/admin");
+      } else if (user.role === "driver") {
+        setLocation("/driver");
+      } else if (user.role === "rider") {
+        setLocation("/rider");
+      }
+    }
+  }, [user, isLoading, setLocation]);
+  
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
+        <div className="text-center">
+          <img 
+            src={busIconUrl} 
+            alt="Bus Buddy" 
+            className="w-16 h-16 rounded-2xl shadow-lg mx-auto mb-4 animate-pulse"
+          />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If user is logged in, they'll be redirected - show nothing to prevent flash
+  if (user) {
+    return null;
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Hero Section */}
