@@ -2667,6 +2667,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proximity Alerts API (in-app notifications for riders)
+  // Get unread proximity alerts for a rider
+  app.get("/api/proximity-alerts/:riderProfileId", async (req, res) => {
+    try {
+      const { riderProfileId } = req.params;
+      const alerts = await storage.getUnreadProximityAlerts(riderProfileId);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching proximity alerts:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Mark a single proximity alert as read
+  app.patch("/api/proximity-alerts/:alertId/read", async (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const alert = await storage.markProximityAlertAsRead(alertId);
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json(alert);
+    } catch (error) {
+      console.error("Error marking proximity alert as read:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Mark all proximity alerts as read for a rider
+  app.patch("/api/proximity-alerts/:riderProfileId/read-all", async (req, res) => {
+    try {
+      const { riderProfileId } = req.params;
+      await storage.markAllProximityAlertsAsRead(riderProfileId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all proximity alerts as read:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Driver Message Routes (Drivers → Admin)
   app.post("/api/driver-messages", async (req, res) => {
     try {
