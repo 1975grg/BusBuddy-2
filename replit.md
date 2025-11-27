@@ -100,6 +100,11 @@ Preferred communication style: Simple, everyday language.
 - **Bundle ID**: com.bytevia.busbuddy
 - **App Name**: Bus Buddy (listed as "BusBuddy Hub" in App Store Connect)
 - **TestFlight Link**: https://testflight.apple.com/join/befk86Cg
-- **Current Build**: 5 (pending submission)
+- **Current Build**: 2.0 (5)
 - **Build 4 Status**: Rejected (server was sleeping during review)
 - **Build 5 Fix**: Updated to use production URL for 24/7 availability
+- **GPS Tracking**: Working - drivers can share location, riders can follow bus on map
+
+### Recent Bug Fixes (November 27, 2025)
+- **Proximity Notifications**: Fixed bug where ALL riders got notifications instead of only those who selected the stop as their home stop
+- **SMS Type Error**: Fixed `to.startsWith is not a function` error by adding defensive string conversion for phone numbers

@@ -59,8 +59,11 @@ export class SmsService {
     }
 
     try {
+      // Ensure phone number is converted to string (defensive against type issues)
+      const phoneStr = String(to);
+      
       // Ensure phone number is in E.164 format (add +1 if missing)
-      const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+      const formattedTo = phoneStr.startsWith('+') ? phoneStr : `+1${phoneStr.replace(/\D/g, '')}`;
       
       console.log(`SMS Debug: Original: ${to}, Formatted: ${formattedTo}, From: ${this.fromNumber}`);
       
@@ -74,7 +77,8 @@ export class SmsService {
       return { success: true, messageId: twilioMessage.sid };
     } catch (error) {
       console.error('SMS send error:', error);
-      console.error(`Failed to send SMS to: ${to} (formatted as: ${to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`})`);
+      const phoneStr = String(to);
+      console.error(`Failed to send SMS to: ${phoneStr} (formatted as: ${phoneStr.startsWith('+') ? phoneStr : `+1${phoneStr.replace(/\D/g, '')}`})`);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown SMS error' 

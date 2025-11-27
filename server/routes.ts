@@ -1646,9 +1646,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send notifications for stops within geofence
+      console.log(`[Notification] Processing ${stopsToNotify.length} stops to notify, checking ${riders.length} riders`);
+      
       for (const { stopId, notificationType } of stopsToNotify) {
         const stop = await storage.getRouteStop(stopId);
         if (!stop) continue;
+        
+        console.log(`[Notification] Checking stop "${stop.name}" (${notificationType})`);
 
         // Track if we sent any notification for this stop (for spam prevention)
         let notificationSent = false;
@@ -1658,22 +1662,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!subscription) continue;
 
           const riderStopPrefs = stopPrefsMap.get(subscription.id);
+          const hasAnyStopPrefs = riderStopPrefs && riderStopPrefs.size > 0;
           const stopPref = riderStopPrefs?.get(stopId);
           
-          // Skip if rider doesn't want notifications for this stop/type
-          if (notificationType === 'approaching' && stopPref && !stopPref.notifyOnApproaching) continue;
-          if (notificationType === 'arrived' && stopPref && !stopPref.notifyOnArrival) continue;
+          // CRITICAL: Only notify riders who specifically selected this stop as their home stop
+          // - If rider has stop preferences: only notify for their selected stops
+          // - If rider has NO stop preferences (legacy/admin-added): skip them entirely
+          //   (this prevents spamming riders who weren't set up through proper onboarding)
+          if (!stopPref) {
+            if (hasAnyStopPrefs) {
+              console.log(`[Notification] Skipping rider ${rider.name} - they selected a different stop, not ${stop.name}`);
+            } else {
+              console.log(`[Notification] Skipping rider ${rider.name} - no stop preferences configured (legacy/admin rider)`);
+            }
+            continue;
+          }
+          
+          // Skip if rider turned off notifications for this type
+          if (notificationType === 'approaching' && !stopPref.notifyOnApproaching) continue;
+          if (notificationType === 'arrived' && !stopPref.notifyOnArrival) continue;
+          
+          console.log(`[Notification] SENDING ${notificationType} notification to ${rider.name} (${rider.phoneNumber}) for stop ${stop.name}`);
 
           // Send notification
           const message = notificationType === 'approaching'
-            ? `Your bus is approximately 5 minutes away from ${stop.name}`
-            : `Your bus has arrived at ${stop.name}`;
+            ? `Bus Buddy: Your bus is approximately 5 minutes away from ${stop.name}`
+            : `Bus Buddy: Your bus has arrived at ${stop.name}`;
 
           try {
-            await smsService.sendSms({
-              to: rider.phoneNumber,
-              body: message
-            });
+            await smsService.sendSms(rider.phoneNumber, message);
 
             notificationSent = true;
 
