@@ -7,6 +7,7 @@ import { Play, Pause, Square, MapPin, Clock, AlertTriangle, Navigation, Wifi, Wi
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
 import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import type { RouteSession } from "@shared/schema";
 
 // GPS status for debugging
@@ -302,14 +303,14 @@ export function DriverControls({
   });
 
   // GPS tracking functions with fail-safe logic
-  // Uses browser navigator.geolocation for ALL platforms (works in Capacitor WebView)
+  // Uses Capacitor Geolocation for native (iOS/Android), browser geolocation for web
   const startGPSTracking = async (activeSessionId: string) => {
     console.log("[GPS] startGPSTracking called with sessionId:", activeSessionId);
     
-    // Check if we're on native and need a token for auth
     const isNative = Capacitor.isNativePlatform();
     console.log("[GPS] Platform check - isNative:", isNative);
     
+    // Check auth token on native
     if (isNative) {
       const token = getStoredSessionToken();
       console.log("[GPS] Native token check:", token ? "present" : "missing");
@@ -340,63 +341,55 @@ export function DriverControls({
     gpsErrorShownRef.current = false;
     watchPositionSucceededRef.current = false;
     
-    // Check if browser geolocation is available (works in Capacitor WebView too)
-    if (!navigator.geolocation) {
-      console.log("[GPS] Geolocation API not available!");
-      toast({
-        variant: "destructive",
-        title: "GPS not available",
-        description: "Your device does not support GPS tracking.",
-      });
-      return;
-    }
-    
-    console.log("[GPS] Setting up GPS tracking using browser geolocation...");
-    
-    // Start 5-second polling interval
-    locationIntervalRef.current = setInterval(() => {
-      if (!sessionIdRef.current || tripStatusRef.current !== "active") {
-        console.log("[GPS] Interval: Session not active, skipping");
+    // NATIVE: Use Capacitor Geolocation plugin (requires pod install + Xcode rebuild)
+    if (isNative) {
+      console.log("[GPS] Using Capacitor Geolocation for native platform...");
+      
+      // Request permissions through native API - this triggers proper iOS permission dialog
+      try {
+        console.log("[GPS] Requesting native location permissions...");
+        const permResult = await Geolocation.requestPermissions();
+        console.log("[GPS] Permission result:", JSON.stringify(permResult));
+        
+        if (permResult.location !== 'granted' && permResult.coarseLocation !== 'granted') {
+          console.log("[GPS] Permission denied - location:", permResult.location);
+          toast({
+            variant: "destructive",
+            title: "Location Permission Required",
+            description: "Please allow location access in Settings > Privacy > Location Services > Bus Buddy.",
+          });
+          setGpsStatus(prev => ({
+            ...prev,
+            lastError: `Permission denied: ${permResult.location}`,
+          }));
+          return;
+        }
+        console.log("[GPS] Permission granted!");
+      } catch (permError: any) {
+        console.error("[GPS] Permission request error:", permError);
+        toast({
+          variant: "destructive",
+          title: "Location Error",
+          description: permError?.message || "Could not request location permission.",
+        });
+        setGpsStatus(prev => ({
+          ...prev,
+          lastError: `Permission error: ${permError?.message}`,
+        }));
         return;
       }
       
-      console.log("[GPS] Interval: Requesting current position...");
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          console.log("[GPS] Interval success:", latitude, longitude);
-          
-          // Update GPS status with received coordinates
-          setGpsStatus(prev => ({
-            ...prev,
-            lastLat: latitude,
-            lastLng: longitude,
-          }));
-          
-          // Send to server
-          if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
-            console.log("[GPS] Sending location update to server...");
-            updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
-          }
-        },
-        (error) => {
-          console.log("[GPS] Interval error (will retry):", error.code, error.message);
-          setGpsStatus(prev => ({
-            ...prev,
-            errorCount: prev.errorCount + 1,
-            lastError: `Code ${error.code}: ${error.message}`,
-          }));
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-      );
-    }, 5000);
-    
-    // Get immediate position
-    console.log("[GPS] Requesting immediate position...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+      // Get immediate position using Capacitor
+      try {
+        console.log("[GPS] Getting immediate position via Capacitor...");
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 5000,
+        });
+        
         const { latitude, longitude } = position.coords;
-        console.log("[GPS] Immediate position success:", latitude, longitude);
+        console.log("[GPS] Capacitor immediate position:", latitude, longitude);
         
         setGpsStatus(prev => ({
           ...prev,
@@ -407,51 +400,210 @@ export function DriverControls({
         if (sessionIdRef.current && tripStatusRef.current === "active") {
           updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
         }
-      },
-      (error) => {
-        console.log("[GPS] Immediate position failed (interval will retry):", error.code, error.message);
-        // Show a toast for permission denied
-        if (error.code === 1 && !gpsErrorShownRef.current) {
-          gpsErrorShownRef.current = true;
-          toast({
-            variant: "destructive",
-            title: "Location Permission Required",
-            description: "Please allow location access when prompted.",
-          });
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-    );
-    
-    // Also set up watchPosition as an additional source
-    console.log("[GPS] Setting up watchPosition...");
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log("[GPS] watchPosition update:", latitude, longitude);
-        watchPositionSucceededRef.current = true;
-        
+      } catch (posError: any) {
+        console.log("[GPS] Capacitor immediate position failed:", posError?.message);
         setGpsStatus(prev => ({
           ...prev,
-          lastLat: latitude,
-          lastLng: longitude,
+          lastError: `Initial position failed: ${posError?.message}`,
         }));
-        
-        if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
-          updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+      }
+      
+      // Start 5-second polling with Capacitor Geolocation
+      locationIntervalRef.current = setInterval(async () => {
+        if (!sessionIdRef.current || tripStatusRef.current !== "active") {
+          console.log("[GPS] Interval: Session not active, skipping");
+          return;
         }
-      },
-      (error) => {
-        console.log("[GPS] watchPosition error (interval will retry):", error.code, error.message);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-    );
+        
+        try {
+          console.log("[GPS] Capacitor interval: Getting position...");
+          const position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 5000,
+          });
+          
+          const { latitude, longitude } = position.coords;
+          console.log("[GPS] Capacitor interval success:", latitude, longitude);
+          
+          setGpsStatus(prev => ({
+            ...prev,
+            lastLat: latitude,
+            lastLng: longitude,
+          }));
+          
+          if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+            console.log("[GPS] Sending location update to server...");
+            updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
+          }
+        } catch (error: any) {
+          console.log("[GPS] Capacitor interval error (will retry):", error?.message);
+          setGpsStatus(prev => ({
+            ...prev,
+            errorCount: prev.errorCount + 1,
+            lastError: error?.message || "Position unavailable",
+          }));
+        }
+      }, 5000);
+      
+      // Also set up Capacitor watchPosition
+      try {
+        console.log("[GPS] Setting up Capacitor watchPosition...");
+        const watchId = await Geolocation.watchPosition(
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
+          (position, err) => {
+            if (err) {
+              console.log("[GPS] Capacitor watchPosition error:", err);
+              return;
+            }
+            if (position) {
+              const { latitude, longitude } = position.coords;
+              console.log("[GPS] Capacitor watchPosition update:", latitude, longitude);
+              watchPositionSucceededRef.current = true;
+              
+              setGpsStatus(prev => ({
+                ...prev,
+                lastLat: latitude,
+                lastLng: longitude,
+              }));
+              
+              if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+                updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+              }
+            }
+          }
+        );
+        // Store as string since Capacitor returns callback ID string
+        watchIdRef.current = parseInt(watchId) || 0;
+        console.log("[GPS] Capacitor watchPosition started, ID:", watchId);
+      } catch (watchError: any) {
+        console.log("[GPS] Capacitor watchPosition setup failed:", watchError?.message);
+      }
+      
+    } else {
+      // WEB: Use browser navigator.geolocation
+      console.log("[GPS] Using browser geolocation for web platform...");
+      
+      if (!navigator.geolocation) {
+        console.log("[GPS] Geolocation API not available!");
+        toast({
+          variant: "destructive",
+          title: "GPS not available",
+          description: "Your device does not support GPS tracking.",
+        });
+        return;
+      }
+      
+      // Start 5-second polling interval
+      locationIntervalRef.current = setInterval(() => {
+        if (!sessionIdRef.current || tripStatusRef.current !== "active") {
+          console.log("[GPS] Interval: Session not active, skipping");
+          return;
+        }
+        
+        console.log("[GPS] Web interval: Requesting current position...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log("[GPS] Web interval success:", latitude, longitude);
+            
+            setGpsStatus(prev => ({
+              ...prev,
+              lastLat: latitude,
+              lastLng: longitude,
+            }));
+            
+            if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+              console.log("[GPS] Sending location update to server...");
+              updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
+            }
+          },
+          (error) => {
+            console.log("[GPS] Web interval error (will retry):", error.code, error.message);
+            setGpsStatus(prev => ({
+              ...prev,
+              errorCount: prev.errorCount + 1,
+              lastError: `Code ${error.code}: ${error.message}`,
+            }));
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+        );
+      }, 5000);
+      
+      // Get immediate position
+      console.log("[GPS] Web: Requesting immediate position...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log("[GPS] Web immediate position success:", latitude, longitude);
+          
+          setGpsStatus(prev => ({
+            ...prev,
+            lastLat: latitude,
+            lastLng: longitude,
+          }));
+          
+          if (sessionIdRef.current && tripStatusRef.current === "active") {
+            updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+          }
+        },
+        (error) => {
+          console.log("[GPS] Web immediate position failed:", error.code, error.message);
+          if (error.code === 1 && !gpsErrorShownRef.current) {
+            gpsErrorShownRef.current = true;
+            toast({
+              variant: "destructive",
+              title: "Location Permission Required",
+              description: "Please allow location access when prompted.",
+            });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      );
+      
+      // Set up watchPosition for web
+      console.log("[GPS] Web: Setting up watchPosition...");
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log("[GPS] Web watchPosition update:", latitude, longitude);
+          watchPositionSucceededRef.current = true;
+          
+          setGpsStatus(prev => ({
+            ...prev,
+            lastLat: latitude,
+            lastLng: longitude,
+          }));
+          
+          if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
+            updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
+          }
+        },
+        (error) => {
+          console.log("[GPS] Web watchPosition error:", error.code, error.message);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      );
+    }
   };
 
-  const stopGPSTracking = () => {
+  const stopGPSTracking = async () => {
+    const isNative = Capacitor.isNativePlatform();
+    
     // Clear watch position
     if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+      if (isNative) {
+        // Capacitor clearWatch takes the callback ID as string
+        try {
+          await Geolocation.clearWatch({ id: String(watchIdRef.current) });
+          console.log("[GPS] Capacitor watchPosition cleared");
+        } catch (e) {
+          console.log("[GPS] Error clearing Capacitor watch:", e);
+        }
+      } else {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        console.log("[GPS] Web watchPosition cleared");
+      }
       watchIdRef.current = null;
     }
 
@@ -459,6 +611,7 @@ export function DriverControls({
     if (locationIntervalRef.current) {
       clearInterval(locationIntervalRef.current);
       locationIntervalRef.current = null;
+      console.log("[GPS] Polling interval cleared");
     }
   };
 
