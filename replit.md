@@ -113,3 +113,4 @@ Preferred communication style: Simple, everyday language.
 ### New Features (November 28, 2025)
 - **Service Alert Toast Notifications**: Service alerts from admins (delays, cancellations, route changes) now appear as toast notifications with sound, similar to proximity alerts. They display for 15 seconds and work on both web and iOS.
 - **Message Management for Riders/Drivers**: Riders and drivers can now archive or delete their own messages from the message history. Previously only admins could manage messages.
+- **Enhanced Forward-to-Driver Workflow**: Admins now see a confirmation dialog when forwarding rider messages to drivers, with the ability to add an optional note. Messages that have already been forwarded display an "Already Forwarded" badge to prevent duplicate forwards. The UI clearly separates "Reply to Parent/Student" from "Forward to Driver" actions with labeled sections and explanatory text.
