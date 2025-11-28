@@ -2997,7 +2997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
-      const { forwardedByUserId } = req.body;
+      const { forwardedByUserId, additionalNote } = req.body;
       
       if (!forwardedByUserId) {
         return res.status(400).json({ error: "forwardedByUserId is required" });
@@ -3007,6 +3007,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const riderMessage = await storage.getRiderMessage(id);
       if (!riderMessage) {
         return res.status(404).json({ error: "Rider message not found" });
+      }
+      
+      // Check if already forwarded
+      if (riderMessage.forwardedAt) {
+        return res.status(400).json({ 
+          error: "Message already forwarded", 
+          forwardedAt: riderMessage.forwardedAt 
+        });
       }
       
       // Verify organization ownership (system admins can access any org)
@@ -3030,7 +3038,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create driver message with forwarded content
       const senderName = riderMessage.riderName || riderMessage.riderEmail || "Anonymous Rider";
-      const forwardedMessage = `Forwarded from rider ${senderName}: ${riderMessage.message}`;
+      let forwardedMessage = `Forwarded from rider ${senderName}: ${riderMessage.message}`;
+      if (additionalNote) {
+        forwardedMessage += `\n\nAdmin note: ${additionalNote}`;
+      }
       
       const driverMessageData = {
         organizationId: riderMessage.organizationId,
@@ -3042,9 +3053,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const newDriverMessage = await storage.createDriverMessage(driverMessageData);
       
+      // Mark the original rider message as forwarded
+      await storage.markRiderMessageAsForwarded(id, driver.id, forwardedByUserId);
+      
       res.status(201).json({ 
         success: true, 
         driverMessage: newDriverMessage,
+        forwardedToDriver: driver.name || driver.email,
         message: "Message forwarded to driver successfully" 
       });
     } catch (error) {

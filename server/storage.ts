@@ -151,6 +151,7 @@ export interface IStorage {
   restoreRiderMessage(id: string): Promise<RiderMessage | undefined>;
   deleteRiderMessage(id: string): Promise<boolean>;
   updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined>;
+  markRiderMessageAsForwarded(id: string, forwardedToDriverId: string, forwardedByUserId: string): Promise<RiderMessage | undefined>;
   
   // Driver messages (Drivers → Admin)
   createDriverMessage(message: InsertDriverMessage): Promise<DriverMessage>;
@@ -893,6 +894,18 @@ export class DatabaseStorage implements IStorage {
   async updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined> {
     const [message] = await db.update(riderMessages)
       .set({ priority })
+      .where(eq(riderMessages.id, id))
+      .returning();
+    return message || undefined;
+  }
+
+  async markRiderMessageAsForwarded(id: string, forwardedToDriverId: string, forwardedByUserId: string): Promise<RiderMessage | undefined> {
+    const [message] = await db.update(riderMessages)
+      .set({ 
+        forwardedAt: new Date(),
+        forwardedToDriverId,
+        forwardedByUserId
+      })
       .where(eq(riderMessages.id, id))
       .returning();
     return message || undefined;
@@ -1997,6 +2010,10 @@ export class MemStorage implements IStorage {
   }
 
   async updateRiderMessagePriority(id: string, priority: string): Promise<RiderMessage | undefined> {
+    return undefined;
+  }
+
+  async markRiderMessageAsForwarded(id: string, forwardedToDriverId: string, forwardedByUserId: string): Promise<RiderMessage | undefined> {
     return undefined;
   }
 

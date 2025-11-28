@@ -152,6 +152,9 @@ export const riderMessages = pgTable("rider_messages", {
   adminResponse: text("admin_response"), // Admin reply
   respondedByUserId: varchar("responded_by_user_id").references(() => users.id),
   respondedAt: timestamp("responded_at"),
+  forwardedAt: timestamp("forwarded_at"), // When message was forwarded to driver
+  forwardedToDriverId: varchar("forwarded_to_driver_id").references(() => users.id), // Driver it was forwarded to
+  forwardedByUserId: varchar("forwarded_by_user_id").references(() => users.id), // Admin who forwarded it
   archivedAt: timestamp("archived_at"),
   archivedByUserId: varchar("archived_by_user_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
