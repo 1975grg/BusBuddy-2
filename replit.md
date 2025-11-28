@@ -109,3 +109,7 @@ Preferred communication style: Simple, everyday language.
 - **Proximity Notifications**: Fixed bug where ALL riders got notifications instead of only those who selected the stop as their home stop
 - **SMS Type Error**: Fixed `to.startsWith is not a function` error by adding defensive string conversion for phone numbers
 - **In-App Proximity Alerts**: Added new `proximity_alerts` table and API endpoints for in-app notifications. Riders now receive toast notifications when their bus is approaching or arriving at their selected stop, even without SMS configured. Alerts are stored in the database and marked as read after being shown.
+
+### New Features (November 28, 2025)
+- **Service Alert Toast Notifications**: Service alerts from admins (delays, cancellations, route changes) now appear as toast notifications with sound, similar to proximity alerts. They display for 15 seconds and work on both web and iOS.
+- **Message Management for Riders/Drivers**: Riders and drivers can now archive or delete their own messages from the message history. Previously only admins could manage messages.
