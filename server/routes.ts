@@ -2476,6 +2476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "route_id or organization_id parameter is required" });
       }
       
+      // Debug: log userId for each message to verify it's being returned
+      console.log("[DEBUG] Rider messages userId values:", messages.map(m => ({ id: m.id, userId: m.userId })));
+      
       // Prevent HTTP caching for real-time message updates
       res.set({
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
