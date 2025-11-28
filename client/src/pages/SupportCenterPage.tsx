@@ -42,6 +42,10 @@ export default function SupportCenterPage() {
   // Track which view to show in Service Alerts tab
   const [showAlertCompose, setShowAlertCompose] = useState(false);
   
+  // Forward to driver dialog state
+  const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
+  const [forwardNote, setForwardNote] = useState("");
+  
   // Track current tab (for dropdown menu navigation to Notification Logs)
   // Initialize from URL parameter if present
   const getInitialTab = () => {
@@ -421,22 +425,31 @@ export default function SupportCenterPage() {
 
   // Forward rider message to driver
   const forwardToDriverMutation = useMutation({
-    mutationFn: async (messageId: string) => {
+    mutationFn: async ({ messageId, additionalNote }: { messageId: string, additionalNote?: string }) => {
       return await apiRequest("POST", `/api/rider-messages/${messageId}/forward-to-driver`, {
-        forwardedByUserId: currentAdmin?.id
+        forwardedByUserId: currentAdmin?.id,
+        additionalNote
       });
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      setForwardDialogOpen(false);
+      setForwardNote("");
       toast({ 
         title: "Message forwarded to driver",
-        description: "The driver will see this message in their app"
+        description: response.forwardedToDriver 
+          ? `Sent to ${response.forwardedToDriver}` 
+          : "The driver will see this message in their app"
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Could not forward message to driver";
       toast({ 
         title: "Forward failed",
-        description: "Could not forward message to driver",
+        description: errorMessage.includes("already forwarded") 
+          ? "This message has already been forwarded to a driver" 
+          : errorMessage,
         variant: "destructive"
       });
     }
@@ -953,16 +966,23 @@ export default function SupportCenterPage() {
                             ) : (
                               <>
                                 {selectedMessage.messageType === 'rider' && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => forwardToDriverMutation.mutate(selectedMessage.id)}
-                                    disabled={forwardToDriverMutation.isPending}
-                                    data-testid="button-forward-to-driver"
-                                  >
-                                    <Forward className="w-4 h-4 mr-2" />
-                                    {forwardToDriverMutation.isPending ? "Forwarding..." : "Forward to Driver"}
-                                  </Button>
+                                  (selectedMessage as RiderMessage).forwardedAt ? (
+                                    <Badge variant="secondary" className="flex items-center gap-1">
+                                      <Forward className="w-3 h-3" />
+                                      Forwarded to Driver
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => setForwardDialogOpen(true)}
+                                      disabled={forwardToDriverMutation.isPending}
+                                      data-testid="button-forward-to-driver"
+                                    >
+                                      <Forward className="w-4 h-4 mr-2" />
+                                      Forward to Driver
+                                    </Button>
+                                  )
                                 )}
                                 {selectedMessage.messageType === 'driver' && (
                                   <Button
@@ -1013,12 +1033,20 @@ export default function SupportCenterPage() {
                         </div>
                         {selectedMessage.adminResponse && (
                           <div className="bg-muted p-3 rounded-md">
-                            <p className="text-sm font-medium mb-1">Your Response:</p>
+                            <p className="text-sm font-medium mb-1">Your Previous Response:</p>
                             <p className="text-sm">{selectedMessage.adminResponse}</p>
                           </div>
                         )}
-                        <div>
-                          <p className="text-sm font-medium mb-2">Send Response:</p>
+                        
+                        {/* Reply to Parent/Student Section */}
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <p className="text-sm font-semibold">Reply to {selectedMessage.messageType === 'rider' ? 'Parent/Student' : 'Driver'}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            This will send a response directly to the {selectedMessage.messageType === 'rider' ? 'parent or student' : 'driver'} who sent this message.
+                          </p>
                           <Textarea
                             placeholder="Type your response..."
                             value={responseText}
@@ -1643,6 +1671,75 @@ export default function SupportCenterPage() {
               data-testid="button-send-broadcast"
             >
               {broadcastAlertMutation.isPending ? "Broadcasting..." : "Broadcast to All Routes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Forward to Driver Dialog */}
+      <Dialog open={forwardDialogOpen} onOpenChange={setForwardDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]" data-testid="dialog-forward-to-driver">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Forward className="w-5 h-5" />
+              Forward to Driver
+            </DialogTitle>
+            <DialogDescription>
+              This will send the message to the driver assigned to this route. The driver will see it in their app.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedMessage && (
+            <div className="space-y-4">
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-xs text-muted-foreground mb-1">Original message from:</p>
+                <p className="text-sm font-medium">
+                  {(selectedMessage as RiderMessage).riderName || "Anonymous Rider"}
+                </p>
+                <p className="text-sm mt-2">{selectedMessage.message}</p>
+              </div>
+              
+              <div>
+                <Label htmlFor="forward-note" className="text-sm font-medium">
+                  Add a note for the driver (optional)
+                </Label>
+                <Textarea
+                  id="forward-note"
+                  placeholder="e.g., Please check the back seats for a blue backpack..."
+                  value={forwardNote}
+                  onChange={(e) => setForwardNote(e.target.value)}
+                  className="mt-2"
+                  data-testid="textarea-forward-note"
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setForwardDialogOpen(false);
+                setForwardNote("");
+              }}
+              data-testid="button-cancel-forward"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedMessage) {
+                  forwardToDriverMutation.mutate({ 
+                    messageId: selectedMessage.id, 
+                    additionalNote: forwardNote.trim() || undefined 
+                  });
+                }
+              }}
+              disabled={forwardToDriverMutation.isPending}
+              data-testid="button-confirm-forward"
+            >
+              <Forward className="w-4 h-4 mr-2" />
+              {forwardToDriverMutation.isPending ? "Forwarding..." : "Forward to Driver"}
             </Button>
           </DialogFooter>
         </DialogContent>
