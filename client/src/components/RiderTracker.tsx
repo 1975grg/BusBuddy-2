@@ -44,12 +44,19 @@ export function RiderTracker({
   const { toast } = useToast();
   const shownAlertIds = useRef<Set<string>>(new Set());
 
+  // Debug: Log riderProfileId on every render
+  console.log("[RiderTracker] Props:", { riderProfileId, isNotificationsEnabled, routeId });
+
   // Poll for proximity alerts (in-app notifications) - always poll if we have a rider profile
   // In-app toasts should always work regardless of the SMS notification toggle
-  const { data: proximityAlerts } = useQuery<ProximityAlert[]>({
+  const { data: proximityAlerts, error: alertsError } = useQuery<ProximityAlert[]>({
     queryKey: ["/api/proximity-alerts", riderProfileId],
     queryFn: async () => {
-      if (!riderProfileId) return [];
+      console.log("[RiderTracker] Fetching proximity alerts for:", riderProfileId);
+      if (!riderProfileId) {
+        console.log("[RiderTracker] No riderProfileId, returning empty array");
+        return [];
+      }
       const headers: HeadersInit = {};
       const token = getStoredSessionToken();
       if (token) {
@@ -59,12 +66,22 @@ export function RiderTracker({
         credentials: "include",
         headers,
       });
-      if (!response.ok) return [];
-      return response.json();
+      if (!response.ok) {
+        console.log("[RiderTracker] Alert fetch failed:", response.status);
+        return [];
+      }
+      const data = await response.json();
+      console.log("[RiderTracker] Got proximity alerts:", data?.length || 0, "alerts");
+      return data;
     },
     refetchInterval: 5000, // Poll every 5 seconds
     enabled: !!riderProfileId, // Always poll if rider has a profile (SMS toggle is separate)
   });
+
+  // Debug: Log alerts error if any
+  if (alertsError) {
+    console.error("[RiderTracker] Alerts query error:", alertsError);
+  }
 
   // Play notification sound
   const playNotificationSound = () => {
@@ -103,10 +120,18 @@ export function RiderTracker({
 
   // Show toast for new proximity alerts
   useEffect(() => {
-    if (!proximityAlerts || proximityAlerts.length === 0) return;
+    console.log("[RiderTracker] useEffect triggered, proximityAlerts:", proximityAlerts?.length || 0);
+    if (!proximityAlerts || proximityAlerts.length === 0) {
+      console.log("[RiderTracker] No alerts to show");
+      return;
+    }
 
     proximityAlerts.forEach((alert) => {
-      if (shownAlertIds.current.has(alert.id)) return;
+      if (shownAlertIds.current.has(alert.id)) {
+        console.log("[RiderTracker] Alert already shown:", alert.id);
+        return;
+      }
+      console.log("[RiderTracker] Showing NEW toast for alert:", alert.id, alert.message);
       shownAlertIds.current.add(alert.id);
 
       // Play notification sound
