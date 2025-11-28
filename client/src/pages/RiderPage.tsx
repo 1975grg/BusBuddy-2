@@ -171,7 +171,7 @@ export default function RiderPage() {
       </Card>
 
       {/* Message History - Below Need Help */}
-      <MessageHistory userType="rider" routeId={currentRoute.id} />
+      <MessageHistory userType="rider" routeId={currentRoute.id} userId={user?.id} />
 
       {/* Contact Support Dialog */}
       <SendRiderMessageDialog

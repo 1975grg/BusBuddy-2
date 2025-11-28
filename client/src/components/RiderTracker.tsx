@@ -43,6 +43,7 @@ export function RiderTracker({
   const [notificationsEnabled, setNotificationsEnabled] = useState(isNotificationsEnabled);
   const { toast } = useToast();
   const shownAlertIds = useRef<Set<string>>(new Set());
+  const shownServiceAlertIds = useRef<Set<string>>(new Set());
 
   // Debug: Log riderProfileId on every render
   console.log("[RiderTracker] Props:", { riderProfileId, isNotificationsEnabled, routeId });
@@ -163,6 +164,44 @@ export function RiderTracker({
       })();
     });
   }, [proximityAlerts, toast]);
+
+  // Show toast for new service alerts (important broadcasts from admin)
+  useEffect(() => {
+    console.log("[RiderTracker] Service alerts check, count:", serviceAlerts?.length || 0);
+    if (!serviceAlerts || serviceAlerts.length === 0) {
+      return;
+    }
+
+    // Helper to get title based on alert type
+    const getServiceAlertTitle = (type: string): string => {
+      switch (type) {
+        case 'delayed': return 'Service Delay';
+        case 'bus_change': return 'Vehicle Change';
+        case 'cancelled': return 'Service Cancelled';
+        case 'general':
+        default: return 'Service Notice';
+      }
+    };
+
+    serviceAlerts.forEach((alert) => {
+      if (shownServiceAlertIds.current.has(alert.id)) {
+        return;
+      }
+      console.log("[RiderTracker] Showing NEW service alert toast:", alert.id, alert.title);
+      shownServiceAlertIds.current.add(alert.id);
+
+      // Play notification sound for service alerts
+      playNotificationSound();
+
+      // Show toast notification with appropriate styling
+      toast({
+        title: alert.title || getServiceAlertTitle(alert.type),
+        description: alert.message,
+        duration: 15000, // Service alerts stay longer (15 seconds)
+        variant: alert.severity === 'critical' ? 'destructive' : 'default',
+      });
+    });
+  }, [serviceAlerts, toast]);
 
   // Fetch active route session for live GPS tracking
   const { data: activeSession } = useQuery({

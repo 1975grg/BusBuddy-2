@@ -2548,7 +2548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/rider-messages/:id/archive", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+  app.patch("/api/rider-messages/:id/archive", authenticateUser, async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
@@ -2565,8 +2565,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Message not found" });
       }
       
-      // Verify organization ownership (system admins can access any org)
-      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+      // Allow access if: admin of the org, system admin, or the rider who created the message
+      const isAdmin = user.role === "org_admin" || user.role === "system_admin";
+      const isOwner = targetMessage.userId === user.id;
+      const sameOrg = targetMessage.organizationId === user.organizationId;
+      
+      if (!(isOwner || (isAdmin && sameOrg) || user.role === "system_admin")) {
         return res.status(403).json({ error: "You don't have permission to modify this message" });
       }
       
@@ -2603,7 +2607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/rider-messages/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+  app.delete("/api/rider-messages/:id", authenticateUser, async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
@@ -2615,9 +2619,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Message not found" });
       }
       
-      // Verify organization ownership (system admins can access any org)
-      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
-        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      // Allow access if: admin of the org, system admin, or the rider who created the message
+      const isAdmin = user.role === "org_admin" || user.role === "system_admin";
+      const isOwner = targetMessage.userId === user.id;
+      const sameOrg = targetMessage.organizationId === user.organizationId;
+      
+      if (!(isOwner || (isAdmin && sameOrg) || user.role === "system_admin")) {
+        return res.status(403).json({ error: "You don't have permission to delete this message" });
       }
       
       const success = await storage.deleteRiderMessage(id);
@@ -2855,7 +2863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/driver-messages/:id/archive", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+  app.patch("/api/driver-messages/:id/archive", authenticateUser, async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
@@ -2872,8 +2880,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Message not found" });
       }
       
-      // Verify organization ownership (system admins can access any org)
-      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
+      // Allow access if: admin of the org, system admin, or the driver who created the message
+      const isAdmin = user.role === "org_admin" || user.role === "system_admin";
+      const isOwner = targetMessage.driverUserId === user.id;
+      const sameOrg = targetMessage.organizationId === user.organizationId;
+      
+      if (!(isOwner || (isAdmin && sameOrg) || user.role === "system_admin")) {
         return res.status(403).json({ error: "You don't have permission to modify this message" });
       }
       
@@ -2910,7 +2922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/driver-messages/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+  app.delete("/api/driver-messages/:id", authenticateUser, async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
       const { id } = req.params;
@@ -2922,9 +2934,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Message not found" });
       }
       
-      // Verify organization ownership (system admins can access any org)
-      if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
-        return res.status(403).json({ error: "You don't have permission to modify this message" });
+      // Allow access if: admin of the org, system admin, or the driver who created the message
+      const isAdmin = user.role === "org_admin" || user.role === "system_admin";
+      const isOwner = targetMessage.driverUserId === user.id;
+      const sameOrg = targetMessage.organizationId === user.organizationId;
+      
+      if (!(isOwner || (isAdmin && sameOrg) || user.role === "system_admin")) {
+        return res.status(403).json({ error: "You don't have permission to delete this message" });
       }
       
       const success = await storage.deleteDriverMessage(id);
