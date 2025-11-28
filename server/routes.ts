@@ -34,7 +34,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { calculateBusStatus } from "./busStatusCalculator";
 import { 
   authenticateUser, 
-  optionalAuth,
+  optionalAuthenticateUser,
   requireRole, 
   requireOrganization,
   requireRouteAccess,
@@ -2408,7 +2408,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rider Messages (Riders → Admin)
-  app.post("/api/rider-messages", async (req, res) => {
+  // Use optional authentication to capture user ID for logged-in riders
+  app.post("/api/rider-messages", optionalAuthenticateUser, async (req, res) => {
     try {
       // Validate client data (without server-controlled fields)
       const clientSchema = insertRiderMessageSchema.omit({ 
@@ -2440,14 +2441,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Route not found" });
       }
       
+      // Get user ID from authenticated session if logged in
+      const user = (req as any).user as AuthUser | undefined;
+      
       // Build complete message data with server-controlled fields
-      // TODO: In a real app, get user ID from authenticated session (if logged in)
-      // For anonymous riders, userId can be null
       const messageData = {
         ...clientData,
         routeId: actualRouteId, // Use resolved route ID
         organizationId: route.organizationId,
-        userId: null // Anonymous rider message
+        userId: user?.id || null // Capture logged-in user's ID, null for anonymous
       };
       
       const message = await storage.createRiderMessage(messageData);

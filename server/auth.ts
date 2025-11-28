@@ -105,6 +105,78 @@ export async function authenticateUser(
   }
 }
 
+// Optional authentication middleware - tries to authenticate but doesn't fail if no token
+// Useful for endpoints that work for both anonymous and logged-in users
+export async function optionalAuthenticateUser(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    // Check for session token in cookie or header
+    const cookieToken = req.cookies?.sessionToken;
+    const headerToken = req.headers.authorization?.replace("Bearer ", "");
+    const token = cookieToken || headerToken;
+
+    // If no token, continue without authentication
+    if (!token) {
+      return next();
+    }
+
+    // Get user by session token
+    const user = await storage.getUserBySessionToken(token);
+
+    // If no valid user, continue without authentication
+    if (!user || !user.isActive) {
+      return next();
+    }
+
+    // Check password expiration for riders (mirror authenticateUser behavior)
+    if (user.role === 'rider' && user.passwordExpiresAt) {
+      const { isPasswordExpired } = await import("./passwordExpiration");
+      if (isPasswordExpired(user.passwordExpiresAt)) {
+        // Clear the session since password has expired
+        await storage.clearUserSession(user.id);
+        // Continue without authentication - expired users are treated as anonymous
+        return next();
+      }
+    }
+
+    // Get user's route assignments
+    const routeAssignments = await storage.getUserRouteAssignments(user.id);
+
+    // For riders, look up their rider profile ID by matching phone number
+    let riderProfileId: string | null = null;
+    if (user.role === 'rider' && user.phoneNumber && user.organizationId) {
+      try {
+        const riderProfile = await storage.getRiderProfileByPhone(user.phoneNumber, user.organizationId);
+        if (riderProfile) {
+          riderProfileId = riderProfile.id;
+        }
+      } catch (err) {
+        console.error("Error looking up rider profile:", err);
+      }
+    }
+
+    // Attach user to request
+    (req as any).user = {
+      ...user,
+      routeAssignments: routeAssignments.map((a) => ({
+        id: a.id,
+        routeId: a.routeId,
+        isDefault: a.isDefault,
+      })),
+      riderProfileId,
+    } as AuthUser;
+
+    next();
+  } catch (error) {
+    // On error, continue without authentication rather than failing
+    console.error("Optional authentication error:", error);
+    next();
+  }
+}
+
 // Middleware to require specific role
 export function requireRole(...allowedRoles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
