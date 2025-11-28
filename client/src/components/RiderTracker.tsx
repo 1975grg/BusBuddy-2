@@ -44,7 +44,8 @@ export function RiderTracker({
   const { toast } = useToast();
   const shownAlertIds = useRef<Set<string>>(new Set());
 
-  // Poll for proximity alerts (in-app notifications)
+  // Poll for proximity alerts (in-app notifications) - always poll if we have a rider profile
+  // In-app toasts should always work regardless of the SMS notification toggle
   const { data: proximityAlerts } = useQuery<ProximityAlert[]>({
     queryKey: ["/api/proximity-alerts", riderProfileId],
     queryFn: async () => {
@@ -62,7 +63,7 @@ export function RiderTracker({
       return response.json();
     },
     refetchInterval: 5000, // Poll every 5 seconds
-    enabled: !!riderProfileId && notificationsEnabled,
+    enabled: !!riderProfileId, // Always poll if rider has a profile (SMS toggle is separate)
   });
 
   // Play notification sound
