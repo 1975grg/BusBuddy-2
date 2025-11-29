@@ -255,18 +255,8 @@ export function AppSidebar() {
           },
         ];
       case "driver":
-        return [
-          {
-            title: "My Routes",
-            url: "/driver",
-            icon: RouteIcon,
-          },
-          {
-            title: "Trip Control",
-            url: "/driver/control",
-            icon: MapPin,
-          },
-        ];
+        // Drivers use a full-screen single-page experience without sidebar
+        return [];
       case "rider":
         return [
           {
