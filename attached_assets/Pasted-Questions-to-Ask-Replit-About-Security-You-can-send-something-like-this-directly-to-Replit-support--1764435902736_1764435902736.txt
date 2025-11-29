@@ -1,0 +1,69 @@
+Questions to Ask Replit About Security
+
+You can send something like this directly to Replit support / sales:
+
+A. Infrastructure & Compliance
+
+Where is data physically hosted?
+
+“Which cloud provider and regions does Replit use to host code and data?”
+
+What security certifications or audits do you have?
+
+“Do you have SOC 2, ISO 27001, or other third-party security audits?”
+
+Do you have a documented security whitepaper or security overview you can share?
+
+B. Data Protection (Encryption, Backups, Retention)
+
+Is all data encrypted in transit and at rest?
+
+“Are HTTPS/TLS used for all connections? Is stored data encrypted at rest?”
+
+How are backups handled?
+
+“Do you back up project data? How long are backups retained and how is access to them controlled?”
+
+Can you describe your data retention and deletion policies?
+
+“If we delete a project or data, how long before it is fully removed from your systems and backups?”
+
+C. Access Control & Isolation
+
+How is my app isolated from other customers’ apps?
+
+“What isolation mechanisms are used so that other Replit users can’t access our code or data?”
+
+Who at Replit can access our projects or databases, and under what conditions?
+
+“Is access logged and limited to specific staff roles (e.g., for support only)?”
+
+Are there tools or settings to restrict team member access (e.g., role-based permissions)?
+
+D. Network & Application Security
+
+Do you provide protections like firewalls, DDoS mitigation, and rate limiting for deployed apps?
+
+How do you handle vulnerabilities?
+
+“Do you run vulnerability scans on your infrastructure? What is your process and typical response time for patching critical issues?”
+
+Do you have a bug bounty or responsible disclosure program for security researchers?
+
+E. Privacy & Student Data (very important for schools)
+
+How do you handle personal data for applications that may involve minors?
+
+“Do you have any guidance or features that help apps built on Replit comply with FERPA / COPPA or similar student-privacy requirements?”
+
+Do you act as a data processor for our app data, and can you provide a Data Processing Agreement (DPA) if needed by the school district?
+
+Who are your sub-processors (other vendors) who may have access to our data, and where are they located?
+
+F. Incident Response
+
+What is your incident response process?
+
+“If there is a security breach that might affect our app, how and how quickly would we be notified?”
+
+Do you provide any uptime / availability guarantees (SLA) for production deployments?
