@@ -55,9 +55,8 @@ function Router() {
       <Route path="/admin/messages" component={SupportCenterPage} />
       <Route path="/admin/settings" component={SettingsPage} />
       
-      {/* Driver Routes */}
+      {/* Driver Routes - single page experience */}
       <Route path="/driver" component={DriverPage} />
-      <Route path="/driver/control" component={DriverPage} />
       
       {/* Rider Routes */}
       <Route path="/rider" component={RiderPage} />
@@ -108,7 +107,10 @@ function AppContent() {
   // Rider pages should have minimal UI (no sidebar)
   const isRiderPage = location.startsWith("/rider") || location.startsWith("/track");
   
-  console.log("AppContent isRiderPage:", isRiderPage, "isPublicPage:", isPublicPage);
+  // Driver pages should have minimal UI (no sidebar) - single page experience
+  const isDriverPage = location.startsWith("/driver");
+  
+  console.log("AppContent isRiderPage:", isRiderPage, "isDriverPage:", isDriverPage, "isPublicPage:", isPublicPage);
   
   if (isPublicPage) {
     return (
@@ -160,7 +162,49 @@ function AppContent() {
     );
   }
   
-  // Admin/Driver pages get the full sidebar layout
+  // Drivers get a simplified layout without sidebar - single page experience
+  if (isDriverPage) {
+    const orgColor = orgSettings?.primaryColor || "#0080FF";
+    const orgAbbreviation = getOrgAbbreviation(orgSettings?.name);
+    
+    return (
+      <div className="flex flex-col h-screen w-full bg-background">
+        <header className="flex items-center justify-between p-4 border-b bg-background">
+          <div className="flex items-center gap-3">
+            {orgSettings?.logoUrl ? (
+              <img 
+                src={orgSettings.logoUrl} 
+                alt={orgSettings?.name || "Organization"} 
+                className="w-8 h-8 rounded-lg object-cover"
+              />
+            ) : (
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                style={{ backgroundColor: orgColor }}
+              >
+                {orgAbbreviation}
+              </div>
+            )}
+            <div className="flex flex-col">
+              <span className="font-bold leading-tight">Bus Buddy</span>
+              {orgSettings?.name && (
+                <span className="text-xs text-muted-foreground leading-tight">{orgSettings.name}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <UserMenu />
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto p-4" key={user?.id || 'anonymous'}>
+          <Router />
+        </main>
+      </div>
+    );
+  }
+  
+  // Admin pages get the full sidebar layout
   const sidebarStyle = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
