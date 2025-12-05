@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock, Plus, UserCog, Mail, Phone, Key, Edit } from "lucide-react";
+import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock, Plus, UserCog, Mail, Phone, Key, Edit, Eye, EyeOff } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -31,6 +31,11 @@ interface RemovalDialogState {
   type: "rider" | "driver" | "admin" | null;
   id: string | null;
   name: string | null;
+}
+
+interface EditDialogState {
+  open: boolean;
+  staffMember: StaffMember | null;
 }
 
 export default function AccessManagementPage() {
@@ -63,20 +68,34 @@ export default function AccessManagementPage() {
   const [renewalDialog, setRenewalDialog] = useState(false);
   const [addDriverDialog, setAddDriverDialog] = useState(false);
   const [addAdminDialog, setAddAdminDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState<EditDialogState>({
+    open: false,
+    staffMember: null,
+  });
   
   const [newDriverForm, setNewDriverForm] = useState({
     name: "",
     email: "",
     phoneNumber: "",
     password: "",
+    confirmPassword: "",
     routeId: "",
   });
+  const [showDriverPassword, setShowDriverPassword] = useState(false);
   
   const [newAdminForm, setNewAdminForm] = useState({
     name: "",
     email: "",
     phoneNumber: "",
     password: "",
+    confirmPassword: "",
+  });
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phoneNumber: "",
+    routeId: "",
   });
   
   useEffect(() => {
@@ -175,7 +194,10 @@ export default function AccessManagementPage() {
   const addDriverMutation = useMutation({
     mutationFn: async (data: typeof newDriverForm) => {
       const response = await apiRequest("POST", "/api/staff", {
-        ...data,
+        name: data.name,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        password: data.password,
         role: "driver",
         routeId: data.routeId && data.routeId !== "none" ? data.routeId : undefined,
       });
@@ -184,7 +206,8 @@ export default function AccessManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       setAddDriverDialog(false);
-      setNewDriverForm({ name: "", email: "", phoneNumber: "", password: "", routeId: "" });
+      setNewDriverForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "", routeId: "" });
+      setShowDriverPassword(false);
       toast({ title: "Driver added", description: "New driver account created successfully." });
     },
     onError: (error: any) => {
@@ -199,7 +222,10 @@ export default function AccessManagementPage() {
   const addAdminMutation = useMutation({
     mutationFn: async (data: typeof newAdminForm) => {
       const response = await apiRequest("POST", "/api/staff", {
-        ...data,
+        name: data.name,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        password: data.password,
         role: "org_admin",
       });
       return response.json();
@@ -207,13 +233,37 @@ export default function AccessManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
       setAddAdminDialog(false);
-      setNewAdminForm({ name: "", email: "", phoneNumber: "", password: "" });
+      setNewAdminForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "" });
+      setShowAdminPassword(false);
       toast({ title: "Admin added", description: "New admin account created successfully." });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create admin account.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateStaffMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof editForm }) => {
+      const response = await apiRequest("PATCH", `/api/staff/${id}`, {
+        name: data.name,
+        phoneNumber: data.phoneNumber || null,
+        routeId: data.routeId && data.routeId !== "none" ? data.routeId : null,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setEditDialog({ open: false, staffMember: null });
+      toast({ title: "Staff updated", description: "Staff member has been updated successfully." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update staff member.",
         variant: "destructive",
       });
     },
@@ -260,6 +310,39 @@ export default function AccessManagementPage() {
   const getRouteName = (routeId: string) => {
     const route = routes.find(r => r.id === routeId);
     return route?.name || "Unassigned";
+  };
+
+  const openEditDialog = (staffMember: StaffMember) => {
+    setEditForm({
+      name: staffMember.name || "",
+      phoneNumber: staffMember.phoneNumber || "",
+      routeId: staffMember.routeAssignments.length > 0 ? staffMember.routeAssignments[0].routeId : "",
+    });
+    setEditDialog({ open: true, staffMember });
+  };
+
+  const passwordsMatch = (password: string, confirmPassword: string) => {
+    return password === confirmPassword;
+  };
+
+  const canSubmitDriver = () => {
+    return (
+      newDriverForm.name.trim() !== "" &&
+      newDriverForm.email.trim() !== "" &&
+      newDriverForm.password.length >= 6 &&
+      passwordsMatch(newDriverForm.password, newDriverForm.confirmPassword) &&
+      !addDriverMutation.isPending
+    );
+  };
+
+  const canSubmitAdmin = () => {
+    return (
+      newAdminForm.name.trim() !== "" &&
+      newAdminForm.email.trim() !== "" &&
+      newAdminForm.password.length >= 6 &&
+      passwordsMatch(newAdminForm.password, newAdminForm.confirmPassword) &&
+      !addAdminMutation.isPending
+    );
   };
 
   if (isLoading) {
@@ -524,14 +607,42 @@ export default function AccessManagementPage() {
                           <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
                             id="driver-password"
-                            type="password"
+                            type={showDriverPassword ? "text" : "password"}
                             placeholder="Minimum 6 characters"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             value={newDriverForm.password}
                             onChange={(e) => setNewDriverForm({ ...newDriverForm, password: e.target.value })}
                             data-testid="input-driver-password"
                           />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                            onClick={() => setShowDriverPassword(!showDriverPassword)}
+                            data-testid="button-toggle-driver-password"
+                          >
+                            {showDriverPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-confirm-password">Confirm Password</Label>
+                        <div className="relative">
+                          <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="driver-confirm-password"
+                            type={showDriverPassword ? "text" : "password"}
+                            placeholder="Re-enter password"
+                            className={`pl-10 ${newDriverForm.confirmPassword && !passwordsMatch(newDriverForm.password, newDriverForm.confirmPassword) ? 'border-destructive' : ''}`}
+                            value={newDriverForm.confirmPassword}
+                            onChange={(e) => setNewDriverForm({ ...newDriverForm, confirmPassword: e.target.value })}
+                            data-testid="input-driver-confirm-password"
+                          />
+                        </div>
+                        {newDriverForm.confirmPassword && !passwordsMatch(newDriverForm.password, newDriverForm.confirmPassword) && (
+                          <p className="text-sm text-destructive">Passwords do not match</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="driver-route">Assign to Route (optional)</Label>
@@ -555,12 +666,16 @@ export default function AccessManagementPage() {
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button variant="outline" onClick={() => setAddDriverDialog(false)}>
+                      <Button variant="outline" onClick={() => {
+                        setAddDriverDialog(false);
+                        setNewDriverForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "", routeId: "" });
+                        setShowDriverPassword(false);
+                      }}>
                         Cancel
                       </Button>
                       <Button 
                         onClick={() => addDriverMutation.mutate(newDriverForm)}
-                        disabled={!newDriverForm.name || !newDriverForm.email || !newDriverForm.password || addDriverMutation.isPending}
+                        disabled={!canSubmitDriver()}
                         data-testid="button-confirm-add-driver"
                       >
                         {addDriverMutation.isPending ? "Creating..." : "Create Driver"}
@@ -607,27 +722,44 @@ export default function AccessManagementPage() {
                               : "Unassigned"}
                           </p>
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setRemovalDialog({
-                                open: true,
-                                type: "driver",
-                                id: driver.id,
-                                name: driver.name || "Unnamed Driver",
-                              })}
-                              disabled={driver.id === user?.id}
-                              data-testid={`button-remove-driver-${driver.id}`}
-                            >
-                              <UserX className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{driver.id === user?.id ? "Cannot remove yourself" : "Remove driver"}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(driver)}
+                                data-testid={`button-edit-driver-${driver.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Edit driver</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setRemovalDialog({
+                                  open: true,
+                                  type: "driver",
+                                  id: driver.id,
+                                  name: driver.name || "Unnamed Driver",
+                                })}
+                                disabled={driver.id === user?.id}
+                                data-testid={`button-remove-driver-${driver.id}`}
+                              >
+                                <UserX className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{driver.id === user?.id ? "Cannot remove yourself" : "Remove driver"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -711,23 +843,55 @@ export default function AccessManagementPage() {
                           <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
                             id="admin-password"
-                            type="password"
+                            type={showAdminPassword ? "text" : "password"}
                             placeholder="Minimum 6 characters"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             value={newAdminForm.password}
                             onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })}
                             data-testid="input-admin-password"
                           />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                            onClick={() => setShowAdminPassword(!showAdminPassword)}
+                            data-testid="button-toggle-admin-password"
+                          >
+                            {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-confirm-password">Confirm Password</Label>
+                        <div className="relative">
+                          <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="admin-confirm-password"
+                            type={showAdminPassword ? "text" : "password"}
+                            placeholder="Re-enter password"
+                            className={`pl-10 ${newAdminForm.confirmPassword && !passwordsMatch(newAdminForm.password, newAdminForm.confirmPassword) ? 'border-destructive' : ''}`}
+                            value={newAdminForm.confirmPassword}
+                            onChange={(e) => setNewAdminForm({ ...newAdminForm, confirmPassword: e.target.value })}
+                            data-testid="input-admin-confirm-password"
+                          />
+                        </div>
+                        {newAdminForm.confirmPassword && !passwordsMatch(newAdminForm.password, newAdminForm.confirmPassword) && (
+                          <p className="text-sm text-destructive">Passwords do not match</p>
+                        )}
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button variant="outline" onClick={() => setAddAdminDialog(false)}>
+                      <Button variant="outline" onClick={() => {
+                        setAddAdminDialog(false);
+                        setNewAdminForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "" });
+                        setShowAdminPassword(false);
+                      }}>
                         Cancel
                       </Button>
                       <Button 
                         onClick={() => addAdminMutation.mutate(newAdminForm)}
-                        disabled={!newAdminForm.name || !newAdminForm.email || !newAdminForm.password || addAdminMutation.isPending}
+                        disabled={!canSubmitAdmin()}
                         data-testid="button-confirm-add-admin"
                       >
                         {addAdminMutation.isPending ? "Creating..." : "Create Admin"}
@@ -765,27 +929,44 @@ export default function AccessManagementPage() {
                           <p className="text-sm text-muted-foreground">{admin.phoneNumber}</p>
                         )}
                       </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setRemovalDialog({
-                              open: true,
-                              type: "admin",
-                              id: admin.id,
-                              name: admin.name || "Unnamed Admin",
-                            })}
-                            disabled={admin.id === user?.id}
-                            data-testid={`button-remove-admin-${admin.id}`}
-                          >
-                            <UserX className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{admin.id === user?.id ? "Cannot remove yourself" : "Remove admin"}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(admin)}
+                              data-testid={`button-edit-admin-${admin.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit admin</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setRemovalDialog({
+                                open: true,
+                                type: "admin",
+                                id: admin.id,
+                                name: admin.name || "Unnamed Admin",
+                              })}
+                              disabled={admin.id === user?.id}
+                              data-testid={`button-remove-admin-${admin.id}`}
+                            >
+                              <UserX className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{admin.id === user?.id ? "Cannot remove yourself" : "Remove admin"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -855,6 +1036,103 @@ export default function AccessManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setEditDialog({ open: false, staffMember: null });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Edit {editDialog.staffMember?.role === "driver" ? "Driver" : "Administrator"}
+            </DialogTitle>
+            <DialogDescription>
+              Update details for {editDialog.staffMember?.name || "staff member"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                placeholder="Full name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                data-testid="input-edit-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editDialog.staffMember?.email || ""}
+                  disabled
+                  className="pl-10 bg-muted"
+                  data-testid="input-edit-email"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone Number (optional)</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  className="pl-10"
+                  value={editForm.phoneNumber}
+                  onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                  data-testid="input-edit-phone"
+                />
+              </div>
+            </div>
+            {editDialog.staffMember?.role === "driver" && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-route">Assigned Route</Label>
+                <Select 
+                  value={editForm.routeId} 
+                  onValueChange={(value) => setEditForm({ ...editForm, routeId: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-route">
+                    <Bus className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Select route" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No route assignment</SelectItem>
+                    {activeRoutes.map((route) => (
+                      <SelectItem key={route.id} value={route.id}>
+                        {route.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog({ open: false, staffMember: null })}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editDialog.staffMember) {
+                  updateStaffMutation.mutate({ id: editDialog.staffMember.id, data: editForm });
+                }
+              }}
+              disabled={!editForm.name.trim() || updateStaffMutation.isPending}
+              data-testid="button-confirm-edit"
+            >
+              {updateStaffMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
