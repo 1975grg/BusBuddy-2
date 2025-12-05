@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/contexts/UserContext";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Route } from "@shared/schema";
 import busIconUrl from "@assets/bus-buddy-logo.png";
@@ -100,17 +100,21 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
-      // Redirect to login page
-      setLocation("/login");
-      toast({
-        title: "Logged out successfully",
-      });
+      
+      // Clear stored session token (for native apps)
+      await setStoredSessionToken(null);
+      
+      // Clear all cached queries
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      queryClient.clear();
+      
+      // Use window.location to force full page reload and clear all React state
+      window.location.href = "/login";
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to logout. Please try again.",
-        variant: "destructive",
-      });
+      // Even on error, try to clear and redirect
+      await setStoredSessionToken(null);
+      queryClient.clear();
+      window.location.href = "/login";
     }
   };
   

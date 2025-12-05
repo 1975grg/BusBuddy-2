@@ -224,27 +224,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // even when the session is already expired
   app.post("/api/auth/logout", async (req, res) => {
     try {
-      // Try to get the session token and clear the user's session if valid
+      // Get the session token from cookie or header
       const sessionToken = req.cookies?.sessionToken || req.headers.authorization?.replace("Bearer ", "");
       
       if (sessionToken) {
-        const session = await storage.getSession(sessionToken);
-        if (session) {
-          await storage.clearUserSession(session.userId);
+        // Look up the user by token and clear their session
+        const user = await storage.getUserBySessionToken(sessionToken);
+        if (user) {
+          await storage.clearUserSession(user.id);
         }
       }
-      
-      // Always clear the session cookie
-      res.clearCookie("sessionToken");
-      
-      // Always return success - user is logged out either way
-      res.json({ success: true });
     } catch (error) {
-      console.error("Error logging out:", error);
-      // Even on error, clear the cookie and return success
-      res.clearCookie("sessionToken");
-      res.json({ success: true });
+      // Log error but don't fail - we'll still clear the cookie
+      console.error("Error clearing session on logout:", error);
     }
+    
+    // Always clear the session cookie and return success
+    res.clearCookie("sessionToken");
+    res.json({ success: true });
   });
 
   // Password-based login (for admin/driver accounts or when email isn't available)
