@@ -177,7 +177,7 @@ export default function AccessManagementPage() {
       const response = await apiRequest("POST", "/api/staff", {
         ...data,
         role: "driver",
-        routeId: data.routeId || undefined,
+        routeId: data.routeId && data.routeId !== "none" ? data.routeId : undefined,
       });
       return response.json();
     },
@@ -544,7 +544,7 @@ export default function AccessManagementPage() {
                             <SelectValue placeholder="Select route" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No route assignment</SelectItem>
+                            <SelectItem value="none">No route assignment</SelectItem>
                             {activeRoutes.map((route) => (
                               <SelectItem key={route.id} value={route.id}>
                                 {route.name}
