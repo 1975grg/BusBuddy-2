@@ -1049,6 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Hash the password
+      const bcrypt = await import("bcrypt");
       const passwordHash = await bcrypt.hash(password, 10);
       
       // Create the admin user with mustResetPassword flag
