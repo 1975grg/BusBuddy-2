@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Users, Settings, MessageSquare, QrCode, Archive } from "lucide-react";
+import { MapPin, Clock, Users, Settings, MessageSquare, QrCode, Archive, RotateCcw } from "lucide-react";
 
 interface Stop {
   id: string;
@@ -24,6 +24,7 @@ interface RouteCardProps {
   onSendAlert?: () => void;
   onShowQr?: () => void;
   onArchive?: () => void;
+  onRestore?: () => void;
 }
 
 export function RouteCard({ 
@@ -39,7 +40,8 @@ export function RouteCard({
   onToggleStatus,
   onSendAlert,
   onShowQr,
-  onArchive
+  onArchive,
+  onRestore
 }: RouteCardProps) {
   return (
     <Card className="hover-elevate">
@@ -60,9 +62,9 @@ export function RouteCard({
             {isArchived ? (
               <Badge variant="secondary">Archived</Badge>
             ) : status === "active" ? (
-              <Badge className="bg-bus-active text-white">Active</Badge>
+              <Badge className="bg-bus-active text-white">Enabled</Badge>
             ) : (
-              <Badge variant="secondary">Inactive</Badge>
+              <Badge variant="secondary">Disabled</Badge>
             )}
             {!isArchived && (
               <Button
@@ -136,7 +138,7 @@ export function RouteCard({
               onClick={onToggleStatus}
               data-testid={`button-toggle-status-${name.toLowerCase().replace(/\s+/g, '-')}`}
             >
-              {status === "active" ? "Deactivate" : "Activate"}
+              {status === "active" ? "Disable" : "Enable"}
             </Button>
             {status === "active" && onSendAlert && (
               <Button 
@@ -162,8 +164,19 @@ export function RouteCard({
             )}
           </div>
         ) : (
-          <div className="pt-2 text-sm text-muted-foreground">
-            This route has been archived. Contact your administrator to restore it.
+          <div className="pt-2 flex items-center gap-2">
+            {onRestore && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRestore}
+                data-testid={`button-restore-route-${name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Restore Route
+              </Button>
+            )}
+            <span className="text-sm text-muted-foreground">This route has been archived.</span>
           </div>
         )}
       </CardContent>

@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode, Archive } from "lucide-react";
+import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode, Archive, RotateCcw } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
 import { EditRouteDialog } from "@/components/EditRouteDialog";
@@ -131,6 +131,32 @@ export default function RoutesPage() {
     },
   });
 
+  // Restore archived route mutation
+  const restoreRouteMutation = useMutation({
+    mutationFn: async (routeId: string) => {
+      return await apiRequest("POST", `/api/routes/${routeId}/restore`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      toast({
+        title: "Route restored",
+        description: "Route has been restored and is now enabled.",
+      });
+    },
+    onError: (error) => {
+      console.error("Error restoring route:", error);
+      toast({
+        title: "Error",
+        description: "Failed to restore route. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRestoreRoute = (routeId: string) => {
+    restoreRouteMutation.mutate(routeId);
+  };
+
   const handleSendAlert = (route: Route) => {
     setAlertRoute(route);
     setAlertDialogOpen(true);
@@ -197,10 +223,10 @@ export default function RoutesPage() {
             All
           </ToggleGroupItem>
           <ToggleGroupItem value="active" data-testid="toggle-active">
-            Active
+            Enabled
           </ToggleGroupItem>
           <ToggleGroupItem value="inactive" data-testid="toggle-inactive">
-            Inactive
+            Disabled
           </ToggleGroupItem>
           <ToggleGroupItem value="archived" data-testid="toggle-archived">
             Archived
@@ -276,6 +302,7 @@ export default function RoutesPage() {
                     onSendAlert={() => handleSendAlert(route)}
                     onShowQr={() => handleShowQr(route.id, route.name)}
                     onArchive={() => handleArchiveRoute(route.id)}
+                    onRestore={() => handleRestoreRoute(route.id)}
                   />
                 );
               })}
@@ -305,9 +332,9 @@ export default function RoutesPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {route.status === "active" ? (
-                            <Badge className="bg-bus-active text-white">Active</Badge>
+                            <Badge className="bg-bus-active text-white">Enabled</Badge>
                           ) : (
-                            <Badge variant="secondary">Inactive</Badge>
+                            <Badge variant="secondary">Disabled</Badge>
                           )}
                           {routesWithActiveTrips.has(route.id) && (
                             <Badge className="bg-primary text-primary-foreground animate-pulse">
@@ -360,7 +387,18 @@ export default function RoutesPage() {
                               </Button>
                             </>
                           ) : (
-                            <Badge variant="secondary">Archived</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">Archived</Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRestoreRoute(route.id)}
+                                data-testid={`button-restore-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <RotateCcw className="w-3 h-3 mr-1" />
+                                Restore
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </TableCell>

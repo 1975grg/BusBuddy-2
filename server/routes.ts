@@ -1524,6 +1524,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Restore archived route
+  app.post("/api/routes/:id/restore", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user as AuthUser;
+      
+      // Verify route exists and get its organization
+      const route = await storage.getRoute(id);
+      if (!route) {
+        return res.status(404).json({ error: "Route not found" });
+      }
+      
+      // Org admins can only restore routes in their organization
+      if (user.role === "org_admin" && route.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You can only restore routes in your organization" });
+      }
+      
+      const result = await storage.restoreRoute(id);
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      console.log(`Route restored: ${id} by user ${user.id} (${user.role})`);
+      
+      res.json({ 
+        success: true,
+        message: "Route restored successfully"
+      });
+    } catch (error) {
+      console.error("Error restoring route:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // QR Code Generation for Routes
   app.get("/api/routes/:id/qr", async (req, res) => {
     try {

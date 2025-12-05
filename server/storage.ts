@@ -128,6 +128,7 @@ export interface IStorage {
   updateRoute(id: string, route: Partial<InsertRoute>): Promise<Route | undefined>;
   deleteRoute(id: string): Promise<boolean>;
   archiveRoute(id: string, archivedByUserId: string): Promise<{ success: boolean; error?: string; affectedRiders?: number; affectedDrivers?: number }>;
+  restoreRoute(id: string): Promise<{ success: boolean; error?: string }>;
   
   // Route stops management
   getRouteStop(id: string): Promise<RouteStop | undefined>;
@@ -716,6 +717,39 @@ export class DatabaseStorage implements IStorage {
         success: false, 
         error: "Failed to archive route" 
       };
+    }
+  }
+
+  async restoreRoute(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Check if route exists and is archived
+      const [route] = await db.select().from(routes).where(eq(routes.id, id));
+      if (!route) {
+        return { success: false, error: "Route not found" };
+      }
+      if (!route.archivedAt) {
+        return { success: false, error: "Route is not archived" };
+      }
+
+      // Restore the route by clearing archive fields and setting to active
+      await db.update(routes)
+        .set({ 
+          status: 'active',
+          isActive: true,
+          archivedAt: null,
+          archivedByUserId: null
+        })
+        .where(eq(routes.id, id));
+
+      // Also restore route stops
+      await db.update(routeStops)
+        .set({ isActive: true })
+        .where(eq(routeStops.routeId, id));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error restoring route:", error);
+      return { success: false, error: "Failed to restore route" };
     }
   }
 
@@ -1891,7 +1925,7 @@ export class MemStorage implements IStorage {
     }
     
     // For MemStorage, just mark as inactive (simplified archival)
-    const updated: Route = { ...existing, isActive: false, status: 'inactive' };
+    const updated: Route = { ...existing, isActive: false, status: 'inactive', archivedAt: new Date(), archivedByUserId };
     this.routes.set(id, updated);
     
     return { 
@@ -1899,6 +1933,22 @@ export class MemStorage implements IStorage {
       affectedRiders: 0, 
       affectedDrivers: 0 
     };
+  }
+
+  async restoreRoute(id: string): Promise<{ success: boolean; error?: string }> {
+    const existing = this.routes.get(id);
+    if (!existing) {
+      return { success: false, error: "Route not found" };
+    }
+    if (!existing.archivedAt) {
+      return { success: false, error: "Route is not archived" };
+    }
+    
+    // Restore the route
+    const updated: Route = { ...existing, isActive: true, status: 'active', archivedAt: null, archivedByUserId: null };
+    this.routes.set(id, updated);
+    
+    return { success: true };
   }
   
   // Route stops management
