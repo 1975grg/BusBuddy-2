@@ -97,6 +97,17 @@ export default function LoginPage() {
       if (data.sessionToken) {
         await setStoredSessionToken(data.sessionToken);
       }
+
+      // Check if user needs to reset their password (temp password on first login)
+      if (data.mustResetPassword) {
+        toast({
+          title: "Password Reset Required",
+          description: "Please set a new password to continue.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+        window.location.href = "/set-new-password";
+        return;
+      }
       
       toast({
         title: "Login successful!",

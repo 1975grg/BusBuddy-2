@@ -27,6 +27,7 @@ export const users = pgTable("users", {
   sessionExpiresAt: timestamp("session_expires_at"), // Session expiration
   passwordHash: text("password_hash"), // Hashed password for password-based login (optional - some users use magic links only)
   passwordExpiresAt: timestamp("password_expires_at"), // Password expiration (null = never expires, used for rider annual expiration on July 1st)
+  mustResetPassword: boolean("must_reset_password").notNull().default(false), // Forces password reset on next login (for temp passwords)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

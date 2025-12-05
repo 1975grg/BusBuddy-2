@@ -297,6 +297,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if user must reset password (temp password on first login)
+      if (user.mustResetPassword) {
+        // Generate a temporary session for password reset only
+        const sessionToken = generateSessionToken();
+        const sessionExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes for reset
+
+        await storage.setUserSession(user.id, sessionToken, sessionExpiresAt);
+
+        res.cookie("sessionToken", sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 30 * 60 * 1000, // 30 minutes
+        });
+
+        return res.json({
+          success: true,
+          mustResetPassword: true,
+          sessionToken,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            organizationId: user.organizationId,
+          }
+        });
+      }
+
       // Generate session token
       const sessionToken = generateSessionToken();
       const sessionExpiresAt = getSessionExpirationDate();
@@ -389,6 +419,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's password and expiration
       await storage.setUserPasswordWithExpiration(targetUserId, passwordHash, passwordExpiresAt);
+
+      // Clear the mustResetPassword flag if it was set (temp password has been changed)
+      if (targetUser.mustResetPassword) {
+        await storage.updateUser(targetUserId, { mustResetPassword: false });
+      }
 
       res.json({ success: true, message: "Password set successfully" });
     } catch (error) {
@@ -955,7 +990,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // System Admin - Organization Management Routes
   app.get("/api/system/organizations", async (req, res) => {
     try {
+      const { includeAdmins } = req.query;
       const organizations = await storage.getAllOrganizations();
+      
+      if (includeAdmins === "true") {
+        const orgsWithAdmins = await Promise.all(
+          organizations.map(async (org) => {
+            const admins = await storage.getUsersByRole("org_admin");
+            const orgAdmin = admins.find(admin => admin.organizationId === org.id);
+            return { ...org, admin: orgAdmin || null };
+          })
+        );
+        return res.json(orgsWithAdmins);
+      }
+      
       res.json(organizations);
     } catch (error) {
       console.error("Error fetching organizations:", error);
@@ -972,6 +1020,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating organization:", error);
       if (error.name === "ZodError") {
         return res.status(400).json({ error: "Invalid organization data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/system/organizations/admin", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const createAdminSchema = z.object({
+        organizationId: z.string().uuid(),
+        name: z.string().min(1),
+        email: z.string().email(),
+        password: z.string().min(6)
+      });
+      
+      const { organizationId, name, email, password } = createAdminSchema.parse(req.body);
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(organizationId);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Check if email is already in use
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already in use" });
+      }
+      
+      // Hash the password
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Create the admin user with mustResetPassword flag
+      const newAdmin = await storage.createUser({
+        name,
+        email,
+        role: "org_admin",
+        organizationId,
+        passwordHash,
+        isActive: true
+      });
+      
+      // Set the mustResetPassword flag
+      await storage.updateUser(newAdmin.id, { mustResetPassword: true });
+      
+      res.status(201).json(newAdmin);
+    } catch (error) {
+      console.error("Error creating org admin:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
       }
       res.status(500).json({ error: "Internal server error" });
     }

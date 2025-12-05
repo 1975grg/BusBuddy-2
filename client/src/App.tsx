@@ -37,6 +37,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import SetNewPasswordPage from "@/pages/SetNewPasswordPage";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/set-new-password" component={SetNewPasswordPage} />
       <Route path="/auth/verify" component={LoginPage} />
       <Route path="/auth/invite/:token" component={LoginPage} />
       
@@ -102,7 +104,7 @@ function AppContent() {
   });
   
   // Public pages that should not show sidebar/header
-  const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/ride/");
+  const isPublicPage = location === "/" || location === "/access" || location.startsWith("/login") || location.startsWith("/auth/") || location.startsWith("/forgot-password") || location.startsWith("/reset-password") || location.startsWith("/set-new-password") || location.startsWith("/ride/");
   
   // Rider pages should have minimal UI (no sidebar)
   const isRiderPage = location.startsWith("/rider") || location.startsWith("/track");

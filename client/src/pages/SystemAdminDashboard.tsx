@@ -1,18 +1,31 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { Building, Plus, Users, Activity, Settings } from "lucide-react";
-import type { Organization, OrganizationType } from "@shared/schema";
+import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send } from "lucide-react";
+import type { Organization, OrganizationType, User } from "@shared/schema";
+
+function generateTempPassword(): string {
+  const adjectives = ["Happy", "Swift", "Bright", "Cool", "Smart"];
+  const nouns = ["Bus", "Route", "Trip", "Rider", "Driver"];
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const number = Math.floor(Math.random() * 900) + 100;
+  return `${adjective}${noun}${number}!`;
+}
+
+interface OrgWithAdmin extends Organization {
+  admin?: User | null;
+}
 
 export default function SystemAdminDashboard() {
   const { user, isLoading: authLoading } = useRequireRole("system_admin");
@@ -23,14 +36,21 @@ export default function SystemAdminDashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
+  const [createAdminDialog, setCreateAdminDialog] = useState<{ open: boolean; org: Organization | null }>({ open: false, org: null });
+  const [newAdminForm, setNewAdminForm] = useState({ name: "", email: "" });
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [successDialog, setSuccessDialog] = useState<{ open: boolean; email: string; password: string; orgName: string }>({ open: false, email: "", password: "", orgName: "" });
+
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
-  // Fetch all organizations
+  // Fetch all organizations with their admins
   const { data: organizations, isLoading } = useQuery({
     queryKey: ["/api/system/organizations"],
     queryFn: async () => {
-      const response = await fetch("/api/system/organizations");
+      const response = await fetch("/api/system/organizations?includeAdmins=true");
       if (!response.ok) throw new Error("Failed to fetch organizations");
-      return response.json() as Promise<Organization[]>;
+      return response.json() as Promise<OrgWithAdmin[]>;
     },
     enabled: !authLoading,
   });
@@ -64,6 +84,66 @@ export default function SystemAdminDashboard() {
       });
     }
   });
+
+  const createAdminMutation = useMutation({
+    mutationFn: async (data: { organizationId: string; name: string; email: string; password: string }) => {
+      const response = await fetch("/api/system/organizations/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create admin");
+      }
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system/organizations"] });
+      setSuccessDialog({ 
+        open: true, 
+        email: variables.email, 
+        password: variables.password,
+        orgName: createAdminDialog.org?.name || ""
+      });
+      setCreateAdminDialog({ open: false, org: null });
+      setNewAdminForm({ name: "", email: "" });
+      setGeneratedPassword("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create admin",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const openCreateAdminDialog = (org: Organization) => {
+    const password = generateTempPassword();
+    setGeneratedPassword(password);
+    setNewAdminForm({ name: "", email: "" });
+    setShowPassword(true);
+    setCopied(false);
+    setCreateAdminDialog({ open: true, org });
+  };
+
+  const handleCreateAdmin = () => {
+    if (!createAdminDialog.org || !newAdminForm.name.trim() || !newAdminForm.email.trim()) return;
+    
+    createAdminMutation.mutate({
+      organizationId: createAdminDialog.org.id,
+      name: newAdminForm.name.trim(),
+      email: newAdminForm.email.trim().toLowerCase(),
+      password: generatedPassword
+    });
+  };
+
+  const copyPassword = () => {
+    navigator.clipboard.writeText(successDialog.password || generatedPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleCreateOrganization = () => {
     if (!newOrgName.trim()) {
@@ -288,10 +368,31 @@ export default function SystemAdminDashboard() {
                         {org.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </div>
+
+                    {org.admin ? (
+                      <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{org.admin.name}</p>
+                          <p className="text-xs text-muted-foreground">{org.admin.email}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => openCreateAdminDialog(org)}
+                        data-testid={`button-create-admin-${org.id}`}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create First Admin
+                      </Button>
+                    )}
                     
                     <Separator />
                     
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-sm gap-2">
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -338,6 +439,154 @@ export default function SystemAdminDashboard() {
           </Card>
         )}
       </div>
+
+      <Dialog open={createAdminDialog.open} onOpenChange={(open) => {
+        if (!open) setCreateAdminDialog({ open: false, org: null });
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Organization Admin</DialogTitle>
+            <DialogDescription>
+              Create the first administrator for {createAdminDialog.org?.name}. They will receive a temporary password and be required to set a new one on first login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="admin-name">Admin Name</Label>
+              <Input
+                id="admin-name"
+                placeholder="Full name"
+                value={newAdminForm.name}
+                onChange={(e) => setNewAdminForm({ ...newAdminForm, name: e.target.value })}
+                data-testid="input-new-admin-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-email">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="admin-email"
+                  type="email"
+                  placeholder="admin@organization.com"
+                  className="pl-10"
+                  value={newAdminForm.email}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })}
+                  data-testid="input-new-admin-email"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Temporary Password</Label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={generatedPassword}
+                    readOnly
+                    className="pr-10 font-mono"
+                    data-testid="input-temp-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedPassword);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  data-testid="button-copy-password"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This password will be required on first login. The admin will be prompted to create a new password.
+              </p>
+            </div>
+            <div className="p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
+              <p className="flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                <span className="font-medium">Magic Link</span>
+                <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+              </p>
+              <p className="mt-1 text-xs">Email magic links will be available once SendGrid is configured.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateAdminDialog({ open: false, org: null })}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateAdmin}
+              disabled={!newAdminForm.name.trim() || !newAdminForm.email.trim() || createAdminMutation.isPending}
+              data-testid="button-confirm-create-admin"
+            >
+              {createAdminMutation.isPending ? "Creating..." : "Create Admin"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={successDialog.open} onOpenChange={(open) => {
+        if (!open) setSuccessDialog({ open: false, email: "", password: "", orgName: "" });
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Check className="w-5 h-5 text-green-500" />
+              Admin Created Successfully
+            </DialogTitle>
+            <DialogDescription>
+              The administrator account for {successDialog.orgName} has been created.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-medium">{successDialog.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Temporary Password</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-muted px-3 py-2 rounded-md font-mono text-sm">
+                      {successDialog.password}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={copyPassword}
+                      data-testid="button-copy-success-password"
+                    >
+                      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <p className="text-sm text-muted-foreground">
+              Share these credentials with the organization admin. They will be required to set a new password on their first login.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSuccessDialog({ open: false, email: "", password: "", orgName: "" })}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
