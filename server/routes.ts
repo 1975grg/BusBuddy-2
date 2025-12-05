@@ -1373,8 +1373,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Org admins can ONLY see routes from their own organization
         // Never trust client-provided organizationId
         routes = await storage.getRoutesByOrganization(user.organizationId);
-      } else if (user.role === "driver" || user.role === "rider") {
-        // Drivers and riders can only see routes they're assigned to
+      } else if (user.role === "driver") {
+        // Drivers can see ALL active routes in their organization
+        // This allows any driver to operate any route without needing explicit assignment
+        routes = await storage.getRoutesByOrganization(user.organizationId);
+      } else if (user.role === "rider") {
+        // Riders can only see routes they're assigned to (via subscription)
         const assignedRouteIds = user.routeAssignments?.map(a => a.routeId) || [];
         if (assignedRouteIds.length === 0) {
           return res.json([]); // No assigned routes
