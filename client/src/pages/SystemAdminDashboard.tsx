@@ -42,6 +42,7 @@ export default function SystemAdminDashboard() {
   const [showPassword, setShowPassword] = useState(true);
   const [copied, setCopied] = useState(false);
   const [successDialog, setSuccessDialog] = useState<{ open: boolean; email: string; password: string; orgName: string }>({ open: false, email: "", password: "", orgName: "" });
+  const [viewOrgDialog, setViewOrgDialog] = useState<{ open: boolean; org: OrgWithAdmin | null }>({ open: false, org: null });
 
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Fetch all organizations with their admins
@@ -392,32 +393,16 @@ export default function SystemAdminDashboard() {
                     
                     <Separator />
                     
-                    <div className="flex justify-between text-sm gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          localStorage.setItem("selected_org_id", org.id);
-                          setLocation("/admin");
-                        }}
-                        data-testid={`button-manage-${org.id}`}
-                      >
-                        <Users className="w-3 h-3 mr-1" />
-                        Manage
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          localStorage.setItem("selected_org_id", org.id);
-                          setLocation("/admin/settings");
-                        }}
-                        data-testid={`button-settings-${org.id}`}
-                      >
-                        <Settings className="w-3 h-3 mr-1" />
-                        Settings
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setViewOrgDialog({ open: true, org })}
+                      data-testid={`button-view-details-${org.id}`}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View Details
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -583,6 +568,102 @@ export default function SystemAdminDashboard() {
           <DialogFooter>
             <Button onClick={() => setSuccessDialog({ open: false, email: "", password: "", orgName: "" })}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewOrgDialog.open} onOpenChange={(open) => {
+        if (!open) setViewOrgDialog({ open: false, org: null });
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5" />
+              {viewOrgDialog.org?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Organization details and statistics
+            </DialogDescription>
+          </DialogHeader>
+          {viewOrgDialog.org && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Type</p>
+                  <p className="font-medium capitalize">{viewOrgDialog.org.type.replace("_", " ")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge variant={viewOrgDialog.org.isActive ? "default" : "secondary"}>
+                    {viewOrgDialog.org.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Created</p>
+                  <p className="font-medium">{viewOrgDialog.org.createdAt ? new Date(viewOrgDialog.org.createdAt).toLocaleDateString() : "Unknown"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Primary Color</p>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: viewOrgDialog.org.primaryColor }}
+                    />
+                    <span className="text-sm">{viewOrgDialog.org.primaryColor}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <p className="text-sm font-medium mb-2">Administrator</p>
+                {viewOrgDialog.org.admin ? (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{viewOrgDialog.org.admin.name}</p>
+                          <p className="text-sm text-muted-foreground">{viewOrgDialog.org.admin.email}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-4 text-center text-muted-foreground">
+                      <p>No administrator assigned</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => {
+                          setViewOrgDialog({ open: false, org: null });
+                          openCreateAdminDialog(viewOrgDialog.org!);
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create Admin
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              
+              <Separator />
+              
+              <div className="text-sm text-muted-foreground">
+                <p>More details like routes, drivers, and riders count will be available in a future update.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewOrgDialog({ open: false, org: null })}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -27,6 +27,7 @@ function getOrgAbbreviation(orgName: string | undefined): string {
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
 import SupportCenterPage from "@/pages/SupportCenterPage";
 import SystemAdminDashboard from "@/pages/SystemAdminDashboard";
+import SystemInboxPage from "@/pages/SystemInboxPage";
 import RoutesPage from "@/pages/RoutesPage";
 import AccessManagementPage from "@/pages/AccessManagementPage";
 import DriverPage from "@/pages/DriverPage";
@@ -47,6 +48,7 @@ function Router() {
       {/* System Admin Routes */}
       <Route path="/system" component={SystemAdminDashboard} />
       <Route path="/system/organizations" component={SystemAdminDashboard} />
+      <Route path="/system/inbox" component={SystemInboxPage} />
       
       {/* Admin Routes */}
       <Route path="/admin" component={AdminDashboardPage} />

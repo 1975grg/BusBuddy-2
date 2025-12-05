@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin, MessageSquare, ChevronDown, Bell, LogOut } from "lucide-react";
+import { Calendar, Home, Route as RouteIcon, Users, Settings, Zap, MapPin, MessageSquare, ChevronDown, Bell, LogOut, Building, Mail } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -32,9 +32,10 @@ import adminIconUrl from "@assets/generated_images/Admin_control_tower_icon_4485
 import driverIconUrl from "@assets/generated_images/Driver_steering_wheel_icon_1bfac9fb.png";
 import riderIconUrl from "@assets/generated_images/Rider_GPS_pin_icon_48a84853.png";
 
-const getRoleIcon = (role: "admin" | "driver" | "rider") => {
+const getRoleIcon = (role: "system_admin" | "org_admin" | "driver" | "rider") => {
   switch (role) {
-    case "admin": return adminIconUrl;
+    case "system_admin": return adminIconUrl;
+    case "org_admin": return adminIconUrl;
     case "driver": return driverIconUrl;
     case "rider": return riderIconUrl;
     default: return adminIconUrl;
@@ -118,13 +119,17 @@ export function AppSidebar() {
     }
   };
   
-  // Detect user role from URL path
-  const userRole = useMemo<"admin" | "driver" | "rider">(() => {
-    if (location.startsWith("/admin") || location.startsWith("/system")) return "admin";
+  // Detect user role - use actual user role for system admins, URL path for others
+  const userRole = useMemo<"system_admin" | "org_admin" | "driver" | "rider">(() => {
+    // System admins are identified by their actual role AND the /system URL
+    if (location.startsWith("/system") && authenticatedUser?.role === "system_admin") {
+      return "system_admin";
+    }
+    if (location.startsWith("/admin")) return "org_admin";
     if (location.startsWith("/driver")) return "driver";
     if (location.startsWith("/track") || location.startsWith("/rider")) return "rider";
-    return "admin"; // default fallback
-  }, [location]);
+    return "org_admin"; // default fallback
+  }, [location, authenticatedUser?.role]);
   
   // Fetch organization data for branding (uses same endpoint as SettingsPage)
   const { data: orgSettings } = useQuery({
@@ -136,19 +141,19 @@ export function AppSidebar() {
     }
   });
 
-  // Fetch routes to get active count (only for admin)
+  // Fetch routes to get active count (only for org_admin)
   const { data: routes = [] } = useQuery<Route[]>({
     queryKey: ["/api/routes"],
-    enabled: userRole === "admin" && !!authenticatedUser,
+    enabled: userRole === "org_admin" && !!authenticatedUser,
   });
 
   // Use authenticated user's organization ID instead of mock endpoints
   const userOrgId = authenticatedUser?.organizationId;
 
   // Fetch messages based on user role using real authenticated user's org
-  // Admin: all organization messages
+  // Org Admin: all organization messages
   const { data: adminRiderMessages = [] } = useQuery({
-    queryKey: ["/api/rider-messages", "admin", userOrgId],
+    queryKey: ["/api/rider-messages", "org_admin", userOrgId],
     queryFn: async () => {
       if (!userOrgId) return [];
       const response = await fetch(`/api/rider-messages?organization_id=${userOrgId}`);
@@ -158,12 +163,12 @@ export function AppSidebar() {
       }
       return response.json();
     },
-    enabled: userRole === "admin" && !!userOrgId,
+    enabled: userRole === "org_admin" && !!userOrgId,
     refetchInterval: 10000,
   });
 
   const { data: adminDriverMessages = [] } = useQuery({
-    queryKey: ["/api/driver-messages", "admin", userOrgId],
+    queryKey: ["/api/driver-messages", "org_admin", userOrgId],
     queryFn: async () => {
       if (!userOrgId) return [];
       const response = await fetch(`/api/driver-messages?organization_id=${userOrgId}`);
@@ -173,7 +178,7 @@ export function AppSidebar() {
       }
       return response.json();
     },
-    enabled: userRole === "admin" && !!userOrgId,
+    enabled: userRole === "org_admin" && !!userOrgId,
     refetchInterval: 10000,
   });
 
@@ -213,11 +218,11 @@ export function AppSidebar() {
     refetchInterval: 10000,
   });
 
-  const activeRoutesCount = userRole === "admin" ? routes.filter(route => route.status === "active").length : 0;
+  const activeRoutesCount = userRole === "org_admin" ? routes.filter(route => route.status === "active").length : 0;
   
   // Count new messages (status = 'new') based on role
   const newMessagesCount = useMemo(() => {
-    if (userRole === "admin") {
+    if (userRole === "org_admin") {
       return [
         ...(Array.isArray(adminRiderMessages) ? adminRiderMessages : []),
         ...(Array.isArray(adminDriverMessages) ? adminDriverMessages : [])
@@ -233,7 +238,21 @@ export function AppSidebar() {
   // Build menu items based on user role
   const menuItems = useMemo<MenuItem[]>(() => {
     switch (userRole) {
-      case "admin":
+      case "system_admin":
+        return [
+          {
+            title: "Organizations",
+            url: "/system",
+            icon: Building,
+          },
+          {
+            title: "System Inbox",
+            url: "/system/inbox",
+            icon: Mail,
+            badge: undefined, // Future: system-level messages from org admins
+          },
+        ];
+      case "org_admin":
         return [
           {
             title: "Dashboard",
@@ -276,7 +295,8 @@ export function AppSidebar() {
 
   const getRoleColor = () => {
     switch (userRole) {
-      case "admin": return "bg-primary";
+      case "system_admin": return "bg-purple-600";
+      case "org_admin": return "bg-primary";
       case "driver": return "bg-bus-active";
       case "rider": return "bg-accent";
       default: return "bg-primary";
@@ -313,22 +333,26 @@ export function AppSidebar() {
           <DropdownMenuContent align="start" className="w-56">
             {authenticatedUser && (
               <>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer" data-testid="menu-settings">
-                    <Settings className="w-4 h-4" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/support?tab=notification-logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
-                    <div className="flex items-center gap-2">
-                      <Bell className="w-4 h-4" />
-                      <span>Notification Logs</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground pl-6">View SMS notification history</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {userRole !== "system_admin" && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer" data-testid="menu-settings">
+                        <Settings className="w-4 h-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/support?tab=notification-logs" className="flex flex-col items-start gap-1 cursor-pointer" data-testid="menu-notification-logs">
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-4 h-4" />
+                          <span>Notification Logs</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground pl-6">View SMS notification history</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer text-destructive" data-testid="menu-logout">
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -351,7 +375,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${getRoleColor()}`} />
-            {userRole === "admin" ? "Administration" : userRole === "driver" ? "Driver Panel" : "Rider Portal"}
+            {userRole === "system_admin" ? "System Administration" : userRole === "org_admin" ? "Administration" : userRole === "driver" ? "Driver Panel" : "Rider Portal"}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
