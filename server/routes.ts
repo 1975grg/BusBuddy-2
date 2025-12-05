@@ -220,19 +220,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logout
-  app.post("/api/auth/logout", authenticateUser, async (req, res) => {
+  // Logout - doesn't require authentication since we want logout to succeed
+  // even when the session is already expired
+  app.post("/api/auth/logout", async (req, res) => {
     try {
-      const user = (req as any).user as AuthUser;
-      await storage.clearUserSession(user.id);
+      // Try to get the session token and clear the user's session if valid
+      const sessionToken = req.cookies?.sessionToken || req.headers.authorization?.replace("Bearer ", "");
       
-      // Clear session cookie
+      if (sessionToken) {
+        const session = await storage.getSession(sessionToken);
+        if (session) {
+          await storage.clearUserSession(session.userId);
+        }
+      }
+      
+      // Always clear the session cookie
       res.clearCookie("sessionToken");
       
+      // Always return success - user is logged out either way
       res.json({ success: true });
     } catch (error) {
       console.error("Error logging out:", error);
-      res.status(500).json({ error: "Internal server error" });
+      // Even on error, clear the cookie and return success
+      res.clearCookie("sessionToken");
+      res.json({ success: true });
     }
   });
 
