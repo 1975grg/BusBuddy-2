@@ -1095,6 +1095,258 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== STAFF MANAGEMENT (Drivers & Admins) ====================
+  
+  // Get staff members (drivers and admins) for the organization
+  app.get("/api/staff", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { role } = req.query;
+      
+      // Get all users for the organization
+      const allUsers = await storage.getUsersByOrganization(user.organizationId);
+      
+      // Filter to only drivers and org_admins
+      let staffMembers = allUsers.filter(u => 
+        u.role === "driver" || u.role === "org_admin"
+      );
+      
+      // Further filter by role if specified
+      if (role && typeof role === "string") {
+        staffMembers = staffMembers.filter(u => u.role === role);
+      }
+      
+      // For each driver, get their route assignments
+      const staffWithAssignments = await Promise.all(
+        staffMembers.map(async (staff) => {
+          if (staff.role === "driver") {
+            const assignments = await storage.getUserRouteAssignments(staff.id);
+            return { ...staff, routeAssignments: assignments };
+          }
+          return { ...staff, routeAssignments: [] };
+        })
+      );
+      
+      res.json(staffWithAssignments);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Create a new staff member (driver or admin)
+  app.post("/api/staff", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      
+      const staffSchema = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        phoneNumber: z.string().optional(),
+        role: z.enum(["driver", "org_admin"], { errorMap: () => ({ message: "Role must be driver or org_admin" }) }),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        routeId: z.string().uuid().optional(), // For drivers - which route to assign
+      });
+      
+      const validationResult = staffSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid data", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { name, email, phoneNumber, role, password, routeId } = validationResult.data;
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "A user with this email already exists" });
+      }
+      
+      // Hash the password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Create the user
+      const newStaff = await storage.createUser({
+        name,
+        email,
+        phoneNumber: phoneNumber || null,
+        role,
+        organizationId: user.organizationId,
+        passwordHash,
+        isActive: true,
+      });
+      
+      // If driver and routeId provided, create route assignment
+      if (role === "driver" && routeId) {
+        // Verify route belongs to organization
+        const route = await storage.getRoute(routeId);
+        if (!route || route.organizationId !== user.organizationId) {
+          // User created but route assignment failed - still return success
+          return res.status(201).json({ 
+            ...newStaff, 
+            routeAssignments: [],
+            warning: "User created but route assignment failed - route not found in organization" 
+          });
+        }
+        
+        await storage.createUserRouteAssignment({
+          userId: newStaff.id,
+          routeId,
+          assignedByUserId: user.id,
+          isDefault: true,
+          isActive: true,
+        });
+        
+        // Fetch assignments to return with response
+        const assignments = await storage.getUserRouteAssignments(newStaff.id);
+        return res.status(201).json({ ...newStaff, routeAssignments: assignments });
+      }
+      
+      res.status(201).json({ ...newStaff, routeAssignments: [] });
+    } catch (error) {
+      console.error("Error creating staff member:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Update a staff member
+  app.patch("/api/staff/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { id } = req.params;
+      
+      // Get the staff member
+      const staffMember = await storage.getUser(id);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      
+      // Verify same organization (org admins can only manage their own org)
+      if (user.role === "org_admin" && staffMember.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "Cannot modify staff from another organization" });
+      }
+      
+      // Verify it's actually a staff member (driver or org_admin)
+      if (staffMember.role !== "driver" && staffMember.role !== "org_admin") {
+        return res.status(400).json({ error: "This endpoint is only for drivers and admins" });
+      }
+      
+      const updateSchema = z.object({
+        name: z.string().min(1).optional(),
+        phoneNumber: z.string().optional().nullable(),
+        routeId: z.string().uuid().optional().nullable(), // For reassigning driver to route
+      });
+      
+      const validationResult = updateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid data", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { name, phoneNumber, routeId } = validationResult.data;
+      
+      // Update user fields
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+      
+      let updatedStaff = staffMember;
+      if (Object.keys(updateData).length > 0) {
+        updatedStaff = await storage.updateUser(id, updateData) || staffMember;
+      }
+      
+      // Handle route assignment for drivers
+      if (staffMember.role === "driver" && routeId !== undefined) {
+        // Get current assignments
+        const currentAssignments = await storage.getUserRouteAssignments(id);
+        
+        if (routeId === null) {
+          // Remove all assignments
+          for (const assignment of currentAssignments) {
+            await storage.revokeRouteAssignment(assignment.id, user.id);
+          }
+        } else {
+          // Verify route belongs to organization
+          const route = await storage.getRoute(routeId);
+          if (!route || route.organizationId !== user.organizationId) {
+            return res.status(400).json({ error: "Route not found in your organization" });
+          }
+          
+          // Remove existing assignments and add new one
+          for (const assignment of currentAssignments) {
+            await storage.revokeRouteAssignment(assignment.id, user.id);
+          }
+          
+          await storage.createUserRouteAssignment({
+            userId: id,
+            routeId,
+            assignedByUserId: user.id,
+            isDefault: true,
+            isActive: true,
+          });
+        }
+      }
+      
+      // Fetch updated assignments
+      const assignments = await storage.getUserRouteAssignments(id);
+      
+      res.json({ ...updatedStaff, routeAssignments: assignments });
+    } catch (error) {
+      console.error("Error updating staff member:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Delete/deactivate a staff member
+  app.delete("/api/staff/:id", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { id } = req.params;
+      
+      // Get the staff member
+      const staffMember = await storage.getUser(id);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      
+      // Prevent self-deletion
+      if (staffMember.id === user.id) {
+        return res.status(400).json({ error: "Cannot remove your own account" });
+      }
+      
+      // Verify same organization
+      if (user.role === "org_admin" && staffMember.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "Cannot remove staff from another organization" });
+      }
+      
+      // Verify it's a staff member
+      if (staffMember.role !== "driver" && staffMember.role !== "org_admin") {
+        return res.status(400).json({ error: "This endpoint is only for drivers and admins" });
+      }
+      
+      // Revoke all route assignments for drivers
+      if (staffMember.role === "driver") {
+        const assignments = await storage.getUserRouteAssignments(id);
+        for (const assignment of assignments) {
+          await storage.revokeRouteAssignment(assignment.id, user.id);
+        }
+      }
+      
+      // Deactivate the user
+      await storage.deactivateUser(id);
+      
+      res.json({ success: true, message: "Staff member removed successfully" });
+    } catch (error) {
+      console.error("Error removing staff member:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Route Management Routes
   app.get("/api/routes", authenticateUser, async (req, res) => {
     try {

@@ -1,27 +1,34 @@
 import { useState, useEffect } from "react";
 import { AccessCodeGenerator } from "@/components/AccessCodeGenerator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock, Plus, UserCog, Mail, Phone, Key, Edit } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiRequest } from "@/lib/queryClient";
-import type { Route, RiderProfile } from "@shared/schema";
+import type { Route, RiderProfile, User, UserRouteAssignment } from "@shared/schema";
 
 interface RiderWithSubscription extends RiderProfile {
   subscriptionId: string;
   notificationMode: string;
 }
 
+interface StaffMember extends User {
+  routeAssignments: UserRouteAssignment[];
+}
+
 interface RemovalDialogState {
   open: boolean;
-  type: "rider" | "driver" | null;
+  type: "rider" | "driver" | "admin" | null;
   id: string | null;
   name: string | null;
 }
@@ -34,12 +41,11 @@ export default function AccessManagementPage() {
   if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
-  // Fetch real routes from API
+
   const { data: routes = [], isLoading } = useQuery<Route[]>({
     queryKey: ["/api/routes"],
   });
 
-  // Filter to only show active routes and sort alphabetically (same as Routes page default)
   const activeRoutes = routes
     .filter(route => route.status === "active" && !route.archivedAt)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -54,17 +60,31 @@ export default function AccessManagementPage() {
     id: null,
     name: null,
   });
-  
   const [renewalDialog, setRenewalDialog] = useState(false);
+  const [addDriverDialog, setAddDriverDialog] = useState(false);
+  const [addAdminDialog, setAddAdminDialog] = useState(false);
   
-  // Set first route as selected when routes load (useEffect to avoid render issues)
+  const [newDriverForm, setNewDriverForm] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+    routeId: "",
+  });
+  
+  const [newAdminForm, setNewAdminForm] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+  });
+  
   useEffect(() => {
     if (!selectedRoute && activeRoutes.length > 0) {
       setSelectedRoute(activeRoutes[0].id);
     }
   }, [selectedRoute, activeRoutes]);
   
-  // Fetch organization settings for branding
   const { data: orgSettings } = useQuery({
     queryKey: ["/api/org-settings"],
     queryFn: async () => {
@@ -74,7 +94,6 @@ export default function AccessManagementPage() {
     }
   });
 
-  // Fetch riders for selected route
   const { data: riders = [], isLoading: ridersLoading } = useQuery<RiderWithSubscription[]>({
     queryKey: ["/api/routes", selectedRoute, "riders"],
     queryFn: async () => {
@@ -85,96 +104,162 @@ export default function AccessManagementPage() {
     enabled: !!selectedRoute,
   });
 
-  const selectedRouteData = activeRoutes.find(r => r.id === selectedRoute);
+  const { data: staff = [], isLoading: staffLoading } = useQuery<StaffMember[]>({
+    queryKey: ["/api/staff"],
+    queryFn: async () => {
+      const response = await fetch("/api/staff");
+      if (!response.ok) throw new Error("Failed to fetch staff");
+      return response.json();
+    },
+  });
 
-  // Filter and sort riders
+  const drivers = staff.filter(s => s.role === "driver" && s.isActive);
+  const admins = staff.filter(s => s.role === "org_admin" && s.isActive);
+
   const filteredRiders = riders
     .filter(rider => {
-      // Search filter - check name and phone
       const searchLower = riderSearch.toLowerCase();
       const matchesSearch = !riderSearch || 
         rider.name?.toLowerCase().includes(searchLower) ||
         rider.phoneNumber?.toLowerCase().includes(searchLower);
-      
-      // Notification mode filter
       const matchesNotification = notificationFilter === "all" || 
         rider.notificationMode === notificationFilter;
-      
       return matchesSearch && matchesNotification;
     })
     .sort((a, b) => {
       if (sortBy === "name") {
         return (a.name || "").localeCompare(b.name || "");
       } else {
-        // Sort by joined date (createdAt) - newest first
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;
       }
     });
 
-  // Remove rider mutation
-  const removeMutation = useMutation({
+  const removeRiderMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       return await apiRequest("DELETE", `/api/routes/${selectedRoute}/riders/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute, "riders"] });
       setRemovalDialog({ open: false, type: null, id: null, name: null });
+      toast({ title: "Rider removed", description: "Rider access has been revoked." });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to remove access. Please try again.",
+        description: error.message || "Failed to remove rider.",
         variant: "destructive",
       });
     },
   });
 
-  const handleRemove = () => {
-    if (removalDialog.id) {
-      removeMutation.mutate({ id: removalDialog.id });
-    }
-  };
+  const removeStaffMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      return await apiRequest("DELETE", `/api/staff/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setRemovalDialog({ open: false, type: null, id: null, name: null });
+      toast({ title: "Staff removed", description: "Staff member has been deactivated." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove staff member.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  // Renew all rider passwords mutation
+  const addDriverMutation = useMutation({
+    mutationFn: async (data: typeof newDriverForm) => {
+      const response = await apiRequest("POST", "/api/staff", {
+        ...data,
+        role: "driver",
+        routeId: data.routeId || undefined,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setAddDriverDialog(false);
+      setNewDriverForm({ name: "", email: "", phoneNumber: "", password: "", routeId: "" });
+      toast({ title: "Driver added", description: "New driver account created successfully." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create driver account.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addAdminMutation = useMutation({
+    mutationFn: async (data: typeof newAdminForm) => {
+      const response = await apiRequest("POST", "/api/staff", {
+        ...data,
+        role: "org_admin",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      setAddAdminDialog(false);
+      setNewAdminForm({ name: "", email: "", phoneNumber: "", password: "" });
+      toast({ title: "Admin added", description: "New admin account created successfully." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create admin account.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const renewPasswordsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.organizationId) {
         throw new Error("Organization ID not found");
       }
-      
       const response = await apiRequest("POST", "/api/users/renew-all-rider-passwords", {
         organizationId: user.organizationId
       });
       return response.json();
     },
     onSuccess: (data: any) => {
-      // Invalidate all queries that might be affected by password renewal
       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
-      if (selectedRoute) {
-        queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute] });
-      }
-      
       toast({
         title: "Passwords Renewed",
-        description: data.message || `Successfully renewed passwords for ${data.renewedCount} rider${data.renewedCount !== 1 ? 's' : ''}. New expiration: July 1st.`,
+        description: data.message || `Successfully renewed passwords for ${data.renewedCount} rider(s).`,
       });
       setRenewalDialog(false);
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to renew passwords. Please try again.",
+        description: error.message || "Failed to renew passwords.",
         variant: "destructive",
       });
     },
   });
 
-  const handleRenewPasswords = () => {
-    renewPasswordsMutation.mutate();
+  const handleRemove = () => {
+    if (!removalDialog.id) return;
+    
+    if (removalDialog.type === "rider") {
+      removeRiderMutation.mutate({ id: removalDialog.id });
+    } else {
+      removeStaffMutation.mutate({ id: removalDialog.id });
+    }
+  };
+
+  const getRouteName = (routeId: string) => {
+    const route = routes.find(r => r.id === routeId);
+    return route?.name || "Unassigned";
   };
 
   if (isLoading) {
@@ -185,192 +270,341 @@ export default function AccessManagementPage() {
     );
   }
 
-  if (activeRoutes.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Access Management</h1>
-          <p className="text-muted-foreground">Generate access codes and manage rider permissions</p>
-        </div>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No active routes found. Create and activate routes to manage access.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Access Management</h1>
-          <p className="text-muted-foreground">Generate access codes and manage rider permissions</p>
-        </div>
-        <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-          <SelectTrigger className="w-64" data-testid="select-route">
-            <Bus className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Select route" />
-          </SelectTrigger>
-          <SelectContent>
-            {activeRoutes.map((route) => (
-              <SelectItem key={route.id} value={route.id} data-testid={`option-route-${route.id}`}>
-                {route.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div>
+        <h1 className="text-2xl font-bold">Access Management</h1>
+        <p className="text-muted-foreground">Manage riders, drivers, and admin accounts</p>
       </div>
 
-      {activeRoutes.map((route) => (
-        selectedRoute === route.id && (
-          <div key={route.id} className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AccessCodeGenerator 
-                routeId={route.id}
-                routeName={route.name}
-                organizationName={orgSettings?.name || "Springfield University"}
-                organizationLogo={orgSettings?.logoUrl || ""}
-              />
+      <Tabs defaultValue="riders" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="riders" data-testid="tab-riders">
+            <Users className="w-4 h-4 mr-2" />
+            Riders
+          </TabsTrigger>
+          <TabsTrigger value="drivers" data-testid="tab-drivers">
+            <Car className="w-4 h-4 mr-2" />
+            Drivers
+          </TabsTrigger>
+          <TabsTrigger value="admins" data-testid="tab-admins">
+            <UserCog className="w-4 h-4 mr-2" />
+            Admins
+          </TabsTrigger>
+        </TabsList>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Access Control
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Active Tokens</p>
-                      <p className="text-sm text-muted-foreground">
-                        0 devices have remembered access
-                      </p>
-                    </div>
-                    <Badge variant="outline">
-                      <Users className="w-3 h-3 mr-1" />
-                      0
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => setRenewalDialog(true)}
-                      data-testid="button-renew-passwords"
-                    >
-                      <CalendarClock className="w-4 h-4 mr-2" />
-                      Renew All Rider Passwords
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Reset all rider password expiration dates to next July 1st.
-                    </p>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => console.log('Revoke all tokens')}
-                      data-testid="button-revoke-all"
-                    >
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Revoke All Access Tokens
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      This will require all riders to re-authenticate using QR codes, links, or passwords.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Riders Section */}
+        <TabsContent value="riders" className="space-y-6 mt-6">
+          {activeRoutes.length === 0 ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Riders
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">No active routes found. Create and activate routes to manage rider access.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+                  <SelectTrigger className="w-64" data-testid="select-route">
+                    <Bus className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Select route" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeRoutes.map((route) => (
+                      <SelectItem key={route.id} value={route.id} data-testid={`option-route-${route.id}`}>
+                        {route.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedRoute && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <AccessCodeGenerator 
+                      routeId={selectedRoute}
+                      routeName={activeRoutes.find(r => r.id === selectedRoute)?.name || ""}
+                      organizationName={orgSettings?.name || "Organization"}
+                      organizationLogo={orgSettings?.logoUrl || ""}
+                    />
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Shield className="w-5 h-5" />
+                          Access Control
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Button 
+                            variant="outline" 
+                            className="w-full"
+                            onClick={() => setRenewalDialog(true)}
+                            data-testid="button-renew-passwords"
+                          >
+                            <CalendarClock className="w-4 h-4 mr-2" />
+                            Renew All Rider Passwords
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Reset all rider password expiration dates to next July 1st.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                  <Badge variant="outline">{riders.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {ridersLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
-                ) : riders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No riders assigned to this route yet.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Search and Filter Controls */}
-                    <div className="flex gap-2 flex-wrap">
-                      <div className="relative flex-1 min-w-[200px]">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-5 h-5" />
+                          Riders for {activeRoutes.find(r => r.id === selectedRoute)?.name}
+                        </div>
+                        <Badge variant="outline">{riders.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {ridersLoading ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        </div>
+                      ) : riders.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No riders assigned to this route yet. Share the QR code or link above to invite riders.
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex gap-2 flex-wrap">
+                            <div className="relative flex-1 min-w-[200px]">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search by name or phone..."
+                                value={riderSearch}
+                                onChange={(e) => setRiderSearch(e.target.value)}
+                                className="pl-10"
+                                data-testid="input-search-riders"
+                              />
+                            </div>
+                            <Select value={notificationFilter} onValueChange={setNotificationFilter}>
+                              <SelectTrigger className="w-40" data-testid="select-notification-filter">
+                                <Filter className="w-4 h-4 mr-2" />
+                                <SelectValue placeholder="Filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Modes</SelectItem>
+                                <SelectItem value="sms">SMS</SelectItem>
+                                <SelectItem value="push">Push</SelectItem>
+                                <SelectItem value="email">Email</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                            {filteredRiders.map((rider) => (
+                              <div 
+                                key={rider.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg"
+                              >
+                                <div className="flex-1">
+                                  <p className="font-medium">{rider.name || "Unnamed Rider"}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {rider.phoneNumber}
+                                    {rider.notificationMode && (
+                                      <Badge variant="outline" className="ml-2">
+                                        {rider.notificationMode}
+                                      </Badge>
+                                    )}
+                                  </p>
+                                </div>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setRemovalDialog({
+                                        open: true,
+                                        type: "rider",
+                                        id: rider.id,
+                                        name: rider.name || "Unnamed Rider",
+                                      })}
+                                      data-testid={`button-remove-rider-${rider.id}`}
+                                    >
+                                      <UserX className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Remove rider access</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="drivers" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Car className="w-5 h-5" />
+                    Drivers
+                  </CardTitle>
+                  <CardDescription>
+                    Manage driver accounts and route assignments
+                  </CardDescription>
+                </div>
+                <Dialog open={addDriverDialog} onOpenChange={setAddDriverDialog}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-driver">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Driver
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Driver</DialogTitle>
+                      <DialogDescription>
+                        Create a new driver account. They will use these credentials to log in and manage their routes.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-name">Full Name</Label>
                         <Input
-                          placeholder="Search by name or phone..."
-                          value={riderSearch}
-                          onChange={(e) => setRiderSearch(e.target.value)}
-                          className="pl-10"
-                          data-testid="input-search-riders"
+                          id="driver-name"
+                          placeholder="John Smith"
+                          value={newDriverForm.name}
+                          onChange={(e) => setNewDriverForm({ ...newDriverForm, name: e.target.value })}
+                          data-testid="input-driver-name"
                         />
                       </div>
-                      <Select value={notificationFilter} onValueChange={setNotificationFilter}>
-                        <SelectTrigger className="w-40" data-testid="select-notification-filter">
-                          <Filter className="w-4 h-4 mr-2" />
-                          <SelectValue placeholder="Filter" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Modes</SelectItem>
-                          <SelectItem value="sms">SMS</SelectItem>
-                          <SelectItem value="push">Push</SelectItem>
-                          <SelectItem value="email">Email</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={sortBy} onValueChange={(value) => setSortBy(value as "name" | "joined")}>
-                        <SelectTrigger className="w-36" data-testid="select-sort-riders">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="name">Sort by Name</SelectItem>
-                          <SelectItem value="joined">Sort by Joined</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-email">Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="driver-email"
+                            type="email"
+                            placeholder="driver@example.com"
+                            className="pl-10"
+                            value={newDriverForm.email}
+                            onChange={(e) => setNewDriverForm({ ...newDriverForm, email: e.target.value })}
+                            data-testid="input-driver-email"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-phone">Phone Number (optional)</Label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="driver-phone"
+                            type="tel"
+                            placeholder="+1 (555) 123-4567"
+                            className="pl-10"
+                            value={newDriverForm.phoneNumber}
+                            onChange={(e) => setNewDriverForm({ ...newDriverForm, phoneNumber: e.target.value })}
+                            data-testid="input-driver-phone"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-password">Password</Label>
+                        <div className="relative">
+                          <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="driver-password"
+                            type="password"
+                            placeholder="Minimum 6 characters"
+                            className="pl-10"
+                            value={newDriverForm.password}
+                            onChange={(e) => setNewDriverForm({ ...newDriverForm, password: e.target.value })}
+                            data-testid="input-driver-password"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-route">Assign to Route (optional)</Label>
+                        <Select 
+                          value={newDriverForm.routeId} 
+                          onValueChange={(value) => setNewDriverForm({ ...newDriverForm, routeId: value })}
+                        >
+                          <SelectTrigger data-testid="select-driver-route">
+                            <Bus className="w-4 h-4 mr-2" />
+                            <SelectValue placeholder="Select route" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">No route assignment</SelectItem>
+                            {activeRoutes.map((route) => (
+                              <SelectItem key={route.id} value={route.id}>
+                                {route.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-
-                    {/* Results count */}
-                    {riderSearch || notificationFilter !== "all" ? (
-                      <p className="text-sm text-muted-foreground">
-                        Showing {filteredRiders.length} of {riders.length} riders
-                      </p>
-                    ) : null}
-
-                    {/* Riders List */}
-                    {filteredRiders.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        No riders match your filters.
-                      </p>
-                    ) : (
-                      <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                        {filteredRiders.map((rider) => (
-                      <div 
-                        key={rider.id} 
-                        className="flex items-center justify-between p-3 border rounded-lg"
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAddDriverDialog(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={() => addDriverMutation.mutate(newDriverForm)}
+                        disabled={!newDriverForm.name || !newDriverForm.email || !newDriverForm.password || addDriverMutation.isPending}
+                        data-testid="button-confirm-add-driver"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium">{rider.name || "Unnamed Rider"}</p>
+                        {addDriverMutation.isPending ? "Creating..." : "Create Driver"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {staffLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : drivers.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No drivers added yet. Click "Add Driver" to create a driver account.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {drivers.map((driver) => (
+                    <div 
+                      key={driver.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{driver.name || "Unnamed Driver"}</p>
+                          {driver.id === user?.id && (
+                            <Badge variant="secondary">You</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{driver.email}</p>
+                        {driver.phoneNumber && (
+                          <p className="text-sm text-muted-foreground">{driver.phoneNumber}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">Assigned Route</p>
                           <p className="text-sm text-muted-foreground">
-                            {rider.phoneNumber}
-                            {rider.notificationMode && (
-                              <Badge variant="outline" className="ml-2">
-                                {rider.notificationMode}
-                              </Badge>
-                            )}
+                            {driver.routeAssignments.length > 0 
+                              ? getRouteName(driver.routeAssignments[0].routeId)
+                              : "Unassigned"}
                           </p>
                         </div>
                         <Tooltip>
@@ -380,32 +614,187 @@ export default function AccessManagementPage() {
                               size="icon"
                               onClick={() => setRemovalDialog({
                                 open: true,
-                                type: "rider",
-                                id: rider.id,
-                                name: rider.name || "Unnamed Rider",
+                                type: "driver",
+                                id: driver.id,
+                                name: driver.name || "Unnamed Driver",
                               })}
-                              data-testid={`button-remove-rider-${rider.id}`}
+                              disabled={driver.id === user?.id}
+                              data-testid={`button-remove-driver-${driver.id}`}
                             >
                               <UserX className="w-4 h-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Remove access from this rider</p>
+                            <p>{driver.id === user?.id ? "Cannot remove yourself" : "Remove driver"}</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )
-      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Removal Confirmation Dialog */}
+        <TabsContent value="admins" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCog className="w-5 h-5" />
+                    Administrators
+                  </CardTitle>
+                  <CardDescription>
+                    Manage admin accounts who can configure routes and manage users
+                  </CardDescription>
+                </div>
+                <Dialog open={addAdminDialog} onOpenChange={setAddAdminDialog}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-admin">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Admin
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Administrator</DialogTitle>
+                      <DialogDescription>
+                        Create a new admin account. Admins have full access to manage routes, users, and settings.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-name">Full Name</Label>
+                        <Input
+                          id="admin-name"
+                          placeholder="Jane Doe"
+                          value={newAdminForm.name}
+                          onChange={(e) => setNewAdminForm({ ...newAdminForm, name: e.target.value })}
+                          data-testid="input-admin-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-email">Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="admin-email"
+                            type="email"
+                            placeholder="admin@example.com"
+                            className="pl-10"
+                            value={newAdminForm.email}
+                            onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })}
+                            data-testid="input-admin-email"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-phone">Phone Number (optional)</Label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="admin-phone"
+                            type="tel"
+                            placeholder="+1 (555) 123-4567"
+                            className="pl-10"
+                            value={newAdminForm.phoneNumber}
+                            onChange={(e) => setNewAdminForm({ ...newAdminForm, phoneNumber: e.target.value })}
+                            data-testid="input-admin-phone"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-password">Password</Label>
+                        <div className="relative">
+                          <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="admin-password"
+                            type="password"
+                            placeholder="Minimum 6 characters"
+                            className="pl-10"
+                            value={newAdminForm.password}
+                            onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })}
+                            data-testid="input-admin-password"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAddAdminDialog(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={() => addAdminMutation.mutate(newAdminForm)}
+                        disabled={!newAdminForm.name || !newAdminForm.email || !newAdminForm.password || addAdminMutation.isPending}
+                        data-testid="button-confirm-add-admin"
+                      >
+                        {addAdminMutation.isPending ? "Creating..." : "Create Admin"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {staffLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : admins.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No other administrators. Click "Add Admin" to create another admin account.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {admins.map((admin) => (
+                    <div 
+                      key={admin.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{admin.name || "Unnamed Admin"}</p>
+                          {admin.id === user?.id && (
+                            <Badge variant="secondary">You</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{admin.email}</p>
+                        {admin.phoneNumber && (
+                          <p className="text-sm text-muted-foreground">{admin.phoneNumber}</p>
+                        )}
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setRemovalDialog({
+                              open: true,
+                              type: "admin",
+                              id: admin.id,
+                              name: admin.name || "Unnamed Admin",
+                            })}
+                            disabled={admin.id === user?.id}
+                            data-testid={`button-remove-admin-${admin.id}`}
+                          >
+                            <UserX className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{admin.id === user?.id ? "Cannot remove yourself" : "Remove admin"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       <AlertDialog open={removalDialog.open} onOpenChange={(open) => {
         if (!open) {
           setRemovalDialog({ open: false, type: null, id: null, name: null });
@@ -413,33 +802,36 @@ export default function AccessManagementPage() {
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Rider Access?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Remove {removalDialog.type === "rider" ? "Rider" : removalDialog.type === "driver" ? "Driver" : "Admin"}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove <span className="font-semibold">{removalDialog.name}</span> from this route?
+              Are you sure you want to remove <span className="font-semibold">{removalDialog.name}</span>?
               <br /><br />
-              This will deactivate their SMS subscription and remove their access to track this route.
+              {removalDialog.type === "rider" 
+                ? "This will deactivate their notifications and remove their access to track this route."
+                : "This will deactivate their account and remove their access to the system."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel 
-              disabled={removeMutation.isPending}
+              disabled={removeRiderMutation.isPending || removeStaffMutation.isPending}
               data-testid="button-cancel-removal"
             >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
-              disabled={removeMutation.isPending}
+              disabled={removeRiderMutation.isPending || removeStaffMutation.isPending}
               className="bg-destructive hover:bg-destructive/90"
               data-testid="button-confirm-removal"
             >
-              {removeMutation.isPending ? "Removing..." : "Remove Access"}
+              {removeRiderMutation.isPending || removeStaffMutation.isPending ? "Removing..." : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Renewal Confirmation Dialog */}
       <AlertDialog open={renewalDialog} onOpenChange={setRenewalDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -448,21 +840,15 @@ export default function AccessManagementPage() {
               This will reset the password expiration date for <strong>all riders</strong> in your organization to July 1st of next year.
               <br /><br />
               Riders will be able to continue using their existing access codes, QR codes, and magic links without interruption.
-              <br /><br />
-              This is typically done at the start of each school year to refresh rider access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
-              disabled={renewPasswordsMutation.isPending}
-              data-testid="button-cancel-renewal"
-            >
+            <AlertDialogCancel disabled={renewPasswordsMutation.isPending}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleRenewPasswords}
+              onClick={() => renewPasswordsMutation.mutate()}
               disabled={renewPasswordsMutation.isPending}
-              data-testid="button-confirm-renewal"
             >
               {renewPasswordsMutation.isPending ? "Renewing..." : "Renew All Passwords"}
             </AlertDialogAction>
