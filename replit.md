@@ -121,3 +121,10 @@ Preferred communication style: Simple, everyday language.
 - **Organization Viewing Mode**: System admins can "Enter as Admin" to view any organization's dashboard, routes, access management, and support center in read-only mode. A blue banner indicates read-only viewing with a "Back to System Dashboard" link.
 - **Read-Only Viewing**: When viewing an organization, system admins see all data but cannot modify anything. Action buttons (Add Route, Add Driver, Remove Rider, etc.) are hidden.
 - **Pages with Read-Only Support**: AdminDashboardPage, RoutesPage, AccessManagementPage, and SupportCenterPage all support the viewingOrgId context for system admin read-only viewing.
+
+### Driver GPS Enhancements (December 6, 2025)
+- **Screen Wake Lock**: When a driver starts a trip, the screen automatically stays awake to prevent GPS tracking interruption from phone sleep. Uses the Web Wake Lock API.
+- **Smart Auto-Off**: Wake lock automatically releases after 30 minutes of no movement (bus stationary) to conserve battery. Threshold is 50 meters of movement required to reset the timer.
+- **Movement Re-Activation**: If the bus starts moving again after being stationary for 30 minutes, wake lock automatically re-engages.
+- **Visual Status Indicator**: Driver dashboard shows wake lock status (On/Auto-off/Not Supported/Off) with explanatory text.
+- **Technical Note**: This is a short-term MVP solution. Long-term solution is Cube hardware integration for buses which will provide GPS independently of driver phones.
