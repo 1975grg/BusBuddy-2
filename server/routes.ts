@@ -1095,6 +1095,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all admins for an organization
+  app.get("/api/system/organizations/:id/admins", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(id);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Get all org_admins for this organization
+      const allAdmins = await storage.getUsersByRole("org_admin");
+      const orgAdmins = allAdmins.filter(admin => admin.organizationId === id);
+      
+      res.json(orgAdmins);
+    } catch (error) {
+      console.error("Error fetching org admins:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Update an org admin's details (name, email)
+  app.put("/api/system/organizations/:orgId/admins/:adminId", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { orgId, adminId } = req.params;
+      const updateSchema = z.object({
+        name: z.string().min(1).optional(),
+        email: z.string().email().optional()
+      });
+      
+      const validatedData = updateSchema.parse(req.body);
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(orgId);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Verify admin exists and belongs to org
+      const admin = await storage.getUser(adminId);
+      if (!admin || admin.organizationId !== orgId || admin.role !== "org_admin") {
+        return res.status(404).json({ error: "Admin not found in this organization" });
+      }
+      
+      // If email is being changed, check it's not already in use
+      if (validatedData.email && validatedData.email !== admin.email) {
+        const existingUser = await storage.getUserByEmail(validatedData.email);
+        if (existingUser) {
+          return res.status(400).json({ error: "Email already in use" });
+        }
+      }
+      
+      const updated = await storage.updateUser(adminId, validatedData);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating org admin:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Reset an org admin's password
+  app.post("/api/system/organizations/:orgId/admins/:adminId/reset-password", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { orgId, adminId } = req.params;
+      const resetSchema = z.object({
+        password: z.string().min(6)
+      });
+      
+      const { password } = resetSchema.parse(req.body);
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(orgId);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Verify admin exists and belongs to org
+      const admin = await storage.getUser(adminId);
+      if (!admin || admin.organizationId !== orgId || admin.role !== "org_admin") {
+        return res.status(404).json({ error: "Admin not found in this organization" });
+      }
+      
+      // Hash the new password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Update password and set mustResetPassword flag
+      await storage.updateUser(adminId, { 
+        passwordHash, 
+        mustResetPassword: true 
+      });
+      
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Error resetting admin password:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Deactivate/Activate an org admin
+  app.post("/api/system/organizations/:orgId/admins/:adminId/toggle-status", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { orgId, adminId } = req.params;
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(orgId);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Verify admin exists and belongs to org
+      const admin = await storage.getUser(adminId);
+      if (!admin || admin.organizationId !== orgId || admin.role !== "org_admin") {
+        return res.status(404).json({ error: "Admin not found in this organization" });
+      }
+      
+      // Toggle active status
+      const updated = await storage.updateUser(adminId, { isActive: !admin.isActive });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error toggling admin status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // User Management Routes
   app.get("/api/users", async (req, res) => {
     try {

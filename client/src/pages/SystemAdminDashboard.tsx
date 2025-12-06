@@ -11,8 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send } from "lucide-react";
+import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X } from "lucide-react";
 import type { Organization, OrganizationType, User } from "@shared/schema";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 function generateTempPassword(): string {
   const adjectives = ["Happy", "Swift", "Bright", "Cool", "Smart"];
@@ -43,6 +44,11 @@ export default function SystemAdminDashboard() {
   const [copied, setCopied] = useState(false);
   const [successDialog, setSuccessDialog] = useState<{ open: boolean; email: string; password: string; orgName: string }>({ open: false, email: "", password: "", orgName: "" });
   const [viewOrgDialog, setViewOrgDialog] = useState<{ open: boolean; org: OrgWithAdmin | null }>({ open: false, org: null });
+  
+  const [editAdminDialog, setEditAdminDialog] = useState<{ open: boolean; admin: User | null; orgId: string }>({ open: false, admin: null, orgId: "" });
+  const [editAdminForm, setEditAdminForm] = useState({ name: "", email: "" });
+  const [resetPasswordDialog, setResetPasswordDialog] = useState<{ open: boolean; admin: User | null; orgId: string }>({ open: false, admin: null, orgId: "" });
+  const [resetPassword, setResetPassword] = useState("");
 
   // ALL HOOKS MUST BE BEFORE EARLY RETURNS
   // Fetch all organizations with their admins
@@ -120,6 +126,98 @@ export default function SystemAdminDashboard() {
     }
   });
 
+  // Query for org admins when viewing org details
+  const { data: orgAdmins, refetch: refetchAdmins } = useQuery({
+    queryKey: ["/api/system/organizations", viewOrgDialog.org?.id, "admins"],
+    queryFn: async () => {
+      if (!viewOrgDialog.org?.id) return [];
+      const response = await fetch(`/api/system/organizations/${viewOrgDialog.org.id}/admins`);
+      if (!response.ok) throw new Error("Failed to fetch admins");
+      return response.json() as Promise<User[]>;
+    },
+    enabled: viewOrgDialog.open && !!viewOrgDialog.org?.id,
+  });
+
+  // Update admin mutation
+  const updateAdminMutation = useMutation({
+    mutationFn: async (data: { orgId: string; adminId: string; name?: string; email?: string }) => {
+      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name, email: data.email })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update admin");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system/organizations"] });
+      refetchAdmins();
+      setEditAdminDialog({ open: false, admin: null, orgId: "" });
+      toast({ title: "Admin updated", description: "Administrator details have been updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update admin", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: { orgId: string; adminId: string; password: string }) => {
+      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: data.password })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to reset password");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setSuccessDialog({
+        open: true,
+        email: resetPasswordDialog.admin?.email || "",
+        password: resetPassword,
+        orgName: viewOrgDialog.org?.name || ""
+      });
+      setResetPasswordDialog({ open: false, admin: null, orgId: "" });
+      setResetPassword("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset password", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Toggle admin status mutation
+  const toggleAdminStatusMutation = useMutation({
+    mutationFn: async (data: { orgId: string; adminId: string }) => {
+      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}/toggle-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to toggle status");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system/organizations"] });
+      refetchAdmins();
+      toast({ 
+        title: data.isActive ? "Admin activated" : "Admin deactivated", 
+        description: `Administrator has been ${data.isActive ? "activated" : "deactivated"}` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to toggle status", description: error.message, variant: "destructive" });
+    }
+  });
+
   const openCreateAdminDialog = (org: Organization) => {
     const password = generateTempPassword();
     setGeneratedPassword(password);
@@ -127,6 +225,20 @@ export default function SystemAdminDashboard() {
     setShowPassword(true);
     setCopied(false);
     setCreateAdminDialog({ open: true, org });
+  };
+
+  const openEditAdminDialog = (admin: User, orgId: string) => {
+    setEditAdminForm({ name: admin.name, email: admin.email || "" });
+    setEditAdminDialog({ open: true, admin, orgId });
+  };
+
+  const openResetPasswordDialog = (admin: User, orgId: string) => {
+    setResetPassword(generateTempPassword());
+    setResetPasswordDialog({ open: true, admin, orgId });
+  };
+
+  const handleEnterAsAdmin = (orgId: string) => {
+    setLocation(`/admin?viewingOrg=${orgId}`);
   };
 
   const handleCreateAdmin = () => {
@@ -576,94 +688,275 @@ export default function SystemAdminDashboard() {
       <Dialog open={viewOrgDialog.open} onOpenChange={(open) => {
         if (!open) setViewOrgDialog({ open: false, org: null });
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building className="w-5 h-5" />
               {viewOrgDialog.org?.name}
             </DialogTitle>
             <DialogDescription>
-              Organization details and statistics
+              Organization details and administrator management
             </DialogDescription>
           </DialogHeader>
           {viewOrgDialog.org && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Type</p>
-                  <p className="font-medium capitalize">{viewOrgDialog.org.type.replace("_", " ")}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge variant={viewOrgDialog.org.isActive ? "default" : "secondary"}>
-                    {viewOrgDialog.org.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">{viewOrgDialog.org.createdAt ? new Date(viewOrgDialog.org.createdAt).toLocaleDateString() : "Unknown"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Primary Color</p>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-4 h-4 rounded-full border"
-                      style={{ backgroundColor: viewOrgDialog.org.primaryColor }}
-                    />
-                    <span className="text-sm">{viewOrgDialog.org.primaryColor}</span>
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Type</p>
+                    <p className="font-medium capitalize">{viewOrgDialog.org.type.replace("_", " ")}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <Badge variant={viewOrgDialog.org.isActive ? "default" : "secondary"}>
+                      {viewOrgDialog.org.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Created</p>
+                    <p className="font-medium">{viewOrgDialog.org.createdAt ? new Date(viewOrgDialog.org.createdAt).toLocaleDateString() : "Unknown"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Primary Color</p>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-4 h-4 rounded-full border"
+                        style={{ backgroundColor: viewOrgDialog.org.primaryColor }}
+                      />
+                      <span className="text-sm">{viewOrgDialog.org.primaryColor}</span>
+                    </div>
                   </div>
                 </div>
+                
+                <Separator />
+                
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium">Administrators</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setViewOrgDialog({ open: false, org: null });
+                        openCreateAdminDialog(viewOrgDialog.org!);
+                      }}
+                      data-testid="button-add-new-admin"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Admin
+                    </Button>
+                  </div>
+                  
+                  {orgAdmins && orgAdmins.length > 0 ? (
+                    <div className="space-y-3">
+                      {orgAdmins.map((admin) => (
+                        <Card key={admin.id} className={!admin.isActive ? "opacity-60" : ""}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                  <Users className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium truncate">{admin.name}</p>
+                                    {!admin.isActive && (
+                                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground truncate">{admin.email}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => openEditAdminDialog(admin, viewOrgDialog.org!.id)}
+                                  title="Edit admin details"
+                                  data-testid={`button-edit-admin-${admin.id}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => openResetPasswordDialog(admin, viewOrgDialog.org!.id)}
+                                  title="Reset password"
+                                  data-testid={`button-reset-password-${admin.id}`}
+                                >
+                                  <KeyRound className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => toggleAdminStatusMutation.mutate({ orgId: viewOrgDialog.org!.id, adminId: admin.id })}
+                                  title={admin.isActive ? "Deactivate admin" : "Activate admin"}
+                                  data-testid={`button-toggle-status-${admin.id}`}
+                                >
+                                  {admin.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card>
+                      <CardContent className="pt-4 text-center text-muted-foreground">
+                        <p>No administrators assigned</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2"
+                          onClick={() => {
+                            setViewOrgDialog({ open: false, org: null });
+                            openCreateAdminDialog(viewOrgDialog.org!);
+                          }}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Create First Admin
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                
+                <Separator />
+                
+                <div className="text-sm text-muted-foreground">
+                  <p>More details like routes, drivers, and riders count will be available in a future update.</p>
+                </div>
               </div>
-              
-              <Separator />
-              
-              <div>
-                <p className="text-sm font-medium mb-2">Administrator</p>
-                {viewOrgDialog.org.admin ? (
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Users className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{viewOrgDialog.org.admin.name}</p>
-                          <p className="text-sm text-muted-foreground">{viewOrgDialog.org.admin.email}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-4 text-center text-muted-foreground">
-                      <p>No administrator assigned</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={() => {
-                          setViewOrgDialog({ open: false, org: null });
-                          openCreateAdminDialog(viewOrgDialog.org!);
-                        }}
-                      >
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Create Admin
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-              
-              <Separator />
-              
-              <div className="text-sm text-muted-foreground">
-                <p>More details like routes, drivers, and riders count will be available in a future update.</p>
-              </div>
-            </div>
+            </ScrollArea>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="default"
+              onClick={() => handleEnterAsAdmin(viewOrgDialog.org!.id)}
+              data-testid="button-enter-as-admin"
+            >
+              <LogIn className="w-4 h-4 mr-2" />
+              Enter as Admin
+            </Button>
             <Button variant="outline" onClick={() => setViewOrgDialog({ open: false, org: null })}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editAdminDialog.open} onOpenChange={(open) => {
+        if (!open) setEditAdminDialog({ open: false, admin: null, orgId: "" });
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Administrator</DialogTitle>
+            <DialogDescription>
+              Update the administrator's name or email address
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-admin-name">Name</Label>
+              <Input
+                id="edit-admin-name"
+                value={editAdminForm.name}
+                onChange={(e) => setEditAdminForm({ ...editAdminForm, name: e.target.value })}
+                data-testid="input-edit-admin-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-admin-email">Email</Label>
+              <Input
+                id="edit-admin-email"
+                type="email"
+                value={editAdminForm.email}
+                onChange={(e) => setEditAdminForm({ ...editAdminForm, email: e.target.value })}
+                data-testid="input-edit-admin-email"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditAdminDialog({ open: false, admin: null, orgId: "" })}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editAdminDialog.admin) {
+                  updateAdminMutation.mutate({
+                    orgId: editAdminDialog.orgId,
+                    adminId: editAdminDialog.admin.id,
+                    name: editAdminForm.name,
+                    email: editAdminForm.email
+                  });
+                }
+              }}
+              disabled={updateAdminMutation.isPending}
+              data-testid="button-save-admin"
+            >
+              {updateAdminMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetPasswordDialog.open} onOpenChange={(open) => {
+        if (!open) setResetPasswordDialog({ open: false, admin: null, orgId: "" });
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Generate a new temporary password for {resetPasswordDialog.admin?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>New Temporary Password</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={resetPassword}
+                  readOnly
+                  className="font-mono"
+                  data-testid="input-reset-password"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(resetPassword);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  data-testid="button-copy-reset-password"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The admin will be required to set a new password on their next login.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordDialog({ open: false, admin: null, orgId: "" })}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (resetPasswordDialog.admin) {
+                  resetPasswordMutation.mutate({
+                    orgId: resetPasswordDialog.orgId,
+                    adminId: resetPasswordDialog.admin.id,
+                    password: resetPassword
+                  });
+                }
+              }}
+              disabled={resetPasswordMutation.isPending}
+              data-testid="button-confirm-reset-password"
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
             </Button>
           </DialogFooter>
         </DialogContent>
