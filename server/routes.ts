@@ -398,7 +398,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If setting own password, verify current password if one exists
-      if (isSelf && targetUser.passwordHash) {
+      // Skip this check if mustResetPassword is true (admin just reset their password)
+      if (isSelf && targetUser.passwordHash && !targetUser.mustResetPassword) {
         if (!currentPassword) {
           return res.status(400).json({ error: "Current password required" });
         }
