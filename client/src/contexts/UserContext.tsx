@@ -80,15 +80,23 @@ export function useRequireRole(...allowedRoles: string[]) {
   const { user, isLoading } = useRequireAuth();
 
   if (isLoading || !user) {
-    return { user: null, isLoading: true, hasAccess: false };
+    return { user: null, isLoading: true, hasAccess: false, viewingOrgId: null };
   }
 
-  const hasAccess = allowedRoles.includes(user.role);
+  // Check for system_admin viewing an org dashboard via viewingOrg query param
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewingOrgId = urlParams.get('viewingOrg');
+  
+  // System admin can access org_admin pages when viewing a specific org
+  const isSystemAdminViewingOrg = user.role === 'system_admin' && viewingOrgId && 
+    (allowedRoles.includes('org_admin') || allowedRoles.includes('driver'));
+  
+  const hasAccess = allowedRoles.includes(user.role) || isSystemAdminViewingOrg;
 
   if (!hasAccess) {
     window.location.href = "/unauthorized";
-    return { user, isLoading: false, hasAccess: false };
+    return { user, isLoading: false, hasAccess: false, viewingOrgId: null };
   }
 
-  return { user, isLoading: false, hasAccess: true };
+  return { user, isLoading: false, hasAccess: true, viewingOrgId };
 }

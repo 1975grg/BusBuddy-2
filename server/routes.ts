@@ -847,8 +847,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== EXISTING ROUTES BELOW ====================
   
   // Organization Settings Routes
-  app.get("/api/org-settings", async (req, res) => {
+  app.get("/api/org-settings", authenticateUser, async (req, res) => {
     try {
+      const user = (req as any).user as AuthUser;
+      const { organizationId } = req.query;
+      
+      // System admin can view any org's settings
+      if (user.role === "system_admin" && organizationId && typeof organizationId === "string") {
+        const org = await storage.getOrganizationById(organizationId);
+        if (!org) {
+          return res.status(404).json({ error: "Organization not found" });
+        }
+        // Return org settings based on organization data
+        return res.json({
+          id: org.id,
+          name: org.name,
+          primaryColor: org.primaryColor,
+          organizationId: org.id,
+          type: org.type
+        });
+      }
+      
+      // For regular users, get default org settings
       const settings = await storage.getDefaultOrgSettings();
       if (!settings) {
         return res.status(404).json({ error: "Organization settings not found" });
@@ -1234,7 +1254,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { role, organizationId } = req.query;
       
       let users;
-      if (role && typeof role === "string") {
+      // Support both role AND organizationId filtering together
+      if (role && typeof role === "string" && organizationId && typeof organizationId === "string") {
+        const validatedRole = roleEnum.parse(role);
+        const allByRole = await storage.getUsersByRole(validatedRole);
+        users = allByRole.filter(u => u.organizationId === organizationId);
+      } else if (role && typeof role === "string") {
         const validatedRole = roleEnum.parse(role);
         users = await storage.getUsersByRole(validatedRole);
       } else if (organizationId && typeof organizationId === "string") {
