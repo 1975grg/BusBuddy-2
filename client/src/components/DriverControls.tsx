@@ -3,11 +3,12 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Square, MapPin, Clock, AlertTriangle, Navigation, Wifi, WifiOff } from "lucide-react";
+import { Play, Pause, Square, MapPin, Clock, AlertTriangle, Navigation, Wifi, WifiOff, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import type { RouteSession } from "@shared/schema";
 
 // GPS status for debugging
@@ -50,6 +51,17 @@ export function DriverControls({
     lastError: null,
   });
   const { toast } = useToast();
+
+  const wakeLock = useWakeLock({
+    enabled: tripStatus === "active",
+    inactivityTimeoutMs: 30 * 60 * 1000,
+    movementThresholdMeters: 50,
+    onAutoRelease: (reason) => {
+      toast({
+        description: `Screen lock resumed - ${reason}. Tap "Resume" to re-enable.`,
+      });
+    },
+  });
   
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<number | null>(null);
@@ -397,6 +409,8 @@ export function DriverControls({
           lastLng: longitude,
         }));
         
+        wakeLock.updatePosition(latitude, longitude);
+        
         if (sessionIdRef.current && tripStatusRef.current === "active") {
           updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
         }
@@ -432,6 +446,8 @@ export function DriverControls({
             lastLng: longitude,
           }));
           
+          wakeLock.updatePosition(latitude, longitude);
+          
           if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
             console.log("[GPS] Sending location update to server...");
             updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
@@ -466,6 +482,8 @@ export function DriverControls({
                 lastLat: latitude,
                 lastLng: longitude,
               }));
+              
+              wakeLock.updatePosition(latitude, longitude);
               
               if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
                 updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
@@ -513,6 +531,8 @@ export function DriverControls({
               lastLng: longitude,
             }));
             
+            wakeLock.updatePosition(latitude, longitude);
+            
             if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
               console.log("[GPS] Sending location update to server...");
               updateLocationMutation.mutate({ sessionId: sessionIdRef.current, latitude, longitude });
@@ -542,6 +562,8 @@ export function DriverControls({
             lastLat: latitude,
             lastLng: longitude,
           }));
+          
+          wakeLock.updatePosition(latitude, longitude);
           
           if (sessionIdRef.current && tripStatusRef.current === "active") {
             updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
@@ -574,6 +596,8 @@ export function DriverControls({
             lastLat: latitude,
             lastLng: longitude,
           }));
+          
+          wakeLock.updatePosition(latitude, longitude);
           
           if (sessionIdRef.current && tripStatusRef.current === "active" && !updateLocationMutation.isPending) {
             updateLocationMutation.mutate({ sessionId: activeSessionId, latitude, longitude });
@@ -762,6 +786,51 @@ export function DriverControls({
                   {gpsStatus.lastError && (
                     <div className="text-xs text-red-500 truncate">
                       Error: {gpsStatus.lastError}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Wake Lock Status Indicator */}
+              {tripStatus === "active" && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Screen Stay Awake</span>
+                    {wakeLock.isActive ? (
+                      <Badge variant="outline" className="ml-auto text-xs bg-green-500/10 text-green-600 border-green-500/30" data-testid="badge-wakelock-active">
+                        On
+                      </Badge>
+                    ) : wakeLock.autoReleasedReason ? (
+                      <Badge variant="outline" className="ml-auto text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30" data-testid="badge-wakelock-auto-off">
+                        Auto-off
+                      </Badge>
+                    ) : !wakeLock.isSupported ? (
+                      <Badge variant="outline" className="ml-auto text-xs bg-gray-500/10 text-gray-500 border-gray-500/30" data-testid="badge-wakelock-unsupported">
+                        Not Supported
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="ml-auto text-xs bg-gray-500/10 text-gray-500 border-gray-500/30" data-testid="badge-wakelock-off">
+                        Off
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {wakeLock.isActive && (
+                    <div className="text-xs text-muted-foreground">
+                      Screen will stay on during trip. Auto-off after 30 min of no movement.
+                    </div>
+                  )}
+                  
+                  {wakeLock.autoReleasedReason && (
+                    <div className="text-xs text-yellow-600">
+                      {wakeLock.autoReleasedReason}
+                    </div>
+                  )}
+                  
+                  {wakeLock.error && !wakeLock.isActive && (
+                    <div className="text-xs text-red-500 truncate">
+                      {wakeLock.error}
                     </div>
                   )}
                 </div>
