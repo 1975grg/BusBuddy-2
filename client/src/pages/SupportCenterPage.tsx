@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone, ArrowLeft } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone, ArrowLeft, Eye } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
@@ -22,9 +23,18 @@ import type { RiderMessage, DriverMessage, Route, ServiceAlert, NotificationLog 
 type Message = (RiderMessage | DriverMessage) & { messageType: 'rider' | 'driver' };
 
 export default function SupportCenterPage() {
-  const { user, isLoading: authLoading } = useRequireRole("org_admin");
+  const { user, isLoading: authLoading, viewingOrgId } = useRequireRole("org_admin");
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  
+  // Determine if system admin is viewing an org (read-only mode)
+  const isSystemAdminViewing = user?.role === 'system_admin' && viewingOrgId;
+  const effectiveOrgId = viewingOrgId || user?.organizationId;
+  
+  const handleBackToSystem = () => {
+    setLocation('/system');
+  };
   const [responseText, setResponseText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
@@ -159,22 +169,29 @@ export default function SupportCenterPage() {
 
   // Fetch active routes for alerts tab
   const { data: routes = [] } = useQuery<Route[]>({
-    queryKey: ["/api/routes"],
+    queryKey: ["/api/routes", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error("Failed to fetch routes");
+      return response.json();
+    },
   });
 
   const activeRoutes = routes.filter(route => route.status === "active");
 
   // Fetch rider messages
   const { data: riderMessages = [] } = useQuery<RiderMessage[]>({
-    queryKey: ["/api/rider-messages", currentAdmin?.organizationId],
+    queryKey: ["/api/rider-messages", effectiveOrgId],
     queryFn: async () => {
-      if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${currentAdmin.organizationId}`, {
+      if (!effectiveOrgId) return [];
+      const response = await fetch(`/api/rider-messages?organization_id=${effectiveOrgId}`, {
+        credentials: 'include',
         cache: 'no-cache' // Force fresh data, bypass HTTP cache
       });
       return response.json();
     },
-    enabled: !!currentAdmin?.organizationId,
+    enabled: !!effectiveOrgId,
     refetchInterval: 10000,
     staleTime: 0, // Always consider data stale
     refetchOnMount: true, // Always refetch when component mounts
@@ -182,15 +199,16 @@ export default function SupportCenterPage() {
 
   // Fetch driver messages
   const { data: driverMessages = [] } = useQuery<DriverMessage[]>({
-    queryKey: ["/api/driver-messages", currentAdmin?.organizationId],
+    queryKey: ["/api/driver-messages", effectiveOrgId],
     queryFn: async () => {
-      if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`, {
+      if (!effectiveOrgId) return [];
+      const response = await fetch(`/api/driver-messages?organization_id=${effectiveOrgId}`, {
+        credentials: 'include',
         cache: 'no-cache' // Force fresh data, bypass HTTP cache
       });
       return response.json();
     },
-    enabled: !!currentAdmin?.organizationId,
+    enabled: !!effectiveOrgId,
     refetchInterval: 10000,
     staleTime: 0, // Always consider data stale
     refetchOnMount: true, // Always refetch when component mounts
@@ -198,19 +216,21 @@ export default function SupportCenterPage() {
 
   // Fetch active service alerts
   const { data: serviceAlerts = [] } = useQuery<ServiceAlert[]>({
-    queryKey: ["/api/service-alerts", currentAdmin?.organizationId],
+    queryKey: ["/api/service-alerts", effectiveOrgId],
     queryFn: async () => {
-      if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/service-alerts?organization_id=${currentAdmin.organizationId}`);
+      if (!effectiveOrgId) return [];
+      const response = await fetch(`/api/service-alerts?organization_id=${effectiveOrgId}`, {
+        credentials: 'include'
+      });
       return response.json();
     },
-    enabled: !!currentAdmin?.organizationId,
+    enabled: !!effectiveOrgId,
     refetchInterval: 10000,
   });
   
   // Build query params for notification logs
   const logsQueryParams = new URLSearchParams({
-    organization_id: currentAdmin?.organizationId || "",
+    organization_id: effectiveOrgId || "",
   });
   
   if (selectedRoute !== "all") {
@@ -254,11 +274,15 @@ export default function SupportCenterPage() {
   
   // Fetch total notification count
   const { data: countData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notification-logs/count", currentAdmin?.organizationId],
+    queryKey: ["/api/notification-logs/count", effectiveOrgId],
     queryFn: async () => {
-      const response = await fetch(`/api/notification-logs/count?organization_id=${currentAdmin.organizationId}`);
+      if (!effectiveOrgId) return { count: 0 };
+      const response = await fetch(`/api/notification-logs/count?organization_id=${effectiveOrgId}`, {
+        credentials: 'include'
+      });
       return response.json();
     },
+    enabled: !!effectiveOrgId,
   });
   
   const totalNotificationCount = countData?.count || 0;
@@ -336,6 +360,7 @@ export default function SupportCenterPage() {
   // Respond to message mutation
   const respondMutation = useMutation({
     mutationFn: async ({ id, messageType, response }: { id: string, messageType: 'rider' | 'driver', response: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const endpoint = messageType === 'rider' 
         ? `/api/rider-messages/${id}/respond`
         : `/api/driver-messages/${id}/respond`;
@@ -346,8 +371,8 @@ export default function SupportCenterPage() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
       setResponseText("");
       setSelectedMessage(null);
       toast({ title: "Response sent successfully" });
@@ -360,6 +385,7 @@ export default function SupportCenterPage() {
   // Update status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, messageType, status }: { id: string, messageType: 'rider' | 'driver', status: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const endpoint = messageType === 'rider'
         ? `/api/rider-messages/${id}/status`
         : `/api/driver-messages/${id}/status`;
@@ -367,8 +393,8 @@ export default function SupportCenterPage() {
       return await apiRequest("PATCH", endpoint, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
       toast({ title: "Status updated successfully" });
     }
   });
@@ -376,6 +402,7 @@ export default function SupportCenterPage() {
   // Archive message mutation
   const archiveMutation = useMutation({
     mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const endpoint = messageType === 'rider'
         ? `/api/rider-messages/${id}/archive`
         : `/api/driver-messages/${id}/archive`;
@@ -383,8 +410,8 @@ export default function SupportCenterPage() {
       return await apiRequest("PATCH", endpoint, { archived_by_user_id: currentAdmin?.id || "" });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
       setSelectedMessage(null);
       toast({ title: "Message archived successfully" });
     }
@@ -393,6 +420,7 @@ export default function SupportCenterPage() {
   // Restore message mutation
   const restoreMutation = useMutation({
     mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const endpoint = messageType === 'rider'
         ? `/api/rider-messages/${id}/restore`
         : `/api/driver-messages/${id}/restore`;
@@ -400,8 +428,8 @@ export default function SupportCenterPage() {
       return await apiRequest("PATCH", endpoint, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
       toast({ title: "Message restored successfully" });
     }
   });
@@ -409,6 +437,7 @@ export default function SupportCenterPage() {
   // Delete message mutation
   const deleteMutation = useMutation({
     mutationFn: async ({ id, messageType }: { id: string, messageType: 'rider' | 'driver' }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const endpoint = messageType === 'rider'
         ? `/api/rider-messages/${id}`
         : `/api/driver-messages/${id}`;
@@ -416,8 +445,8 @@ export default function SupportCenterPage() {
       return await apiRequest("DELETE", endpoint, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
       setSelectedMessage(null);
       toast({ title: "Message deleted successfully" });
     }
@@ -426,14 +455,15 @@ export default function SupportCenterPage() {
   // Forward rider message to driver
   const forwardToDriverMutation = useMutation({
     mutationFn: async ({ messageId, additionalNote }: { messageId: string, additionalNote?: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("POST", `/api/rider-messages/${messageId}/forward-to-driver`, {
         forwardedByUserId: currentAdmin?.id,
         additionalNote
       });
     },
     onSuccess: (response: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
       setForwardDialogOpen(false);
       setForwardNote("");
       toast({ 
@@ -458,13 +488,14 @@ export default function SupportCenterPage() {
   // Broadcast driver message as service alert
   const broadcastAsAlertMutation = useMutation({
     mutationFn: async ({ messageId, severity }: { messageId: string, severity?: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("POST", `/api/driver-messages/${messageId}/broadcast-as-alert`, {
         broadcastByUserId: currentAdmin?.id,
         severity: severity || "warning"
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", effectiveOrgId] });
       toast({ 
         title: "Alert broadcast successfully",
         description: "All riders on this route will see the alert"
@@ -482,10 +513,11 @@ export default function SupportCenterPage() {
   // Expire alert mutation
   const expireAlertMutation = useMutation({
     mutationFn: async (alertId: string) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("PATCH", `/api/service-alerts/${alertId}/expire`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", currentAdmin?.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", effectiveOrgId] });
       toast({ title: "Alert expired successfully" });
     },
     onError: () => {
@@ -496,26 +528,29 @@ export default function SupportCenterPage() {
   // Mark rider message as read
   const markRiderMessageReadMutation = useMutation({
     mutationFn: async (messageId: string) => {
+      if (isSystemAdminViewing) return; // Silently skip in read-only mode
       return await apiRequest("PATCH", `/api/rider-messages/${messageId}/mark-read`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rider-messages", effectiveOrgId] });
     },
   });
 
   // Mark driver message as read
   const markDriverMessageReadMutation = useMutation({
     mutationFn: async (messageId: string) => {
+      if (isSystemAdminViewing) return; // Silently skip in read-only mode
       return await apiRequest("PATCH", `/api/driver-messages/${messageId}/mark-read`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
     },
   });
 
   // Broadcast alert to all routes
   const broadcastAlertMutation = useMutation({
     mutationFn: async (data: any) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("POST", "/api/service-alerts/broadcast-all", {
         organization_id: currentAdmin?.organizationId,
         ...data,
@@ -523,8 +558,8 @@ export default function SupportCenterPage() {
       });
     },
     onSuccess: (response: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notification-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-alerts", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-logs", effectiveOrgId] });
       toast({
         title: "Broadcast successful",
         description: `Alert sent to ${response.routesNotified} routes (${response.notificationsSent} notifications attempted)`,
@@ -691,11 +726,44 @@ export default function SupportCenterPage() {
     return <Badge variant={variants[status] || "default"}>{status}</Badge>;
   };
 
+  // Fetch organization settings for the banner
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/org-settings", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId 
+        ? `/api/org-settings?organizationId=${effectiveOrgId}`
+        : "/api/org-settings";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+    enabled: !authLoading && !!isSystemAdminViewing,
+  });
+
   return (
     <div className="space-y-6">
+      {isSystemAdminViewing && (
+        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-blue-800 dark:text-blue-200">
+              Viewing <strong>{orgSettings?.name || 'Organization'}</strong> support as System Administrator (read-only)
+            </span>
+            <button 
+              onClick={handleBackToSystem}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              data-testid="button-back-to-system"
+            >
+              Back to System Dashboard
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Inbox</h1>
-        <p className="text-muted-foreground">Manage communications and service alerts</p>
+        <p className="text-muted-foreground">
+          {isSystemAdminViewing ? "Viewing communications (read-only)" : "Manage communications and service alerts"}
+        </p>
       </div>
 
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-4">
@@ -924,7 +992,7 @@ export default function SupportCenterPage() {
                               {getMessageTypeIcon(selectedMessage.messageType)}
                               Message Details
                             </CardTitle>
-                            {selectedMessage.status !== "resolved" && !selectedMessage.archivedAt && (
+                            {selectedMessage.status !== "resolved" && !selectedMessage.archivedAt && !isSystemAdminViewing && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -935,6 +1003,7 @@ export default function SupportCenterPage() {
                               </Button>
                             )}
                           </div>
+                          {!isSystemAdminViewing && (
                           <div className="flex items-center gap-2">
                             {selectedMessage.archivedAt ? (
                               <>
@@ -1009,6 +1078,7 @@ export default function SupportCenterPage() {
                               </>
                             )}
                           </div>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -1039,6 +1109,7 @@ export default function SupportCenterPage() {
                         )}
                         
                         {/* Reply to Parent/Student Section */}
+                        {!isSystemAdminViewing && (
                         <div className="border-t pt-4 mt-4">
                           <div className="flex items-center gap-2 mb-3">
                             <User className="w-4 h-4 text-muted-foreground" />
@@ -1064,6 +1135,7 @@ export default function SupportCenterPage() {
                             {respondMutation.isPending ? "Sending..." : "Send Response"}
                           </Button>
                         </div>
+                        )}
                       </CardContent>
                     </Card>
                   ) : (
@@ -1175,6 +1247,7 @@ export default function SupportCenterPage() {
                       </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">One-way broadcast notifications to students & families</p>
                     </div>
+                    {!isSystemAdminViewing && (
                     <Button
                       onClick={() => setShowAlertCompose(true)}
                       data-testid="button-compose-alert"
@@ -1182,6 +1255,7 @@ export default function SupportCenterPage() {
                       <Megaphone className="w-4 h-4 mr-2" />
                       + Compose New Alert
                     </Button>
+                    )}
                   </div>
                   
                   {/* Filter Row */}

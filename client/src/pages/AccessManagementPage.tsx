@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { AccessCodeGenerator } from "@/components/AccessCodeGenerator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, CalendarClock, Plus, UserCog, Mail, Phone, Key, Edit, Eye, EyeOff } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -39,16 +41,31 @@ interface EditDialogState {
 }
 
 export default function AccessManagementPage() {
-  const { user, isLoading: authLoading } = useRequireRole("org_admin");
+  const { user, isLoading: authLoading, viewingOrgId } = useRequireRole("org_admin");
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Determine if system admin is viewing an org (read-only mode)
+  const isSystemAdminViewing = user?.role === 'system_admin' && viewingOrgId;
+  const effectiveOrgId = viewingOrgId || user?.organizationId;
+  
+  const handleBackToSystem = () => {
+    setLocation('/system');
+  };
 
   if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
   const { data: routes = [], isLoading } = useQuery<Route[]>({
-    queryKey: ["/api/routes"],
+    queryKey: ["/api/routes", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch routes");
+      return response.json();
+    },
   });
 
   const activeRoutes = routes
@@ -105,31 +122,39 @@ export default function AccessManagementPage() {
   }, [selectedRoute, activeRoutes]);
   
   const { data: orgSettings } = useQuery({
-    queryKey: ["/api/org-settings"],
+    queryKey: ["/api/org-settings", effectiveOrgId],
     queryFn: async () => {
-      const response = await fetch("/api/org-settings");
+      const url = effectiveOrgId 
+        ? `/api/org-settings?organizationId=${effectiveOrgId}`
+        : "/api/org-settings";
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
     }
   });
 
   const { data: riders = [], isLoading: ridersLoading } = useQuery<RiderWithSubscription[]>({
-    queryKey: ["/api/routes", selectedRoute, "riders"],
+    queryKey: ["/api/routes", selectedRoute, "riders", effectiveOrgId],
     queryFn: async () => {
-      const response = await fetch(`/api/routes/${selectedRoute}/riders`);
+      const url = `/api/routes/${selectedRoute}/riders${effectiveOrgId ? `?organizationId=${effectiveOrgId}` : ''}`;
+      const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error("Failed to fetch riders");
       return response.json();
     },
-    enabled: !!selectedRoute,
+    enabled: !!selectedRoute && !!effectiveOrgId,
   });
 
   const { data: staff = [], isLoading: staffLoading } = useQuery<StaffMember[]>({
-    queryKey: ["/api/staff"],
+    queryKey: ["/api/staff", effectiveOrgId],
     queryFn: async () => {
-      const response = await fetch("/api/staff");
+      const url = effectiveOrgId 
+        ? `/api/staff?organizationId=${effectiveOrgId}`
+        : "/api/staff";
+      const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error("Failed to fetch staff");
       return response.json();
     },
+    enabled: !!effectiveOrgId,
   });
 
   const drivers = staff.filter(s => s.role === "driver" && s.isActive);
@@ -157,10 +182,11 @@ export default function AccessManagementPage() {
 
   const removeRiderMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("DELETE", `/api/routes/${selectedRoute}/riders/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute, "riders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", selectedRoute, "riders", effectiveOrgId] });
       setRemovalDialog({ open: false, type: null, id: null, name: null });
       toast({ title: "Rider removed", description: "Rider access has been revoked." });
     },
@@ -175,10 +201,11 @@ export default function AccessManagementPage() {
 
   const removeStaffMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("DELETE", `/api/staff/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff", effectiveOrgId] });
       setRemovalDialog({ open: false, type: null, id: null, name: null });
       toast({ title: "Staff removed", description: "Staff member has been deactivated." });
     },
@@ -193,6 +220,7 @@ export default function AccessManagementPage() {
 
   const addDriverMutation = useMutation({
     mutationFn: async (data: typeof newDriverForm) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const response = await apiRequest("POST", "/api/staff", {
         name: data.name,
         email: data.email,
@@ -204,7 +232,7 @@ export default function AccessManagementPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff", effectiveOrgId] });
       setAddDriverDialog(false);
       setNewDriverForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "", routeId: "" });
       setShowDriverPassword(false);
@@ -221,6 +249,7 @@ export default function AccessManagementPage() {
 
   const addAdminMutation = useMutation({
     mutationFn: async (data: typeof newAdminForm) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const response = await apiRequest("POST", "/api/staff", {
         name: data.name,
         email: data.email,
@@ -231,7 +260,7 @@ export default function AccessManagementPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff", effectiveOrgId] });
       setAddAdminDialog(false);
       setNewAdminForm({ name: "", email: "", phoneNumber: "", password: "", confirmPassword: "" });
       setShowAdminPassword(false);
@@ -248,6 +277,7 @@ export default function AccessManagementPage() {
 
   const updateStaffMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof editForm }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       const response = await apiRequest("PATCH", `/api/staff/${id}`, {
         name: data.name,
         phoneNumber: data.phoneNumber || null,
@@ -256,7 +286,7 @@ export default function AccessManagementPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff", effectiveOrgId] });
       setEditDialog({ open: false, staffMember: null });
       toast({ title: "Staff updated", description: "Staff member has been updated successfully." });
     },
@@ -271,17 +301,18 @@ export default function AccessManagementPage() {
 
   const renewPasswordsMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.organizationId) {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
+      if (!effectiveOrgId) {
         throw new Error("Organization ID not found");
       }
       const response = await apiRequest("POST", "/api/users/renew-all-rider-passwords", {
-        organizationId: user.organizationId
+        organizationId: effectiveOrgId
       });
       return response.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", effectiveOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", effectiveOrgId] });
       toast({
         title: "Passwords Renewed",
         description: data.message || `Successfully renewed passwords for ${data.renewedCount} rider(s).`,
@@ -355,9 +386,28 @@ export default function AccessManagementPage() {
 
   return (
     <div className="space-y-6">
+      {isSystemAdminViewing && (
+        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-blue-800 dark:text-blue-200">
+              Viewing <strong>{orgSettings?.name || 'Organization'}</strong> access as System Administrator (read-only)
+            </span>
+            <button 
+              onClick={handleBackToSystem}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              data-testid="button-back-to-system"
+            >
+              Back to System Dashboard
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Access Management</h1>
-        <p className="text-muted-foreground">Manage riders, drivers, and admin accounts</p>
+        <p className="text-muted-foreground">
+          {isSystemAdminViewing ? "Viewing access (read-only)" : "Manage riders, drivers, and admin accounts"}
+        </p>
       </div>
 
       <Tabs defaultValue="riders" className="w-full">
@@ -403,39 +453,41 @@ export default function AccessManagementPage() {
 
               {selectedRoute && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <AccessCodeGenerator 
-                      routeId={selectedRoute}
-                      routeName={activeRoutes.find(r => r.id === selectedRoute)?.name || ""}
-                      organizationName={orgSettings?.name || "Organization"}
-                      organizationLogo={orgSettings?.logoUrl || ""}
-                    />
+                  {!isSystemAdminViewing && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <AccessCodeGenerator 
+                        routeId={selectedRoute}
+                        routeName={activeRoutes.find(r => r.id === selectedRoute)?.name || ""}
+                        organizationName={orgSettings?.name || "Organization"}
+                        organizationLogo={orgSettings?.logoUrl || ""}
+                      />
 
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Shield className="w-5 h-5" />
-                          Access Control
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Button 
-                            variant="outline" 
-                            className="w-full"
-                            onClick={() => setRenewalDialog(true)}
-                            data-testid="button-renew-passwords"
-                          >
-                            <CalendarClock className="w-4 h-4 mr-2" />
-                            Renew All Rider Passwords
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            Reset all rider password expiration dates to next July 1st.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Shield className="w-5 h-5" />
+                            Access Control
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => setRenewalDialog(true)}
+                              data-testid="button-renew-passwords"
+                            >
+                              <CalendarClock className="w-4 h-4 mr-2" />
+                              Renew All Rider Passwords
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              Reset all rider password expiration dates to next July 1st.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
 
                   <Card>
                     <CardHeader>
@@ -500,6 +552,7 @@ export default function AccessManagementPage() {
                                     )}
                                   </p>
                                 </div>
+                                {!isSystemAdminViewing && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
@@ -520,6 +573,7 @@ export default function AccessManagementPage() {
                                     <p>Remove rider access</p>
                                   </TooltipContent>
                                 </Tooltip>
+                              )}
                               </div>
                             ))}
                           </div>
@@ -543,9 +597,10 @@ export default function AccessManagementPage() {
                     Drivers
                   </CardTitle>
                   <CardDescription>
-                    Manage driver accounts and route assignments
+                    {isSystemAdminViewing ? "Viewing drivers (read-only)" : "Manage driver accounts and route assignments"}
                   </CardDescription>
                 </div>
+                {!isSystemAdminViewing && (
                 <Dialog open={addDriverDialog} onOpenChange={setAddDriverDialog}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-add-driver">
@@ -683,6 +738,7 @@ export default function AccessManagementPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -722,6 +778,7 @@ export default function AccessManagementPage() {
                               : "Unassigned"}
                           </p>
                         </div>
+                        {!isSystemAdminViewing && (
                         <div className="flex items-center gap-1">
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -760,6 +817,7 @@ export default function AccessManagementPage() {
                             </TooltipContent>
                           </Tooltip>
                         </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -779,9 +837,10 @@ export default function AccessManagementPage() {
                     Administrators
                   </CardTitle>
                   <CardDescription>
-                    Manage admin accounts who can configure routes and manage users
+                    {isSystemAdminViewing ? "Viewing admins (read-only)" : "Manage admin accounts who can configure routes and manage users"}
                   </CardDescription>
                 </div>
+                {!isSystemAdminViewing && (
                 <Dialog open={addAdminDialog} onOpenChange={setAddAdminDialog}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-add-admin">
@@ -899,6 +958,7 @@ export default function AccessManagementPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -929,6 +989,7 @@ export default function AccessManagementPage() {
                           <p className="text-sm text-muted-foreground">{admin.phoneNumber}</p>
                         )}
                       </div>
+                      {!isSystemAdminViewing && (
                       <div className="flex items-center gap-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -967,6 +1028,7 @@ export default function AccessManagementPage() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
+                      )}
                     </div>
                   ))}
                 </div>

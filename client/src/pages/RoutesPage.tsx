@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table as TableComponent, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode, Archive, RotateCcw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Search, LayoutGrid, Table, Settings, MessageSquare, QrCode, Archive, RotateCcw, Eye } from "lucide-react";
 import { RouteCard } from "@/components/RouteCard";
 import { CreateRouteDialog } from "@/components/CreateRouteDialog";
 import { EditRouteDialog } from "@/components/EditRouteDialog";
@@ -27,7 +29,8 @@ type SortOption = "name-asc" | "name-desc" | "status";
 type ViewMode = "cards" | "table";
 
 export default function RoutesPage() {
-  const { user, isLoading: authLoading } = useRequireRole("org_admin");
+  const { user, isLoading: authLoading, viewingOrgId } = useRequireRole("org_admin");
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [sortOption, setSortOption] = useState<SortOption>("name-asc");
@@ -42,9 +45,33 @@ export default function RoutesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get the default organization for now - in a real app this would be from user context
+  // Determine if system admin is viewing an org (read-only mode)
+  const isSystemAdminViewing = user?.role === 'system_admin' && viewingOrgId;
+  const effectiveOrgId = viewingOrgId || user?.organizationId;
+
+  // Fetch organization settings for the banner
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/org-settings", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId 
+        ? `/api/org-settings?organizationId=${effectiveOrgId}`
+        : "/api/org-settings";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    },
+    enabled: !authLoading && !!isSystemAdminViewing,
+  });
+
+  // Get routes filtered by organization if viewing
   const { data: routes = [], isLoading, error } = useQuery<RouteWithStops[]>({
-    queryKey: ["/api/routes"],
+    queryKey: ["/api/routes", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch routes");
+      return response.json();
+    },
   });
 
   // Fetch active sessions to show which routes have trips in progress
@@ -102,20 +129,21 @@ export default function RoutesPage() {
       }
     });
 
-  // Get the first organization from system admin API for now - in real app this would come from user context
-  const { data: organizations = [] } = useQuery<Organization[]>({
-    queryKey: ["/api/system/organizations"],
-  });
+  // Use the effective organization ID (from viewing param or user's org)
+  const organizationId = effectiveOrgId || "";
   
-  const organizationId = organizations[0]?.id || "";
+  const handleBackToSystem = () => {
+    setLocation('/system');
+  };
 
   // Toggle route status mutation
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ routeId, newStatus }: { routeId: string; newStatus: "active" | "inactive" }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("PUT", `/api/routes/${routeId}`, { status: newStatus });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", effectiveOrgId] });
       toast({
         title: "Route updated",
         description: "Route status has been updated successfully.",
@@ -134,10 +162,11 @@ export default function RoutesPage() {
   // Restore archived route mutation
   const restoreRouteMutation = useMutation({
     mutationFn: async (routeId: string) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
       return await apiRequest("POST", `/api/routes/${routeId}/restore`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", effectiveOrgId] });
       toast({
         title: "Route restored",
         description: "Route has been restored and is now enabled.",
@@ -189,12 +218,31 @@ export default function RoutesPage() {
 
   return (
     <div className="space-y-6">
+      {isSystemAdminViewing && (
+        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-blue-800 dark:text-blue-200">
+              Viewing <strong>{orgSettings?.name || 'Organization'}</strong> routes as System Administrator (read-only)
+            </span>
+            <button 
+              onClick={handleBackToSystem}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              data-testid="button-back-to-system"
+            >
+              Back to System Dashboard
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Routes</h1>
-          <p className="text-muted-foreground">Manage your bus and shuttle routes</p>
+          <p className="text-muted-foreground">
+            {isSystemAdminViewing ? "Viewing routes (read-only)" : "Manage your bus and shuttle routes"}
+          </p>
         </div>
-        <CreateRouteDialog organizationId={organizationId} />
+        {!isSystemAdminViewing && <CreateRouteDialog organizationId={organizationId} />}
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -297,12 +345,12 @@ export default function RoutesPage() {
                     ridersCount={0} // TODO: Add riders count to API
                     isArchived={!!route.archivedAt}
                     hasTripInProgress={routesWithActiveTrips.has(route.id)}
-                    onEdit={() => handleEditRoute(route.id)}
-                    onToggleStatus={() => handleToggleStatus(route.id, route.status as "active" | "inactive")}
-                    onSendAlert={() => handleSendAlert(route)}
+                    onEdit={isSystemAdminViewing ? undefined : () => handleEditRoute(route.id)}
+                    onToggleStatus={isSystemAdminViewing ? undefined : () => handleToggleStatus(route.id, route.status as "active" | "inactive")}
+                    onSendAlert={isSystemAdminViewing ? undefined : () => handleSendAlert(route)}
                     onShowQr={() => handleShowQr(route.id, route.name)}
-                    onArchive={() => handleArchiveRoute(route.id)}
-                    onRestore={() => handleRestoreRoute(route.id)}
+                    onArchive={isSystemAdminViewing ? undefined : () => handleArchiveRoute(route.id)}
+                    onRestore={isSystemAdminViewing ? undefined : () => handleRestoreRoute(route.id)}
                   />
                 );
               })}
@@ -358,46 +406,52 @@ export default function RoutesPage() {
                               >
                                 <QrCode className="w-4 h-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditRoute(route.id)}
-                                title="Edit Route"
-                                data-testid={`button-edit-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <Settings className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleSendAlert(route)}
-                                title="Send Alert"
-                                data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <MessageSquare className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleArchiveRoute(route.id)}
-                                title="Archive Route"
-                                data-testid={`button-archive-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <Archive className="w-4 h-4" />
-                              </Button>
+                              {!isSystemAdminViewing && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditRoute(route.id)}
+                                    title="Edit Route"
+                                    data-testid={`button-edit-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                                  >
+                                    <Settings className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleSendAlert(route)}
+                                    title="Send Alert"
+                                    data-testid={`button-send-alert-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                                  >
+                                    <MessageSquare className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleArchiveRoute(route.id)}
+                                    title="Archive Route"
+                                    data-testid={`button-archive-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                                  >
+                                    <Archive className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
                             </>
                           ) : (
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary">Archived</Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRestoreRoute(route.id)}
-                                data-testid={`button-restore-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <RotateCcw className="w-3 h-3 mr-1" />
-                                Restore
-                              </Button>
+                              {!isSystemAdminViewing && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRestoreRoute(route.id)}
+                                  data-testid={`button-restore-route-${route.name.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  <RotateCcw className="w-3 h-3 mr-1" />
+                                  Restore
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -414,7 +468,7 @@ export default function RoutesPage() {
               <p className="text-muted-foreground">
                 {searchTerm ? "No routes found matching your search." : "No routes created yet."}
               </p>
-              {!searchTerm && (
+              {!searchTerm && !isSystemAdminViewing && (
                 <CreateRouteDialog 
                   organizationId={organizationId}
                   trigger={

@@ -115,3 +115,9 @@ Preferred communication style: Simple, everyday language.
 - **Message Management for Riders/Drivers**: Riders and drivers can now archive or delete their own messages from the message history. Previously only admins could manage messages.
 - **Enhanced Forward-to-Driver Workflow**: Admins now see a confirmation dialog when forwarding rider messages to drivers, with the ability to add an optional note. Messages that have already been forwarded display an "Already Forwarded" badge to prevent duplicate forwards. The UI clearly separates "Reply to Parent/Student" from "Forward to Driver" actions with labeled sections and explanatory text.
 - **Simplified Driver Experience**: Removed sidebar navigation for drivers. Drivers now see a full-screen single-page dashboard with route selection, trip controls (start/stop/GPS), live map, and messaging - no need to navigate anywhere.
+
+### System Admin Features (December 6, 2025)
+- **System Admin Dashboard**: Dedicated dashboard at `/system` for system administrators to manage all organizations.
+- **Organization Viewing Mode**: System admins can "Enter as Admin" to view any organization's dashboard, routes, access management, and support center in read-only mode. A blue banner indicates read-only viewing with a "Back to System Dashboard" link.
+- **Read-Only Viewing**: When viewing an organization, system admins see all data but cannot modify anything. Action buttons (Add Route, Add Driver, Remove Rider, etc.) are hidden.
+- **Pages with Read-Only Support**: AdminDashboardPage, RoutesPage, AccessManagementPage, and SupportCenterPage all support the viewingOrgId context for system admin read-only viewing.

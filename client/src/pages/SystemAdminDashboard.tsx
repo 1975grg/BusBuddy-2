@@ -478,13 +478,18 @@ export default function SystemAdminDashboard() {
         {organizations && organizations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {organizations.map((org) => (
-              <Card key={org.id} className="hover-elevate" data-testid={`card-org-${org.id}`}>
+              <Card key={org.id} className={`hover-elevate ${!org.isActive ? 'opacity-60' : ''}`} data-testid={`card-org-${org.id}`}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{org.name}</CardTitle>
-                    <Badge className={getOrgTypeColor(org.type)}>
-                      {getOrgTypeLabel(org.type)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {!org.isActive && (
+                        <Badge variant="secondary">Archived</Badge>
+                      )}
+                      <Badge className={getOrgTypeColor(org.type)}>
+                        {getOrgTypeLabel(org.type)}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -533,16 +538,32 @@ export default function SystemAdminDashboard() {
                     
                     <Separator />
                     
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setViewOrgDialog({ open: true, org })}
-                      data-testid={`button-view-details-${org.id}`}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View Details
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setViewOrgDialog({ open: true, org })}
+                        data-testid={`button-view-details-${org.id}`}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Details
+                      </Button>
+                      <Button 
+                        variant={org.isActive ? "outline" : "default"}
+                        size="sm"
+                        onClick={() => toggleOrgStatusMutation.mutate(org.id)}
+                        disabled={toggleOrgStatusMutation.isPending}
+                        title={org.isActive ? "Archive organization" : "Restore organization"}
+                        data-testid={`button-toggle-org-${org.id}`}
+                      >
+                        {org.isActive ? (
+                          <Archive className="w-4 h-4" />
+                        ) : (
+                          <ArchiveRestore className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
