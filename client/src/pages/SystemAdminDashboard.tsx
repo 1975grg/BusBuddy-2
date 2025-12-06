@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X } from "lucide-react";
+import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X, Archive, ArchiveRestore } from "lucide-react";
 import type { Organization, OrganizationType, User } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -215,6 +215,34 @@ export default function SystemAdminDashboard() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to toggle status", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Toggle organization status mutation (archive/restore)
+  const toggleOrgStatusMutation = useMutation({
+    mutationFn: async (orgId: string) => {
+      const response = await fetch(`/api/system/organizations/${orgId}/toggle-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to toggle organization status");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system/organizations"] });
+      setViewOrgDialog({ open: false, org: null });
+      toast({ 
+        title: data.isActive ? "Organization restored" : "Organization archived", 
+        description: data.isActive 
+          ? `${data.name} has been restored and is now active` 
+          : `${data.name} has been archived`
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update organization", description: error.message, variant: "destructive" });
     }
   });
 

@@ -1115,6 +1115,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle organization active status (archive/unarchive)
+  app.post("/api/system/organizations/:id/toggle-status", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify organization exists
+      const org = await storage.getOrganization(id);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Toggle active status
+      const updated = await storage.updateOrganization(id, { isActive: !org.isActive });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error toggling organization status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Get all admins for an organization
   app.get("/api/system/organizations/:id/admins", authenticateUser, requireRole("system_admin"), async (req, res) => {
     try {
