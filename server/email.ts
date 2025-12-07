@@ -39,6 +39,9 @@ async function sendEmail(options: EmailOptions): Promise<boolean> {
     return true;
   } catch (error: any) {
     console.error(`❌ Failed to send email to ${options.to}:`, error.message);
+    if (error.response) {
+      console.error("SendGrid error details:", JSON.stringify(error.response.body, null, 2));
+    }
     return false;
   }
 }
