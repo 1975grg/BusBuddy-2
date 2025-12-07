@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X, Archive, ArchiveRestore } from "lucide-react";
+import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X, Archive, ArchiveRestore, Inbox, Clock } from "lucide-react";
 import type { Organization, OrganizationType, User } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -58,6 +58,17 @@ export default function SystemAdminDashboard() {
       const response = await fetch("/api/system/organizations?includeAdmins=true");
       if (!response.ok) throw new Error("Failed to fetch organizations");
       return response.json() as Promise<OrgWithAdmin[]>;
+    },
+    enabled: !authLoading,
+  });
+
+  // Fetch organization inquiries
+  const { data: inquiries } = useQuery({
+    queryKey: ["/api/system/inquiries"],
+    queryFn: async () => {
+      const response = await fetch("/api/system/inquiries", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch inquiries");
+      return response.json() as Promise<Array<{ id: string; organizationName: string; organizationType: string; contactName: string; contactEmail: string; status: string; createdAt: string }>>;
     },
     enabled: !authLoading,
   });
@@ -470,6 +481,21 @@ export default function SystemAdminDashboard() {
             </div>
           </CardContent>
         </Card>
+        
+        <Card className={inquiries?.filter(i => i.status === 'pending').length ? 'ring-2 ring-primary' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Inquiries</CardTitle>
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-pending-inquiries">
+              {inquiries?.filter(i => i.status === 'pending').length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              from Get Started form
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Organizations Grid */}
@@ -585,6 +611,48 @@ export default function SystemAdminDashboard() {
           </Card>
         )}
       </div>
+
+      {/* Organization Inquiries Section */}
+      {inquiries && inquiries.filter(i => i.status === 'pending').length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Inbox className="w-5 h-5" />
+            Pending Organization Inquiries
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {inquiries.filter(i => i.status === 'pending').map((inquiry) => (
+              <Card key={inquiry.id} className="hover-elevate" data-testid={`card-inquiry-${inquiry.id}`}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{inquiry.organizationName}</CardTitle>
+                    <Badge variant="outline">{inquiry.organizationType}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span>{inquiry.contactName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <a href={`mailto:${inquiry.contactEmail}`} className="text-primary hover:underline">
+                        {inquiry.contactEmail}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {new Date(inquiry.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Dialog open={createAdminDialog.open} onOpenChange={(open) => {
         if (!open) setCreateAdminDialog({ open: false, org: null });

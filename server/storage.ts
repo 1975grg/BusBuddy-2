@@ -37,6 +37,10 @@ import {
   type PushToken,
   type InsertPushToken,
   type PasswordResetToken,
+  type OrganizationInquiry,
+  type InsertOrganizationInquiry,
+  type ContactMessage,
+  type InsertContactMessage,
   users,
   passwordResetTokens,
   organizations,
@@ -55,7 +59,9 @@ import {
   notificationLogs,
   inviteTokens,
   userRouteAssignments,
-  pushTokens
+  pushTokens,
+  organizationInquiries,
+  contactMessages
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, isNull } from "drizzle-orm";
@@ -227,6 +233,16 @@ export interface IStorage {
   getRiderMessagesByOrganization(organizationId: string): Promise<RiderMessage[]>;
   updateRiderMessageStatus(id: string, status: string): Promise<RiderMessage | undefined>;
   addAdminResponse(id: string, response: string, respondedByUserId: string): Promise<RiderMessage | undefined>;
+  
+  // Organization inquiries (from public website)
+  createOrganizationInquiry(inquiry: InsertOrganizationInquiry): Promise<OrganizationInquiry>;
+  getOrganizationInquiries(): Promise<OrganizationInquiry[]>;
+  updateOrganizationInquiry(id: string, data: Partial<OrganizationInquiry>): Promise<OrganizationInquiry | undefined>;
+  
+  // Contact messages (from public website)
+  createContactMessage(message: InsertContactMessage): Promise<ContactMessage>;
+  getContactMessages(): Promise<ContactMessage[]>;
+  markContactMessageRead(id: string): Promise<ContactMessage | undefined>;
 }
 
 // Database-backed storage implementation (from javascript_database blueprint)
@@ -1511,6 +1527,42 @@ export class DatabaseStorage implements IStorage {
       return { success: false };
     }
   }
+
+  // Organization inquiries (from public website)
+  async createOrganizationInquiry(inquiry: InsertOrganizationInquiry): Promise<OrganizationInquiry> {
+    const [newInquiry] = await db.insert(organizationInquiries).values(inquiry).returning();
+    return newInquiry;
+  }
+
+  async getOrganizationInquiries(): Promise<OrganizationInquiry[]> {
+    return await db.select().from(organizationInquiries).orderBy(desc(organizationInquiries.createdAt));
+  }
+
+  async updateOrganizationInquiry(id: string, data: Partial<OrganizationInquiry>): Promise<OrganizationInquiry | undefined> {
+    const [updated] = await db.update(organizationInquiries)
+      .set(data)
+      .where(eq(organizationInquiries.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Contact messages (from public website)
+  async createContactMessage(message: InsertContactMessage): Promise<ContactMessage> {
+    const [newMessage] = await db.insert(contactMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async getContactMessages(): Promise<ContactMessage[]> {
+    return await db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt));
+  }
+
+  async markContactMessageRead(id: string): Promise<ContactMessage | undefined> {
+    const [updated] = await db.update(contactMessages)
+      .set({ status: 'read', readAt: new Date() })
+      .where(eq(contactMessages.id, id))
+      .returning();
+    return updated;
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -2534,6 +2586,32 @@ export class MemStorage implements IStorage {
   async getOrganizationById(id: string): Promise<Organization | undefined> {
     return this.getOrganization(id);
   }
+
+  // Organization inquiries (from public website) - not implemented in MemStorage
+  async createOrganizationInquiry(_inquiry: InsertOrganizationInquiry): Promise<OrganizationInquiry> {
+    throw new Error("Organization inquiries not implemented in MemStorage");
+  }
+
+  async getOrganizationInquiries(): Promise<OrganizationInquiry[]> {
+    throw new Error("Organization inquiries not implemented in MemStorage");
+  }
+
+  async updateOrganizationInquiry(_id: string, _data: Partial<OrganizationInquiry>): Promise<OrganizationInquiry | undefined> {
+    throw new Error("Organization inquiries not implemented in MemStorage");
+  }
+
+  // Contact messages (from public website) - not implemented in MemStorage
+  async createContactMessage(_message: InsertContactMessage): Promise<ContactMessage> {
+    throw new Error("Contact messages not implemented in MemStorage");
+  }
+
+  async getContactMessages(): Promise<ContactMessage[]> {
+    throw new Error("Contact messages not implemented in MemStorage");
+  }
+
+  async markContactMessageRead(_id: string): Promise<ContactMessage | undefined> {
+    throw new Error("Contact messages not implemented in MemStorage");
+  }
 }
 
 // Seed function to populate initial data
@@ -2683,3 +2761,4 @@ export const storage = new DatabaseStorage();
 
 // Seed the database on startup
 seedDatabase();
+// Cache buster: 1765135962

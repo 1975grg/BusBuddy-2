@@ -4091,6 +4091,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PUBLIC WEBSITE ROUTES ====================
+  
+  // Contact form submission (public - no auth required)
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const { name, email, subject, message } = req.body;
+      
+      if (!name || !email || !message) {
+        return res.status(400).json({ error: "Name, email, and message are required" });
+      }
+      
+      const contactMessage = await storage.createContactMessage({
+        name,
+        email,
+        subject: subject || null,
+        message,
+      });
+      
+      console.log(`New contact form submission from ${email}`);
+      res.status(201).json({ success: true, id: contactMessage.id });
+    } catch (error) {
+      console.error("Error creating contact message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Organization inquiry submission (public - no auth required)
+  app.post("/api/organization-inquiries", async (req, res) => {
+    try {
+      const { organizationName, organizationType, contactName, contactEmail, contactPhone, estimatedFleetSize, message } = req.body;
+      
+      if (!organizationName || !organizationType || !contactName || !contactEmail) {
+        return res.status(400).json({ error: "Organization name, type, contact name, and email are required" });
+      }
+      
+      const inquiry = await storage.createOrganizationInquiry({
+        organizationName,
+        organizationType,
+        contactName,
+        contactEmail,
+        contactPhone: contactPhone || null,
+        estimatedFleetSize: estimatedFleetSize || null,
+        message: message || null,
+      });
+      
+      console.log(`New organization inquiry from ${contactEmail} for ${organizationName}`);
+      res.status(201).json({ success: true, id: inquiry.id });
+    } catch (error) {
+      console.error("Error creating organization inquiry:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Get all organization inquiries (system admin only)
+  app.get("/api/system/inquiries", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+    try {
+      const inquiries = await storage.getOrganizationInquiries();
+      res.json(inquiries);
+    } catch (error) {
+      console.error("Error fetching organization inquiries:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Update organization inquiry status (system admin only)
+  app.patch("/api/system/inquiries/:id", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, notes } = req.body;
+      const user = (req as any).user as AuthUser;
+      
+      const inquiry = await storage.updateOrganizationInquiry(id, {
+        status,
+        notes,
+        reviewedAt: new Date(),
+        reviewedByUserId: user.id,
+      });
+      
+      res.json(inquiry);
+    } catch (error) {
+      console.error("Error updating organization inquiry:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Get all contact messages (system admin only)
+  app.get("/api/system/contact-messages", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+    try {
+      const messages = await storage.getContactMessages();
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching contact messages:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  
+  // Mark contact message as read (system admin only)
+  app.patch("/api/system/contact-messages/:id/read", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.markContactMessageRead(id);
+      res.json(message);
+    } catch (error) {
+      console.error("Error marking contact message as read:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

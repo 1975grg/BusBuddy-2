@@ -657,6 +657,51 @@ export const insertUserRouteAssignmentSchema = createInsertSchema(userRouteAssig
   isDefault: true,
 });
 
+// Organization inquiries from the public website (Get Started form)
+export const organizationInquiries = pgTable("organization_inquiries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationName: text("organization_name").notNull(),
+  organizationType: text("organization_type").notNull(), // school, hospital, airport, hotel, transit, other
+  contactName: text("contact_name").notNull(),
+  contactEmail: text("contact_email").notNull(),
+  contactPhone: text("contact_phone"),
+  estimatedFleetSize: text("estimated_fleet_size"),
+  message: text("message"),
+  status: text("status").notNull().default("pending"), // pending, contacted, approved, declined
+  notes: text("notes"), // Internal notes from system admin
+  createdAt: timestamp("created_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedByUserId: varchar("reviewed_by_user_id").references(() => users.id),
+});
+
+// Contact form submissions from the public website
+export const contactMessages = pgTable("contact_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject"),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("new"), // new, read, replied
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
+export const insertOrganizationInquirySchema = createInsertSchema(organizationInquiries).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+  reviewedByUserId: true,
+  notes: true,
+  status: true,
+});
+
+export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+  status: true,
+});
+
 export const roleEnum = z.enum(["system_admin", "org_admin", "driver", "rider"]);
 export const orgTypeEnum = z.enum(["university", "school", "hospital", "airport", "hotel"]);
 export const routeTypeEnum = z.enum(["shuttle", "bus"]);
@@ -730,3 +775,7 @@ export type NotificationType = z.infer<typeof notificationTypeEnum>;
 export type NotificationDeliveryMethod = z.infer<typeof notificationDeliveryMethodEnum>;
 export type NotificationStatus = z.infer<typeof notificationStatusEnum>;
 export type DayOfWeek = z.infer<typeof dayOfWeekEnum>;
+export type InsertOrganizationInquiry = z.infer<typeof insertOrganizationInquirySchema>;
+export type OrganizationInquiry = typeof organizationInquiries.$inferSelect;
+export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
+export type ContactMessage = typeof contactMessages.$inferSelect;
