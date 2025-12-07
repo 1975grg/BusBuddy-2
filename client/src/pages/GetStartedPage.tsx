@@ -122,22 +122,6 @@ export default function GetStartedPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {organizationTypes.slice(0, 3).map((type) => (
-              <Card 
-                key={type.value} 
-                className={`cursor-pointer transition-all ${formData.organizationType === type.value ? 'ring-2 ring-primary' : 'hover-elevate'}`}
-                onClick={() => setFormData({ ...formData, organizationType: type.value })}
-                data-testid={`card-org-type-${type.value}`}
-              >
-                <CardContent className="pt-6 text-center">
-                  <type.icon className="w-10 h-10 mx-auto mb-3 text-primary" />
-                  <p className="font-medium">{type.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Organization Details</CardTitle>
