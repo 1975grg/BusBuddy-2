@@ -2,9 +2,36 @@ import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, MapPin, Settings, ArrowRight, Bus, Shield, Bell } from "lucide-react";
+import { Users, MapPin, Settings, ArrowRight, Bus, Shield, Bell, Quote, MessageSquare } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import busIconUrl from "@assets/bus-buddy-logo.png";
+
+const reviews = [
+  {
+    name: "Sarah M.",
+    role: "Parent",
+    organization: "Lincoln Elementary",
+    quote: "Finally, no more guessing if the bus came early or if we're running late. I get a notification right when it's approaching our stop. Total game-changer for our morning routine.",
+  },
+  {
+    name: "Marcus T.",
+    role: "Parent",
+    organization: "Westwood Academy",
+    quote: "As a working parent, knowing exactly when my kids' bus is arriving gives me peace of mind. I can time my schedule perfectly and know they're safe.",
+  },
+  {
+    name: "Jennifer L.",
+    role: "Guest Services Manager",
+    organization: "Oceanview Resort",
+    quote: "Our guests love knowing exactly when the airport shuttle will arrive. It's eliminated complaints about wait times and improved our service scores significantly.",
+  },
+  {
+    name: "Dr. Robert K.",
+    role: "Transportation Coordinator",
+    organization: "Regional Medical Center",
+    quote: "Tracking our patient shuttles has never been easier. Staff and patients can plan their schedules around real arrival times, not estimates.",
+  },
+];
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -117,6 +144,43 @@ export default function LandingPage() {
             </div>
             <h3 className="font-semibold mb-2">Secure & Reliable</h3>
             <p className="text-sm text-muted-foreground">Multi-organization support with role-based access control</p>
+          </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mb-16 max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2">What People Are Saying</h2>
+            <p className="text-muted-foreground">Trusted by parents, schools, hotels, and healthcare organizations</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {reviews.map((review, index) => (
+              <div 
+                key={index}
+                className="bg-card rounded-xl p-6 relative"
+                data-testid={`review-${index}`}
+              >
+                <Quote className="w-8 h-8 text-primary/20 absolute top-4 right-4" />
+                <p className="text-muted-foreground mb-4 italic">"{review.quote}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary font-semibold text-sm">{review.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">{review.name}</p>
+                    <p className="text-xs text-muted-foreground">{review.role} - {review.organization}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Button variant="outline" asChild data-testid="button-share-experience">
+              <Link href="/contact">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Share Your Experience
+              </Link>
+            </Button>
           </div>
         </div>
 

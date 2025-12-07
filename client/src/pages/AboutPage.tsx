@@ -36,6 +36,19 @@ export default function AboutPage() {
             </p>
           </div>
 
+          {/* Team Photo Section */}
+          <div className="mb-12 text-center">
+            <div className="bg-gradient-to-br from-primary/5 to-bus-active/5 rounded-2xl p-8 max-w-md mx-auto">
+              <div className="w-48 h-48 mx-auto mb-6 rounded-2xl bg-muted/50 flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
+                <span className="text-muted-foreground text-sm">Team Photo</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">The Ghorayeb Family</h3>
+              <p className="text-muted-foreground text-sm">
+                What started as a family project to solve a real problem has grown into a mission to bring peace of mind to riders everywhere.
+              </p>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
             <div className="order-2 md:order-1">
               <div className="space-y-6">
