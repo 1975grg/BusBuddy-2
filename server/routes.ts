@@ -4199,6 +4199,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test SendGrid email (system admin only)
+  app.post("/api/system/test-email", authenticateUser, requireRole("system_admin"), async (req, res) => {
+    try {
+      const { to } = req.body;
+      if (!to) {
+        return res.status(400).json({ error: "Email address required" });
+      }
+      
+      const { sendWelcomeEmail } = await import("./email");
+      const result = await sendWelcomeEmail(to, "Test User", "Test Route");
+      
+      if (result) {
+        res.json({ success: true, message: `Test email sent to ${to}` });
+      } else {
+        res.status(500).json({ error: "Failed to send email - check server logs for details" });
+      }
+    } catch (error: any) {
+      console.error("Error sending test email:", error);
+      res.status(500).json({ error: error.message || "Failed to send test email" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
