@@ -4145,7 +4145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get all organization inquiries (system admin only)
-  app.get("/api/system/inquiries", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+  app.get("/api/system/inquiries", authenticateUser, requireRole("system_admin"), async (req, res) => {
     try {
       const inquiries = await storage.getOrganizationInquiries();
       res.json(inquiries);
@@ -4156,7 +4156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update organization inquiry status (system admin only)
-  app.patch("/api/system/inquiries/:id", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+  app.patch("/api/system/inquiries/:id", authenticateUser, requireRole("system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { status, notes } = req.body;
@@ -4177,7 +4177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get all contact messages (system admin only)
-  app.get("/api/system/contact-messages", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+  app.get("/api/system/contact-messages", authenticateUser, requireRole("system_admin"), async (req, res) => {
     try {
       const messages = await storage.getContactMessages();
       res.json(messages);
@@ -4188,7 +4188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Mark contact message as read (system admin only)
-  app.patch("/api/system/contact-messages/:id/read", authenticateUser, requireRole(["system_admin"]), async (req, res) => {
+  app.patch("/api/system/contact-messages/:id/read", authenticateUser, requireRole("system_admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const message = await storage.markContactMessageRead(id);
