@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Heart, Lightbulb, Users, GraduationCap, Building2, Plane, Hotel, Bus, Home, Theater, TreePine } from "lucide-react";
 import busIconUrl from "@assets/bus-buddy-logo.png";
+import foundersPhotoUrl from "@assets/Boys_Suit_-_Bus_Buddy_1765140708567.jpg";
 import { PublicHeader } from "@/components/PublicHeader";
 
 const industries = [
@@ -34,19 +35,6 @@ export default function AboutPage() {
             <p className="text-lg text-muted-foreground">
               How two students turned frustration into innovation
             </p>
-          </div>
-
-          {/* Team Photo Section */}
-          <div className="mb-12 text-center">
-            <div className="bg-gradient-to-br from-primary/5 to-bus-active/5 rounded-2xl p-8 max-w-md mx-auto">
-              <div className="w-48 h-48 mx-auto mb-6 rounded-2xl bg-muted/50 flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
-                <span className="text-muted-foreground text-sm">Team Photo</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">The Ghorayeb Family</h3>
-              <p className="text-muted-foreground text-sm">
-                What started as a family project to solve a real problem has grown into a mission to bring peace of mind to riders everywhere.
-              </p>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
@@ -164,6 +152,35 @@ export default function AboutPage() {
                   <p className="text-xs text-muted-foreground">{industry.description}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Meet the Founders */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-8 text-center">Meet the Founders</h2>
+            <div className="bg-gradient-to-br from-primary/5 to-bus-active/5 rounded-2xl p-8 max-w-2xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-shrink-0">
+                  <img 
+                    src={foundersPhotoUrl} 
+                    alt="Evan and Ryan Ghorayeb, Co-Founders of Bus Buddy" 
+                    className="w-64 h-64 object-cover rounded-2xl shadow-lg"
+                  />
+                </div>
+                <div className="text-center md:text-left">
+                  <h3 className="text-xl font-semibold mb-2">Evan & Ryan Ghorayeb</h3>
+                  <p className="text-muted-foreground mb-4">Co-Founders</p>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    While sitting in on MBA classes at MIT Sloan with their dad, Evan and Ryan learned 
+                    a valuable lesson: don't just recognize problems—become a problem solver who creates 
+                    real solutions that make a difference.
+                  </p>
+                  <p className="text-sm text-muted-foreground italic">
+                    "We turned a frustrating morning into a mission to help families everywhere feel 
+                    confident about their transportation."
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
