@@ -1,20 +1,25 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Heart, Lightbulb, Users } from "lucide-react";
+import { Heart, Lightbulb, Users, GraduationCap, Building2, Plane, Hotel, Bus, Home, Theater, TreePine } from "lucide-react";
 import busIconUrl from "@assets/bus-buddy-logo.png";
+import { PublicHeader } from "@/components/PublicHeader";
+
+const industries = [
+  { name: "Schools & Universities", icon: GraduationCap, description: "Student transportation tracking" },
+  { name: "Hospitals & Healthcare", icon: Building2, description: "Patient and staff shuttles" },
+  { name: "Airports", icon: Plane, description: "Terminal and parking shuttles" },
+  { name: "Hotels & Resorts", icon: Hotel, description: "Guest transportation services" },
+  { name: "Senior Living", icon: Home, description: "Resident activity shuttles" },
+  { name: "Corporate Campuses", icon: Building2, description: "Employee shuttle programs" },
+  { name: "Public Transit", icon: Bus, description: "City and commuter shuttles" },
+  { name: "Theme Parks & Venues", icon: Theater, description: "Guest shuttle services" },
+];
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <PublicHeader />
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Button variant="ghost" asChild data-testid="button-back-home">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
 
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
@@ -123,6 +128,29 @@ export default function AboutPage() {
                   Schools, hospitals, airports, and more—we serve all transportation needs
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Industries We Serve */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-2 text-center">Industries We Serve</h2>
+            <p className="text-muted-foreground text-center mb-8">
+              Trusted by organizations of all sizes across multiple sectors
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {industries.map((industry) => (
+                <div 
+                  key={industry.name}
+                  className="bg-card rounded-xl p-4 text-center hover-elevate"
+                  data-testid={`industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <industry.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <h4 className="font-semibold text-sm mb-1">{industry.name}</h4>
+                  <p className="text-xs text-muted-foreground">{industry.description}</p>
+                </div>
+              ))}
             </div>
           </div>
 

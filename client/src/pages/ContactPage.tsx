@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Mail, MessageSquare, Send, CheckCircle } from "lucide-react";
+import { Mail, MessageSquare, Send, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import busIconUrl from "@assets/bus-buddy-logo.png";
+import { PublicHeader } from "@/components/PublicHeader";
 
 export default function ContactPage() {
   const { toast } = useToast();
@@ -57,16 +58,8 @@ export default function ContactPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <PublicHeader />
         <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <Button variant="ghost" asChild data-testid="button-back-home">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-              </Link>
-            </Button>
-          </div>
-
           <div className="max-w-md mx-auto text-center py-16">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -91,16 +84,8 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <PublicHeader />
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Button variant="ghost" asChild data-testid="button-back-home">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
-
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <div className="flex justify-center mb-6">

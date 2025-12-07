@@ -6,18 +6,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Building2, CheckCircle, School, Hospital, Plane, Hotel, Bus } from "lucide-react";
+import { Building2, CheckCircle, School, Hospital, Plane, Hotel, Bus, Home, Theater } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import busIconUrl from "@assets/bus-buddy-logo.png";
+import { PublicHeader } from "@/components/PublicHeader";
 
 const organizationTypes = [
   { value: "school", label: "School / University", icon: School },
   { value: "hospital", label: "Hospital / Medical", icon: Hospital },
   { value: "airport", label: "Airport / Aviation", icon: Plane },
   { value: "hotel", label: "Hotel / Hospitality", icon: Hotel },
+  { value: "senior_living", label: "Senior Living / Care", icon: Home },
+  { value: "corporate", label: "Corporate Campus", icon: Building2 },
   { value: "transit", label: "Public Transit", icon: Bus },
+  { value: "theme_park", label: "Theme Park / Venue", icon: Theater },
   { value: "other", label: "Other", icon: Building2 },
 ];
 
@@ -70,16 +74,8 @@ export default function GetStartedPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <PublicHeader />
         <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <Button variant="ghost" asChild data-testid="button-back-home">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-              </Link>
-            </Button>
-          </div>
-
           <div className="max-w-md mx-auto text-center py-16">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -108,16 +104,8 @@ export default function GetStartedPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <PublicHeader />
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Button variant="ghost" asChild data-testid="button-back-home">
-            <Link href="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
-
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <div className="flex justify-center mb-6">
