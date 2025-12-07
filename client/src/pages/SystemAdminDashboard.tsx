@@ -73,6 +73,17 @@ export default function SystemAdminDashboard() {
     enabled: !authLoading,
   });
 
+  // Fetch contact messages
+  const { data: contactMessages } = useQuery({
+    queryKey: ["/api/system/contact-messages"],
+    queryFn: async () => {
+      const response = await fetch("/api/system/contact-messages", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch contact messages");
+      return response.json() as Promise<Array<{ id: string; name: string; email: string; subject: string; message: string; status: string; createdAt: string; readAt: string | null }>>;
+    },
+    enabled: !authLoading,
+  });
+
   // Create organization mutation
   const createOrgMutation = useMutation({
     mutationFn: async (data: { name: string; type: OrganizationType }) => {
@@ -646,6 +657,49 @@ export default function SystemAdminDashboard() {
                         {new Date(inquiry.createdAt).toLocaleDateString()}
                       </span>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Contact Messages Section */}
+      {contactMessages && contactMessages.filter(m => m.status === 'new').length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            New Contact Messages
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {contactMessages.filter(m => m.status === 'new').map((msg) => (
+              <Card key={msg.id} className="hover-elevate" data-testid={`card-contact-${msg.id}`}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{msg.subject}</CardTitle>
+                    <Badge variant="secondary">New</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span>{msg.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <a href={`mailto:${msg.email}`} className="text-primary hover:underline">
+                        {msg.email}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {new Date(msg.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground mt-2 line-clamp-2">{msg.message}</p>
                   </div>
                 </CardContent>
               </Card>
