@@ -4,6 +4,7 @@ import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
+import { sendMagicLinkEmail, sendPasswordResetEmail, sendWelcomeEmail } from "./email";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -96,15 +97,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: user.id, // Self-generated
       });
 
-      // TODO: Send magic link via email or SMS
-      // For now, we'll just return the token in development
-      const magicLink = `${req.protocol}://${req.get('host')}/auth/verify?token=${token}`;
+      // Build magic link URL - use production URL if available
+      const appBaseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const magicLink = `${appBaseUrl}/auth/verify?token=${token}`;
       
-      // In production, send via email/SMS instead of returning
+      // Send magic link via email
+      if (user.email) {
+        const emailSent = await sendMagicLinkEmail(user.email, magicLink, user.name || undefined);
+        if (!emailSent) {
+          console.error("Failed to send magic link email to:", user.email);
+        }
+      }
+      
       res.json({ 
         success: true, 
-        message: "Magic link sent",
-        // Remove this in production:
+        message: "If an account exists with that email, a login link has been sent.",
+        // Only include link in development for testing
         magicLink: process.env.NODE_ENV === 'development' ? magicLink : undefined
       });
     } catch (error) {
