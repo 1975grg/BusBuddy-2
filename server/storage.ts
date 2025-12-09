@@ -254,7 +254,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    // Case-insensitive email lookup
+    const normalizedEmail = email.toLowerCase();
+    const [user] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, normalizedEmail));
     return user || undefined;
   }
 
@@ -269,6 +271,8 @@ export class DatabaseStorage implements IStorage {
     
     const [user] = await db.insert(users).values({
       ...insertUser,
+      // Normalize email to lowercase for consistent lookups
+      email: insertUser.email.toLowerCase(),
       passwordExpiresAt
     }).returning();
     return user;
@@ -1781,8 +1785,10 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
+    // Case-insensitive email lookup
+    const normalizedEmail = email.toLowerCase();
     return Array.from(this.users.values()).find(
-      (user) => user.email === email,
+      (user) => user.email.toLowerCase() === normalizedEmail,
     );
   }
 
@@ -1794,7 +1800,8 @@ export class MemStorage implements IStorage {
     const user: User = { 
       id,
       name: insertUser.name,
-      email: insertUser.email,
+      // Normalize email to lowercase for consistent lookups
+      email: insertUser.email.toLowerCase(),
       phoneNumber: insertUser.phoneNumber || null,
       role: insertUser.role,
       organizationId: insertUser.organizationId || null,
