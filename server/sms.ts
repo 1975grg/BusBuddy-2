@@ -1,75 +1,203 @@
 import twilio from 'twilio';
 
+// Replit Twilio Integration - fetch credentials from Replit Connector
+async function getTwilioCredentials(): Promise<{
+  accountSid: string;
+  apiKey: string;
+  apiKeySecret: string;
+  phoneNumber: string;
+} | null> {
+  try {
+    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+    const xReplitToken = process.env.REPL_IDENTITY 
+      ? 'repl ' + process.env.REPL_IDENTITY 
+      : process.env.WEB_REPL_RENEWAL 
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+      : null;
+
+    if (!hostname || !xReplitToken) {
+      console.log('Replit Connector environment not available, trying legacy credentials...');
+      return null;
+    }
+
+    const response = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=twilio',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
+      }
+    );
+
+    const data = await response.json();
+    const connectionSettings = data.items?.[0];
+
+    console.log('Twilio connector settings keys:', connectionSettings?.settings ? Object.keys(connectionSettings.settings) : 'none');
+    
+    if (!connectionSettings || !connectionSettings.settings) {
+      console.log('Twilio connector not configured');
+      return null;
+    }
+
+    const settings = connectionSettings.settings;
+    
+    // Log what we received (mask sensitive data)
+    console.log('Twilio settings received:', {
+      hasAccountSid: !!settings.account_sid,
+      accountSidPrefix: settings.account_sid?.substring(0, 4),
+      hasApiKey: !!settings.api_key,
+      apiKeyPrefix: settings.api_key?.substring(0, 4),
+      hasApiKeySecret: !!settings.api_key_secret,
+      hasPhoneNumber: !!settings.phone_number
+    });
+
+    if (!settings.account_sid || !settings.api_key || !settings.api_key_secret) {
+      console.log('Twilio connector missing required credentials');
+      return null;
+    }
+
+    // The Replit connector field mapping can be inconsistent:
+    // - account_sid may contain API Key SID (starts with SK) instead of Account SID (AC)
+    // - api_key may contain something else
+    // We need to figure out the correct mapping
+    
+    let accountSid: string | null = null;
+    let apiKeySid: string | null = null;
+    
+    // Find the Account SID (must start with AC)
+    if (settings.account_sid?.startsWith('AC')) {
+      accountSid = settings.account_sid;
+    } else if (settings.api_key?.startsWith('AC')) {
+      accountSid = settings.api_key;
+    } else {
+      // Fallback to environment variable if connector doesn't have proper Account SID
+      accountSid = process.env.TWILIO_ACCOUNT_SID || null;
+      console.log('Using TWILIO_ACCOUNT_SID from environment as fallback');
+    }
+    
+    // Find the API Key SID (must start with SK)
+    if (settings.account_sid?.startsWith('SK')) {
+      apiKeySid = settings.account_sid;
+    } else if (settings.api_key?.startsWith('SK')) {
+      apiKeySid = settings.api_key;
+    }
+    
+    console.log('Final credential mapping:', {
+      accountSidPrefix: accountSid?.substring(0, 4),
+      apiKeySidPrefix: apiKeySid?.substring(0, 4),
+      hasApiKeySecret: !!settings.api_key_secret,
+      hasPhoneNumber: !!settings.phone_number
+    });
+    
+    if (!accountSid || !apiKeySid || !settings.api_key_secret) {
+      console.log('Missing required credentials after mapping');
+      return null;
+    }
+
+    return {
+      accountSid: accountSid,
+      apiKey: apiKeySid,
+      apiKeySecret: settings.api_key_secret,
+      phoneNumber: settings.phone_number
+    };
+  } catch (error) {
+    console.error('Error fetching Twilio credentials from Replit Connector:', error);
+    return null;
+  }
+}
+
 // SMS service for sending notifications to riders
 export class SmsService {
   private client: twilio.Twilio | null = null;
   private fromNumber: string | null = null;
+  private initialized: boolean = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    // Initialize Twilio client if credentials are available
-    // Support both Auth Token and API Key authentication methods
+    // Initialize asynchronously
+    this.initPromise = this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    if (this.initialized) return;
+
     try {
+      // First try Replit Twilio Connector (recommended)
+      const connectorCreds = await getTwilioCredentials();
+      
+      if (connectorCreds) {
+        console.log('Initializing Twilio with Replit Connector...');
+        this.client = twilio(connectorCreds.apiKey, connectorCreds.apiKeySecret, {
+          accountSid: connectorCreds.accountSid
+        });
+        this.fromNumber = connectorCreds.phoneNumber;
+        console.log('✅ Twilio SMS service initialized via Replit Connector');
+        this.initialized = true;
+        return;
+      }
+
+      // Fall back to legacy environment variables
       if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_PHONE_NUMBER) {
         if (process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET) {
-          // Use API Key authentication (recommended for production)
-          console.log('Initializing Twilio with API Key authentication...');
+          console.log('Initializing Twilio with legacy API Key authentication...');
           this.client = twilio(
             process.env.TWILIO_API_KEY_SID,
             process.env.TWILIO_API_KEY_SECRET,
             { accountSid: process.env.TWILIO_ACCOUNT_SID }
           );
-          console.log('✅ Twilio SMS service initialized successfully with API Key');
-        } else if (process.env.TWILIO_AUTH_TOKEN) {
-          // Fall back to Auth Token authentication
-          console.log('Initializing Twilio with Auth Token authentication...');
-          this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-          console.log('✅ Twilio SMS service initialized successfully with Auth Token');
-        }
-        
-        if (this.client) {
           this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+          console.log('✅ Twilio SMS service initialized with legacy API Key');
+          this.initialized = true;
+          return;
+        } else if (process.env.TWILIO_AUTH_TOKEN) {
+          console.log('Initializing Twilio with legacy Auth Token authentication...');
+          this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+          this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+          console.log('✅ Twilio SMS service initialized with legacy Auth Token');
+          this.initialized = true;
+          return;
         }
-      } else {
-        console.warn('⚠️ Twilio credentials not found. SMS notifications will be disabled.');
       }
+
+      console.warn('⚠️ Twilio credentials not found. SMS notifications will be disabled.');
+      console.warn('Please set up the Twilio integration via Replit Connectors.');
+      this.initialized = true;
     } catch (error) {
       console.error('❌ Failed to initialize Twilio client:', error instanceof Error ? error.message : error);
-      console.error('SMS notifications will be disabled. Please check your Twilio credentials:');
-      console.error('- TWILIO_ACCOUNT_SID should start with "AC"');
-      console.error('- TWILIO_API_KEY_SID or TWILIO_AUTH_TOKEN must be provided');
-      console.error('- TWILIO_PHONE_NUMBER should be in E.164 format (e.g., +1234567890)');
       this.client = null;
       this.fromNumber = null;
+      this.initialized = true;
     }
   }
 
-  /**
-   * Check if SMS service is properly configured
-   */
-  isConfigured(): boolean {
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
+  }
+
+  async isConfigured(): Promise<boolean> {
+    await this.ensureInitialized();
     return this.client !== null && this.fromNumber !== null;
   }
 
-  /**
-   * Send an SMS message
-   */
   async sendSms(to: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.isConfigured()) {
+    await this.ensureInitialized();
+    
+    if (!this.client || !this.fromNumber) {
       return { success: false, error: 'SMS service not configured' };
     }
 
     try {
-      // Ensure phone number is converted to string (defensive against type issues)
       const phoneStr = String(to);
-      
-      // Ensure phone number is in E.164 format (add +1 if missing)
       const formattedTo = phoneStr.startsWith('+') ? phoneStr : `+1${phoneStr.replace(/\D/g, '')}`;
       
       console.log(`SMS Debug: Original: ${to}, Formatted: ${formattedTo}, From: ${this.fromNumber}`);
       
-      const twilioMessage = await this.client!.messages.create({
+      const twilioMessage = await this.client.messages.create({
         body: message,
-        from: this.fromNumber!,
+        from: this.fromNumber,
         to: formattedTo,
       });
 
@@ -78,7 +206,7 @@ export class SmsService {
     } catch (error) {
       console.error('SMS send error:', error);
       const phoneStr = String(to);
-      console.error(`Failed to send SMS to: ${phoneStr} (formatted as: ${phoneStr.startsWith('+') ? phoneStr : `+1${phoneStr.replace(/\D/g, '')}`})`);
+      console.error(`Failed to send SMS to: ${phoneStr}`);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown SMS error' 
@@ -86,44 +214,27 @@ export class SmsService {
     }
   }
 
-  /**
-   * Send route started notification
-   */
   async sendRouteStartedNotification(to: string, routeName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const message = `🚌 Bus Buddy: The ${routeName} route has started! Track your bus in real-time.`;
     return this.sendSms(to, message);
   }
 
-  /**
-   * Send approaching stop notification
-   */
   async sendApproachingStopNotification(to: string, routeName: string, stopName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const message = `🚌 Bus Buddy: Your ${routeName} bus is approaching ${stopName} in about 2-3 minutes!`;
     return this.sendSms(to, message);
   }
 
-  /**
-   * Send arrived at stop notification
-   */
   async sendArrivedAtStopNotification(to: string, routeName: string, stopName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const message = `🚌 Bus Buddy: Your ${routeName} bus has arrived at ${stopName}!`;
     return this.sendSms(to, message);
   }
 
-  /**
-   * Send welcome message to new rider
-   */
   async sendWelcomeMessage(to: string, routeName: string, organizationName: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const message = `🚌 Welcome to ${organizationName}! You're now subscribed to notifications for the ${routeName} route. You'll receive SMS updates when your bus is approaching your selected stops. Reply STOP to opt out anytime.`;
     return this.sendSms(to, message);
   }
 
-  /**
-   * Send removal notification when rider is deleted from a route
-   */
   async sendRiderRemovedMessage(to: string, routeName: string, organizationName: string, riderName?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    // Extract first name from full name (e.g., "Emma Johnson" -> "Emma")
-    // Trim to handle any leading/trailing whitespace
     const firstName = riderName ? riderName.trim().split(' ')[0] : '';
     const greeting = firstName ? `Hey ${firstName}, ` : '';
     
@@ -131,14 +242,10 @@ export class SmsService {
     return this.sendSms(to, message);
   }
 
-  /**
-   * Send service alert notification
-   */
   async sendServiceAlertNotification(to: string, routeName: string, alertTitle: string, alertMessage: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const message = `🚌 Bus Buddy Alert: ${routeName} - ${alertTitle}: ${alertMessage}`;
     return this.sendSms(to, message);
   }
 }
 
-// Export singleton instance
 export const smsService = new SmsService();
