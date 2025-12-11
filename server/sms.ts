@@ -123,7 +123,18 @@ export class SmsService {
     if (this.initialized) return;
 
     try {
-      // First try Replit Twilio Connector (recommended)
+      // Primary method: Use environment variables (Account SID + Auth Token)
+      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+        console.log('Initializing Twilio with Account SID + Auth Token...');
+        this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+        console.log('✅ Twilio SMS service initialized successfully');
+        console.log(`   From number: ${this.fromNumber}`);
+        this.initialized = true;
+        return;
+      }
+
+      // Fallback: Try Replit Twilio Connector
       const connectorCreds = await getTwilioCredentials();
       
       if (connectorCreds) {
@@ -137,31 +148,8 @@ export class SmsService {
         return;
       }
 
-      // Fall back to legacy environment variables
-      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_PHONE_NUMBER) {
-        if (process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET) {
-          console.log('Initializing Twilio with legacy API Key authentication...');
-          this.client = twilio(
-            process.env.TWILIO_API_KEY_SID,
-            process.env.TWILIO_API_KEY_SECRET,
-            { accountSid: process.env.TWILIO_ACCOUNT_SID }
-          );
-          this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
-          console.log('✅ Twilio SMS service initialized with legacy API Key');
-          this.initialized = true;
-          return;
-        } else if (process.env.TWILIO_AUTH_TOKEN) {
-          console.log('Initializing Twilio with legacy Auth Token authentication...');
-          this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-          this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
-          console.log('✅ Twilio SMS service initialized with legacy Auth Token');
-          this.initialized = true;
-          return;
-        }
-      }
-
       console.warn('⚠️ Twilio credentials not found. SMS notifications will be disabled.');
-      console.warn('Please set up the Twilio integration via Replit Connectors.');
+      console.warn('Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in secrets.');
       this.initialized = true;
     } catch (error) {
       console.error('❌ Failed to initialize Twilio client:', error instanceof Error ? error.message : error);
