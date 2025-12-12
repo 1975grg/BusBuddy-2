@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { sendMagicLinkEmail, sendPasswordResetEmail, sendWelcomeEmail } from "./email";
+import { sendProximityAlertPush, sendServiceAlertPush, isFirebaseReady } from "./firebase-push";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -2293,6 +2294,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`Failed to create in-app alert for ${rider.name}:`, alertError);
           }
 
+          // Send Firebase push notification to authenticated riders on this route
+          if (isFirebaseReady()) {
+            try {
+              // Get authenticated riders assigned to this route
+              const routeAssignments = await storage.getRouteAssignmentsByRoute(session.routeId);
+              const authenticatedRiderUserIds = routeAssignments.map(a => a.userId);
+              
+              // Send push notification to each authenticated rider
+              for (const userId of authenticatedRiderUserIds) {
+                const pushResult = await sendProximityAlertPush(
+                  userId,
+                  notificationType as 'approaching' | 'arrived',
+                  stop.name,
+                  route.name
+                );
+                console.log(`[Notification] Firebase push to user ${userId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+              }
+            } catch (pushError) {
+              console.error(`[Notification] Firebase push error:`, pushError);
+            }
+          }
+
           // ALSO try to send SMS if Twilio is configured (optional enhancement)
           if (smsService.isConfigured() && rider.smsConsent) {
             try {
@@ -2735,6 +2758,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (smsError) {
         // Log SMS error but don't fail the request - alert was still created
         console.error("❌ Error sending SMS notifications for service alert:", smsError);
+      }
+
+      // Send Firebase push notifications to authenticated riders on this route
+      if (isFirebaseReady()) {
+        try {
+          const routeAssignments = await storage.getRouteAssignmentsByRoute(clientData.routeId);
+          const authenticatedRiderUserIds = routeAssignments.map(a => a.userId);
+          
+          if (authenticatedRiderUserIds.length > 0) {
+            const pushResult = await sendServiceAlertPush(
+              authenticatedRiderUserIds,
+              clientData.type,
+              clientData.title,
+              clientData.message,
+              route.name
+            );
+            console.log(`[ServiceAlert] Firebase push sent: ${pushResult.totalSent} success, ${pushResult.totalFailed} failed`);
+          }
+        } catch (pushError) {
+          console.error("[ServiceAlert] Firebase push error:", pushError);
+        }
       }
       
       res.status(201).json(alert);
