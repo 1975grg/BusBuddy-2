@@ -1,0 +1,70 @@
+{
+  "project_info": {
+    "project_number": "588764187878",
+    "project_id": "bus-buddy-app",
+    "storage_bucket": "bus-buddy-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:588764187878:android:a812ff545d76d7ce603f27",
+        "android_client_info": {
+          "package_name": "com.bytevia.busbuddy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "588764187878-2luqb90leavm1d3fhsc3ghf5m2of80jm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bytevia.busbuddy",
+            "certificate_hash": "dcb99fc708ecef02da8ca586455c9bdd9b19a5e8"
+          }
+        },
+        {
+          "client_id": "588764187878-e0sh50ija97s3rdth6rd3t3o5192fie6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bytevia.busbuddy",
+            "certificate_hash": "f52b45bbba65ad8299e1c98a285f23f2960a5748"
+          }
+        },
+        {
+          "client_id": "588764187878-ok5g2in62q2eqsnj5lsk1kncrskdtrnn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bytevia.busbuddy",
+            "certificate_hash": "4974e218e3d359dcc34b32e1766c9c0812f5f70f"
+          }
+        },
+        {
+          "client_id": "588764187878-ri9eb6cbhh720vpto6dj9l64e2tv4a4a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1VXKSSRaeUH1SKAuEv5mWXEUbbls9inI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "588764187878-ri9eb6cbhh720vpto6dj9l64e2tv4a4a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "588764187878-mcof1ictj8svdekihf8h2llasrm79lv3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bytevia.busbuddy"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
