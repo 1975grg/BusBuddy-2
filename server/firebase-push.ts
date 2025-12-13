@@ -3,7 +3,7 @@
  * Works for both iOS and Android devices
  */
 
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { db } from './db';
 import { pushTokens } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -28,8 +28,14 @@ export function initializeFirebase(): boolean {
   try {
     const serviceAccount = JSON.parse(serviceAccountKey);
     
+    // Validate that required fields exist
+    if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+      console.error('Firebase service account key is missing required fields (project_id, client_email, or private_key)');
+      return false;
+    }
+    
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
     });
     
     isInitialized = true;
