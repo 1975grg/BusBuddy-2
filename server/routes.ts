@@ -4135,6 +4135,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test push notification endpoint (for debugging)
+  app.post("/api/test-push", async (req, res) => {
+    try {
+      const { userId, title, body } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      
+      const { sendPushToUser, isFirebaseReady } = await import("./firebase-push");
+      
+      if (!isFirebaseReady()) {
+        return res.status(500).json({ error: "Firebase not initialized" });
+      }
+      
+      const result = await sendPushToUser(
+        userId,
+        title || "🚌 Test Notification",
+        body || "This is a test push notification from Bus Buddy!",
+        { type: "test" }
+      );
+      
+      console.log(`[Test Push] Sent to user ${userId}: ${result.sent} success, ${result.failed} failed`);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Error sending test push:", error);
+      res.status(500).json({ error: "Failed to send test push" });
+    }
+  });
+
   // ==================== PUBLIC WEBSITE ROUTES ====================
   
   // Contact form submission (public - no auth required)
