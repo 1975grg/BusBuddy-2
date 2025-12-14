@@ -1136,8 +1136,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Organization not found" });
       }
       
+      const isDeactivating = org.isActive; // If currently active, we're deactivating
+      
+      // Get all users in this organization
+      const orgUsers = await storage.getUsersByOrganization(id);
+      
       // Toggle active status
       const updated = await storage.updateOrganization(id, { isActive: !org.isActive });
+      
+      // When deactivating an organization, also deactivate all its users and clear their sessions
+      if (isDeactivating && orgUsers.length > 0) {
+        let deactivatedCount = 0;
+        for (const user of orgUsers) {
+          // Deactivate user and clear their session
+          await storage.deactivateUser(user.id);
+          await storage.clearUserSession(user.id);
+          deactivatedCount++;
+        }
+        console.log(`Deactivated ${deactivatedCount} users when deactivating organization ${org.name}`);
+        
+        return res.json({
+          ...updated,
+          usersDeactivated: deactivatedCount,
+          message: `Organization and ${deactivatedCount} user(s) have been deactivated`
+        });
+      }
       
       res.json(updated);
     } catch (error) {
