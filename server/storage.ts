@@ -1518,6 +1518,20 @@ export class DatabaseStorage implements IStorage {
             eq(users.phoneNumber, riderProfile.phoneNumber),
             eq(users.favoriteRouteId, routeId)
           ));
+        
+        // Also revoke user_route_assignments for any users with this phone number and route
+        // This is the key fix - without this, the rider can still access the route via routeAssignments
+        await db.update(userRouteAssignments)
+          .set({ 
+            isActive: false, 
+            revokedAt: new Date() 
+          })
+          .where(and(
+            eq(userRouteAssignments.routeId, routeId),
+            sql`${userRouteAssignments.userId} IN (
+              SELECT id FROM users WHERE phone_number = ${riderProfile.phoneNumber}
+            )`
+          ));
       }
 
       // Check if rider has any other subscriptions

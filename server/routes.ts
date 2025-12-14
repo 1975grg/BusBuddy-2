@@ -180,6 +180,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if user account is active
+      if (!user.isActive) {
+        return res.status(401).json({ 
+          error: "Your account has been deactivated. Please contact your administrator for assistance.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      // Check if user's organization is active (for non-system admins)
+      if (user.organizationId) {
+        const org = await storage.getOrganization(user.organizationId);
+        if (!org || !org.isActive) {
+          return res.status(401).json({ 
+            error: "Your organization is no longer active. Please contact support for assistance.",
+            code: "ORG_DEACTIVATED"
+          });
+        }
+      }
+
       // Check password expiration for riders before granting session
       if (user.role === 'rider' && user.passwordExpiresAt) {
         const { isPasswordExpired } = await import("./passwordExpiration");
@@ -291,6 +310,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!isValid) {
         return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Check if user account is active
+      if (!user.isActive) {
+        return res.status(401).json({ 
+          error: "Your account has been deactivated. Please contact your administrator for assistance.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+
+      // Check if user's organization is active (for non-system admins)
+      if (user.organizationId) {
+        const org = await storage.getOrganization(user.organizationId);
+        if (!org || !org.isActive) {
+          return res.status(401).json({ 
+            error: "Your organization is no longer active. Please contact support for assistance.",
+            code: "ORG_DEACTIVATED"
+          });
+        }
       }
 
       // Check password expiration for riders

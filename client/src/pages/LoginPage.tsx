@@ -142,6 +142,18 @@ export default function LoginPage() {
           description: "Please use magic link login or contact your administrator.",
         });
         setLoginMethod("magic-link");
+      } else if (error.code === "ACCOUNT_DEACTIVATED") {
+        toast({
+          variant: "destructive",
+          title: "Account Deactivated",
+          description: "Your account has been deactivated. Please contact your administrator for assistance.",
+        });
+      } else if (error.code === "ORG_DEACTIVATED") {
+        toast({
+          variant: "destructive",
+          title: "Organization Inactive",
+          description: "Your organization is no longer active. Please contact support for assistance.",
+        });
       } else {
         toast({
           variant: "destructive",
@@ -184,11 +196,32 @@ export default function LoginPage() {
       }
     },
     onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error.message || "Invalid or expired token",
-      });
+      if (error.code === "PASSWORD_EXPIRED") {
+        toast({
+          variant: "destructive",
+          title: "Access Expired",
+          description: "Your access has expired. Please contact your administrator for a new access code.",
+        });
+        setLocation("/access");
+      } else if (error.code === "ACCOUNT_DEACTIVATED") {
+        toast({
+          variant: "destructive",
+          title: "Account Deactivated",
+          description: "Your account has been deactivated. Please contact your administrator for assistance.",
+        });
+      } else if (error.code === "ORG_DEACTIVATED") {
+        toast({
+          variant: "destructive",
+          title: "Organization Inactive",
+          description: "Your organization is no longer active. Please contact support for assistance.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: error.message || "Invalid or expired token",
+        });
+      }
     },
   });
 
