@@ -1,6 +1,7 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
+import { pushNotificationService } from "@/lib/pushNotifications";
 
 // Extended user type with route assignments and rider profile
 interface UserWithAssignments extends User {
@@ -34,6 +35,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
     retry: false, // Don't retry on 401
     refetchOnWindowFocus: false,
   });
+
+  // Initialize push notifications when user is authenticated on native platform
+  useEffect(() => {
+    if (user?.id) {
+      // Initialize push notifications for native platforms (iOS/Android)
+      pushNotificationService.initialize(user.id).catch((err) => {
+        console.error('Failed to initialize push notifications:', err);
+      });
+    }
+  }, [user?.id]);
 
   const contextValue: UserContextType = {
     user: user || null,
