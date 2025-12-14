@@ -1517,6 +1517,11 @@ export class DatabaseStorage implements IStorage {
 
       // If no other subscriptions, delete the rider profile
       if (remainingSubscriptions.length === 0) {
+        // First delete any proximity alerts for this rider profile (foreign key constraint)
+        await db.delete(proximityAlerts)
+          .where(eq(proximityAlerts.riderProfileId, riderProfileId));
+        
+        // Now delete the rider profile
         await db.delete(riderProfiles)
           .where(eq(riderProfiles.id, riderProfileId));
       }
