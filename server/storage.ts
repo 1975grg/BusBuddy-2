@@ -1509,6 +1509,17 @@ export class DatabaseStorage implements IStorage {
       await db.delete(routeSubscriptions)
         .where(eq(routeSubscriptions.id, subscription.id));
 
+      // Clear favorite_route_id for any users with this route as their favorite
+      // This prevents riders from still seeing the route after being removed
+      if (riderProfile?.phoneNumber) {
+        await db.update(users)
+          .set({ favoriteRouteId: null })
+          .where(and(
+            eq(users.phoneNumber, riderProfile.phoneNumber),
+            eq(users.favoriteRouteId, routeId)
+          ));
+      }
+
       // Check if rider has any other subscriptions
       const remainingSubscriptions = await db.select()
         .from(routeSubscriptions)
