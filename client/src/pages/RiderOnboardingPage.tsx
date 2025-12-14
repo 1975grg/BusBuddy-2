@@ -80,16 +80,16 @@ export default function RiderOnboardingPage() {
   
   const organization = organizations?.find(org => org.id === organizationId);
 
-  // Subscribe to route mutation - now creates user account with password
+  // Subscribe to route mutation - creates account or adds route to existing account
   const subscribeToRouteMutation = useMutation({
     mutationFn: async () => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
 
-      // Create rider account with password using the new onboarding endpoint
+      // Create rider account or add route to existing account
       const response = await apiRequest("POST", "/api/rider-onboard", {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password,
+        password: password || undefined, // Optional for returning users
         phoneNumber: cleanPhoneNumber,
         organizationId,
         routeId,
@@ -108,29 +108,68 @@ export default function RiderOnboardingPage() {
 
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { success: boolean; message: string; isRouteAdded?: boolean; isExistingSubscription?: boolean }) => {
       setIsSubscribed(true);
-      toast({
-        title: "Account created!",
-        description: `You can now log in with your email and password to track the ${route?.name} route.`,
-      });
+      
+      if (data.isRouteAdded) {
+        // Returning user - route was added to their account
+        toast({
+          title: "Route added!",
+          description: data.message || `You're now following the ${route?.name} route.`,
+        });
+      } else if (data.isExistingSubscription) {
+        // User was already following this route
+        toast({
+          title: "Already following",
+          description: data.message || "You're already following this route.",
+        });
+      } else {
+        // New account created
+        toast({
+          title: "Account created!",
+          description: `You can now track the ${route?.name} route.`,
+        });
+      }
     },
     onError: (error: Error & { code?: string }) => {
-      console.error("Error creating rider account:", error);
+      console.error("Error in rider onboarding:", error);
       
-      // Check if this is a duplicate account error using structured error code
-      const isAccountExists = error.code === "EMAIL_IN_USE" || error.code === "PHONE_IN_USE";
-      
-      if (isAccountExists) {
+      if (error.code === "PHONE_IN_USE") {
         toast({
-          title: "Account already exists",
-          description: "You already have an account. Redirecting to login...",
-          variant: "default",
+          title: "Phone number already registered",
+          description: "Please use the same email you registered with before, or contact support.",
+          variant: "destructive",
         });
-        // Redirect to login after a brief delay
-        setTimeout(() => {
-          setLocation("/login");
-        }, 1500);
+      } else if (error.code === "NOT_A_RIDER") {
+        toast({
+          title: "Staff account detected",
+          description: "This email is registered as a staff account. Please use a different email.",
+          variant: "destructive",
+        });
+      } else if (error.code === "ACCOUNT_DEACTIVATED") {
+        toast({
+          title: "Account deactivated",
+          description: "Your account has been deactivated. Please contact your administrator.",
+          variant: "destructive",
+        });
+      } else if (error.code === "PASSWORD_REQUIRED") {
+        toast({
+          title: "Password required",
+          description: "Please enter your password to continue.",
+          variant: "destructive",
+        });
+      } else if (error.code === "INVALID_PASSWORD") {
+        toast({
+          title: "Incorrect password",
+          description: "The password you entered is incorrect. Please try again.",
+          variant: "destructive",
+        });
+      } else if (error.code === "NO_PASSWORD_SET") {
+        toast({
+          title: "Password not set",
+          description: "Your account doesn't have a password. Please reset your password first.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Registration failed",

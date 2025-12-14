@@ -592,15 +592,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== RIDER ONBOARDING (QR CODE SIGNUP) ====================
   
   // Complete rider onboarding from QR code - creates user account, rider profile, and subscription
+  // Also handles returning users who want to add another route
   app.post("/api/rider-onboard", async (req, res) => {
     try {
       const { z } = await import("zod");
       
-      // Validate input
+      // Validate input - password is optional for returning users
       const onboardSchema = z.object({
         name: z.string().min(1, "Name is required"),
         email: z.string().email("Invalid email address"),
-        password: z.string().min(6, "Password must be at least 6 characters"),
+        password: z.string().min(6, "Password must be at least 6 characters").optional(),
         phoneNumber: z.string().min(10, "Valid phone number required"),
         organizationId: z.string().min(1, "Organization ID required"),
         routeId: z.string().min(1, "Route ID required"),
@@ -611,20 +612,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = onboardSchema.parse(req.body);
 
-      // Check if email already exists
+      // Check if email already exists - if so, handle as returning user
       const existingUser = await storage.getUserByEmail(validatedData.email);
+      
       if (existingUser) {
-        return res.status(409).json({ 
-          error: "An account with this email already exists. Please log in instead.",
-          code: "EMAIL_IN_USE"
+        // Returning user flow - add route to their existing account
+        console.log(`[RIDER-ONBOARD] Returning user detected: ${existingUser.email}`);
+        
+        // Must be a rider to add routes via this flow
+        if (existingUser.role !== "rider") {
+          return res.status(400).json({
+            error: "This email is registered as a staff account. Please use a different email.",
+            code: "NOT_A_RIDER"
+          });
+        }
+        
+        // Check if account is active
+        if (!existingUser.isActive) {
+          return res.status(403).json({
+            error: "Your account has been deactivated. Please contact your administrator.",
+            code: "ACCOUNT_DEACTIVATED"
+          });
+        }
+        
+        // SECURITY: Verify password for returning users before granting session
+        if (!validatedData.password) {
+          return res.status(400).json({
+            error: "Password is required to add a route to your existing account.",
+            code: "PASSWORD_REQUIRED"
+          });
+        }
+        
+        if (!existingUser.passwordHash) {
+          return res.status(400).json({
+            error: "Your account does not have a password set. Please reset your password first.",
+            code: "NO_PASSWORD_SET"
+          });
+        }
+        
+        const bcrypt = await import("bcrypt");
+        const isPasswordValid = await bcrypt.compare(validatedData.password, existingUser.passwordHash);
+        
+        if (!isPasswordValid) {
+          return res.status(401).json({
+            error: "Incorrect password. Please try again.",
+            code: "INVALID_PASSWORD"
+          });
+        }
+        
+        // Check if they already have a rider profile for this org
+        let riderProfile = await storage.getRiderProfileByPhone(validatedData.phoneNumber, validatedData.organizationId);
+        
+        if (!riderProfile) {
+          // Create rider profile for this organization
+          riderProfile = await storage.createRiderProfile({
+            phoneNumber: validatedData.phoneNumber,
+            name: validatedData.name,
+            organizationId: validatedData.organizationId,
+            notificationMethod: "sms",
+            smsConsent: validatedData.smsConsent,
+            smsConsentAt: validatedData.smsConsent ? new Date() : undefined,
+          });
+          console.log(`[RIDER-ONBOARD] Created new rider profile for returning user: ${riderProfile.id}`);
+        }
+        
+        // Check if they already have a subscription to this route
+        const existingSubscriptions = await storage.getSubscriptionsByRiderProfile(riderProfile.id);
+        const alreadySubscribed = existingSubscriptions.some(sub => sub.routeId === validatedData.routeId);
+        
+        if (alreadySubscribed) {
+          // Already following this route - log them in and tell them
+          const sessionToken = generateSessionToken();
+          const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+          await storage.setUserSession(existingUser.id, sessionToken, sessionExpiresAt);
+          
+          return res.status(200).json({
+            success: true,
+            message: "You're already following this route!",
+            isExistingSubscription: true,
+            user: {
+              id: existingUser.id,
+              name: existingUser.name,
+              email: existingUser.email,
+            },
+            sessionToken,
+          });
+        }
+        
+        // Create new route subscription
+        const subscription = await storage.createRouteSubscription({
+          routeId: validatedData.routeId,
+          riderProfileId: riderProfile.id,
+          notificationMode: validatedData.notificationMode,
+        });
+        
+        // Create stop preferences
+        for (const stopId of validatedData.selectedStopIds) {
+          try {
+            await storage.createStopPreference({
+              subscriptionId: subscription.id,
+              stopId,
+              notifyOnApproaching: true,
+              notifyOnArrival: true,
+            });
+          } catch (error) {
+            console.error(`Failed to create stop preference for ${stopId}:`, error);
+          }
+        }
+        
+        // Create route assignment
+        try {
+          await storage.createUserRouteAssignment({
+            userId: existingUser.id,
+            routeId: validatedData.routeId,
+            assignedByUserId: existingUser.id,
+            isDefault: false, // Not default since they have other routes
+            isActive: true,
+          });
+        } catch (error) {
+          console.error("Failed to create user route assignment:", error);
+        }
+        
+        // Log them in
+        const sessionToken = generateSessionToken();
+        const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        await storage.setUserSession(existingUser.id, sessionToken, sessionExpiresAt);
+        
+        const route = await storage.getRoute(validatedData.routeId);
+        console.log(`[RIDER-ONBOARD] Added route ${route?.name} to existing user ${existingUser.email}`);
+        
+        return res.status(200).json({
+          success: true,
+          message: `Route "${route?.name || 'New route'}" added to your account!`,
+          isRouteAdded: true,
+          user: {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+          },
+          sessionToken,
+        });
+      }
+      
+      // New user flow - require password
+      if (!validatedData.password) {
+        return res.status(400).json({ 
+          error: "Password is required for new accounts",
+          code: "PASSWORD_REQUIRED"
         });
       }
 
-      // Check if phone number already has a rider profile for this organization
+      // Check if phone number already has a rider profile for this organization (new user with existing phone)
       const existingProfile = await storage.getRiderProfileByPhone(validatedData.phoneNumber, validatedData.organizationId);
       if (existingProfile) {
         return res.status(409).json({ 
-          error: "This phone number is already registered. Please log in instead.",
+          error: "This phone number is already registered. Please use the same email as before or contact support.",
           code: "PHONE_IN_USE"
         });
       }
