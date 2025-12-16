@@ -1,5 +1,6 @@
 import { PushNotifications, Token, ActionPerformed } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
+import { getStoredSessionToken } from './queryClient';
 
 export interface DeviceToken {
   token: string;
@@ -70,11 +71,23 @@ class PushNotificationService {
     try {
       const platform = Capacitor.getPlatform() as 'ios' | 'android';
       
+      // Build headers with auth token for native platforms
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Include Bearer token for native app authentication
+      const sessionToken = getStoredSessionToken();
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+        console.log('[PUSH] Including auth token in push registration request');
+      } else {
+        console.warn('[PUSH] No session token available for push registration');
+      }
+      
       const response = await fetch('/api/push-tokens', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           token,
           platform,
@@ -83,12 +96,14 @@ class PushNotificationService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to register device token');
+        const errorText = await response.text();
+        console.error('[PUSH] Registration failed:', response.status, errorText);
+        throw new Error(`Failed to register device token: ${response.status}`);
       }
 
-      console.log('Device token registered successfully');
+      console.log('[PUSH] Device token registered successfully');
     } catch (error) {
-      console.error('Error registering device token:', error);
+      console.error('[PUSH] Error registering device token:', error);
     }
   }
 

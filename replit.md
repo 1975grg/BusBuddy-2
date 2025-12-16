@@ -105,6 +105,22 @@ Preferred communication style: Simple, everyday language.
 - **Build 5 Fix**: Updated to use production URL for 24/7 availability
 - **GPS Tracking**: Working - drivers can share location, riders can follow bus on map
 
+### Android App (Google Play Internal Testing)
+- **Package ID**: com.bytevia.busbuddy
+- **App Name**: Bus Buddy (temporary name until reviewed)
+- **Testing Link**: https://play.google.com/apps/internaltest/4701505178777042651
+- **Current Release**: 3 (1.2)
+- **Released**: December 13, 2025
+- **Internal Testers**: 5 registered
+- **Status**: Available to internal testers
+- **How to Test**: Add tester's email to Internal Testers list → Share testing link → They accept and install from Play Store
+
+### Admin Onboarding Flow
+- **System Admin Dashboard**: `/system` - Create organizations and admins
+- **Temp Password**: When creating an org admin, system generates a temporary password
+- **First Login**: Admin logs in with temp password → redirected to set their own password
+- **Test Password**: For Westwood Academy test accounts, use `busbuddy123`
+
 ### Recent Bug Fixes (November 27, 2025)
 - **Proximity Notifications**: Fixed bug where ALL riders got notifications instead of only those who selected the stop as their home stop
 - **SMS Type Error**: Fixed `to.startsWith is not a function` error by adding defensive string conversion for phone numbers
