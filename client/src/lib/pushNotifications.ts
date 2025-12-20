@@ -21,6 +21,9 @@ class PushNotificationService {
     }
 
     try {
+      // Initialize Firebase Messaging plugin first (required on iOS to wire native delegates)
+      console.log('[PUSH] Initializing Firebase Messaging plugin...');
+      
       // Request permission
       const permissionResult = await FirebaseMessaging.requestPermissions();
       console.log('[PUSH] Permission result:', permissionResult.receive);
