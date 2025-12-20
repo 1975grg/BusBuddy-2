@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { getStoredSessionToken } from './queryClient';
+import { getStoredSessionToken, buildApiUrl } from './queryClient';
 import type { FirebaseMessaging as FirebaseMessagingType } from '@capacitor-firebase/messaging';
 
 export interface DeviceToken {
@@ -99,7 +99,10 @@ class PushNotificationService {
         console.warn('[PUSH] No session token available for push registration');
       }
       
-      const response = await fetch('/api/push-tokens', {
+      const url = buildApiUrl('/api/push-tokens');
+      console.log('[PUSH] Registering token at:', url);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({

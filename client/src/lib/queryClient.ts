@@ -5,6 +5,32 @@ import { Capacitor } from "@capacitor/core";
 // Session token storage key for native app persistence
 const SESSION_TOKEN_KEY = "busbuddy_session_token";
 
+// Production API URL for native apps with embedded JavaScript
+const PRODUCTION_API_URL = "https://bus-buddy-v-3-user-interface-1975grg.replit.app";
+
+// Get the base URL for API calls
+// On native platforms with embedded JS, we need to call the production server
+// On web, relative URLs work fine
+export function getApiBaseUrl(): string {
+  if (Capacitor.isNativePlatform()) {
+    console.log("[API] Using production URL for native platform");
+    return PRODUCTION_API_URL;
+  }
+  return "";
+}
+
+// Build full API URL
+export function buildApiUrl(path: string): string {
+  const baseUrl = getApiBaseUrl();
+  // If path already starts with http, return as-is
+  if (path.startsWith("http")) {
+    return path;
+  }
+  // Ensure path starts with /
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${normalizedPath}`;
+}
+
 // In-memory cache of the token for synchronous access
 let cachedToken: string | null = null;
 let tokenInitialized = false;
@@ -190,7 +216,10 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const fullUrl = buildApiUrl(url);
+  console.log("[API] Request:", method, fullUrl);
+  
+  const res = await fetch(fullUrl, {
     method,
     headers: getAuthHeaders(!!data),
     body: data ? JSON.stringify(data) : undefined,
@@ -207,7 +236,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const path = queryKey.join("/") as string;
+    const fullUrl = buildApiUrl(path);
+    console.log("[API] Query:", fullUrl);
+    
+    const res = await fetch(fullUrl, {
       credentials: "include",
       headers: getAuthHeaders(false),
     });
