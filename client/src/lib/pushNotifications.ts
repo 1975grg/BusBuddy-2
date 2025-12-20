@@ -1,4 +1,4 @@
-import { PushNotifications, Token, ActionPerformed } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { getStoredSessionToken } from './queryClient';
 
@@ -16,54 +16,52 @@ class PushNotificationService {
     
     // Only run on native platforms (iOS/Android)
     if (!Capacitor.isNativePlatform()) {
-      console.log('Push notifications only available on native platforms');
+      console.log('[PUSH] Push notifications only available on native platforms');
       return;
     }
 
     try {
       // Request permission
-      const permissionResult = await PushNotifications.requestPermissions();
+      const permissionResult = await FirebaseMessaging.requestPermissions();
+      console.log('[PUSH] Permission result:', permissionResult.receive);
       
       if (permissionResult.receive === 'granted') {
-        // Register with OS for push notifications
-        await PushNotifications.register();
+        // Get the FCM token (this is the key difference - Firebase SDK gives us FCM token, not APNS token)
+        const tokenResult = await FirebaseMessaging.getToken();
+        console.log('[PUSH] FCM token received:', tokenResult.token.substring(0, 20) + '...');
         
-        // Listen for registration success
-        await PushNotifications.addListener('registration', async (token: Token) => {
-          console.log('Push registration success, token:', token.value);
-          
-          // Send token to backend
-          await this.registerDeviceToken(token.value, userId);
+        // Send token to backend
+        await this.registerDeviceToken(tokenResult.token, userId);
+
+        // Listen for token refresh
+        await FirebaseMessaging.addListener('tokenReceived', async (event) => {
+          console.log('[PUSH] Token refreshed:', event.token.substring(0, 20) + '...');
+          await this.registerDeviceToken(event.token, userId);
         });
 
-        // Listen for registration errors
-        await PushNotifications.addListener('registrationError', (error: any) => {
-          console.error('Push registration error:', error);
-        });
-
-        // Listen for push notifications
-        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          console.log('Push notification received:', notification);
-          // Notification is automatically shown by OS
+        // Listen for push notifications when app is in foreground
+        await FirebaseMessaging.addListener('notificationReceived', (event) => {
+          console.log('[PUSH] Notification received in foreground:', event.notification);
         });
 
         // Listen for notification taps
-        await PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-          console.log('Push notification action performed:', action);
+        await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+          console.log('[PUSH] Notification action performed:', event);
           
           // Handle notification tap - could navigate to specific page
-          const data = action.notification.data;
+          const data = event.notification?.data;
           if (data?.route) {
-            window.location.href = data.route;
+            window.location.href = data.route as string;
           }
         });
 
         this.isInitialized = true;
+        console.log('[PUSH] Firebase messaging initialized successfully');
       } else {
-        console.log('Push notification permission denied');
+        console.log('[PUSH] Push notification permission denied');
       }
     } catch (error) {
-      console.error('Error initializing push notifications:', error);
+      console.error('[PUSH] Error initializing push notifications:', error);
     }
   }
 
@@ -101,7 +99,7 @@ class PushNotificationService {
         throw new Error(`Failed to register device token: ${response.status}`);
       }
 
-      console.log('[PUSH] Device token registered successfully');
+      console.log('[PUSH] FCM device token registered successfully');
     } catch (error) {
       console.error('[PUSH] Error registering device token:', error);
     }
@@ -110,7 +108,7 @@ class PushNotificationService {
   async removeAllListeners(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     
-    await PushNotifications.removeAllListeners();
+    await FirebaseMessaging.removeAllListeners();
     this.isInitialized = false;
   }
 }
