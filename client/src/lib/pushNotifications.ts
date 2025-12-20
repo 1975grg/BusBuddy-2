@@ -1,6 +1,6 @@
-import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { getStoredSessionToken } from './queryClient';
+import type { FirebaseMessaging as FirebaseMessagingType } from '@capacitor-firebase/messaging';
 
 export interface DeviceToken {
   token: string;
@@ -10,48 +10,63 @@ export interface DeviceToken {
 
 class PushNotificationService {
   private isInitialized = false;
+  private firebaseMessaging: typeof FirebaseMessagingType | null = null;
+
+  private async getFirebaseMessaging(): Promise<typeof FirebaseMessagingType | null> {
+    if (this.firebaseMessaging) return this.firebaseMessaging;
+    
+    if (!Capacitor.isNativePlatform()) {
+      return null;
+    }
+
+    try {
+      const module = await import('@capacitor-firebase/messaging');
+      this.firebaseMessaging = module.FirebaseMessaging;
+      return this.firebaseMessaging;
+    } catch (error) {
+      console.error('[PUSH] Failed to load Firebase Messaging module:', error);
+      return null;
+    }
+  }
 
   async initialize(userId: string): Promise<void> {
     if (this.isInitialized) return;
     
-    // Only run on native platforms (iOS/Android)
     if (!Capacitor.isNativePlatform()) {
       console.log('[PUSH] Push notifications only available on native platforms');
       return;
     }
 
     try {
-      // Initialize Firebase Messaging plugin first (required on iOS to wire native delegates)
+      const FirebaseMessaging = await this.getFirebaseMessaging();
+      if (!FirebaseMessaging) {
+        console.error('[PUSH] Firebase Messaging not available');
+        return;
+      }
+
       console.log('[PUSH] Initializing Firebase Messaging plugin...');
       
-      // Request permission
       const permissionResult = await FirebaseMessaging.requestPermissions();
       console.log('[PUSH] Permission result:', permissionResult.receive);
       
       if (permissionResult.receive === 'granted') {
-        // Get the FCM token (this is the key difference - Firebase SDK gives us FCM token, not APNS token)
         const tokenResult = await FirebaseMessaging.getToken();
         console.log('[PUSH] FCM token received:', tokenResult.token.substring(0, 20) + '...');
         
-        // Send token to backend
         await this.registerDeviceToken(tokenResult.token, userId);
 
-        // Listen for token refresh
         await FirebaseMessaging.addListener('tokenReceived', async (event) => {
           console.log('[PUSH] Token refreshed:', event.token.substring(0, 20) + '...');
           await this.registerDeviceToken(event.token, userId);
         });
 
-        // Listen for push notifications when app is in foreground
         await FirebaseMessaging.addListener('notificationReceived', (event) => {
           console.log('[PUSH] Notification received in foreground:', event.notification);
         });
 
-        // Listen for notification taps
         await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
           console.log('[PUSH] Notification action performed:', event);
           
-          // Handle notification tap - could navigate to specific page
           const data = event.notification?.data as Record<string, unknown> | undefined;
           if (data?.route) {
             window.location.href = data.route as string;
@@ -72,12 +87,10 @@ class PushNotificationService {
     try {
       const platform = Capacitor.getPlatform() as 'ios' | 'android';
       
-      // Build headers with auth token for native platforms
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
       
-      // Include Bearer token for native app authentication
       const sessionToken = getStoredSessionToken();
       if (sessionToken) {
         headers['Authorization'] = `Bearer ${sessionToken}`;
@@ -111,7 +124,10 @@ class PushNotificationService {
   async removeAllListeners(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     
-    await FirebaseMessaging.removeAllListeners();
+    const FirebaseMessaging = await this.getFirebaseMessaging();
+    if (FirebaseMessaging) {
+      await FirebaseMessaging.removeAllListeners();
+    }
     this.isInitialized = false;
   }
 }
