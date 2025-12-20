@@ -1,0 +1,395 @@
+Last login: Fri Dec  5 21:16:34 on ttys000
+ghassanghorayeb@Ghassans-Air ~ % cd ~/Downloads/
+ghassanghorayeb@Ghassans-Air Downloads % ls
+📅 Hickory Ridge POA Meeting.docx
+~$town_Realty_PTE100_Resubmission_2024.docx
+~$town_Realty_ScheduleA_2024.docx
+286408923809.JPEG
+286610004609.JPEG
+286610355159.JPEG
+286610459559.JPEG
+677557168.pdf
+Allai  reactive triage.docx
+AllAI_ From Reactive Triage to Predictive Intelligence.pdf
+AllAI_Predictive_Maintenance_Pitch.pdf
+AllAI_Predictive_Maintenance_Pitch.pptx
+AllAI-From-Reactive-Triage-to-Predictive-Intelligence (1).pptx
+AllAI-From-Reactive-Triage-to-Predictive-Intelligence.pptx
+AllstateClaimsTextMessaging.vcf
+android-studio-2025.2.2.7-mac_arm.dmg
+AppIcon.tar.gz
+ASCRS - OCT 11-21-24.pptx
+ASCRS - OCT 11-21-25.pptx
+Big Idea example .pdf
+Boys Suit - Bus Buddy.jpeg
+Boys Suit - Bus Buddy.jpg
+BusBuddy-v3-user-interface
+BusBuddy-v3-user-interface (1).zip
+BusBuddy-v3-user-interface (10).zip
+BusBuddy-v3-user-interface (2).zip
+BusBuddy-v3-user-interface (3).zip
+BusBuddy-v3-user-interface (4).zip
+BusBuddy-v3-user-interface (5).zip
+BusBuddy-v3-user-interface (6).zip
+BusBuddy-v3-user-interface (7).zip
+BusBuddy-v3-user-interface (8).zip
+BusBuddy-v3-user-interface (9).zip
+BusBuddy-v3-user-interface.zip
+BusBuddyIcons.tar.gz
+ChatGPT Image Dec 8, 2025, 08_20_10 PM.png
+ChatGPT Image Dec 9, 2025, 07_49_17 PM.png
+ChatGPT Image Dec 9, 2025, 07_49_26 PM.png
+ChatGPT Image Nov 16, 2025, 11_12_44 AM.png
+ChatGPT Image Nov 16, 2025, 11_16_28 AM.png
+ChatGPT Image Nov 24, 2025, 04_50_13 PM.png
+ChatGPT Image Nov 29, 2025, 02_32_03 PM.png
+ChatGPT Image Nov 3, 2025, 09_32_06 PM.png
+ChatGPT Image Nov 4, 2025, 12_14_49 PM.png
+ChatGPT Image Oct 28, 2025, 08_35_06 PM.png
+ChatGPT_Atlas.dmg
+d7321bb2-296b-45e2-8239-8209d8eda4b7.HEIC
+dashboard views for each user type_.docx
+G - headshot.jpeg
+GG - DL - Back.pdf
+GG - DL - Front.pdf
+Ghorayeb CV.docx
+googlechrome.dmg
+IMG_0010.PNG
+IMG_0046.PNG
+IMG_0083.heic
+IMG_0084.HEIC
+IMG_9905.HEIC
+IMG_9906.HEIC
+IMG_9907.HEIC
+IMG_9912.HEIC
+IMG_9939.HEIC
+IMG_9940.HEIC
+Info.plist
+ios (1).zip
+ios (2).zip
+ios.zip
+Moonlit Christmas Home at Dusk.png
+Motown 2024 Tax Resubmission packet
+My Town 2024 Tax resubmission Packet
+Nihal 103125.docx
+OT 2025 Ghassan Fountain Project - Outdoor Tranquility Estimate.pdf
+Pigmented lesions 2025 pptx.pptx
+public (1).zip
+public.zip
+Ride Tech BusinessSigPage (2).pdf
+Ride Tech EIN  02-25.pdf
+s12886-021-02218-5.pdf
+Screenshot 2025-11-25 at 7.12.38 PM.png
+Screenshot 2025-11-26 at 10.31.28 PM.png
+Screenshot 2025-11-26 at 10.37.39 PM.png
+Screenshot 2025-11-26 at 11.26.47 PM.png
+Screenshot 2025-11-26 at 4.59.04 PM.png
+Screenshot 2025-11-26 at 5.39.52 PM.png
+Screenshot 2025-11-26 at 5.48.49 PM.png
+Screenshot 2025-11-26 at 5.58.17 PM.png
+Screenshot 2025-11-26 at 6.07.34 PM.png
+Screenshot 2025-11-26 at 9.19.34 PM.png
+Screenshot 2025-11-27 at 1.16.24 PM.png
+Screenshot 2025-11-27 at 1.16.48 PM copy.png
+Screenshot 2025-11-27 at 1.16.48 PM.png
+Screenshot 2025-11-27 at 1.18.53 PM.png
+Screenshot 2025-11-29 at 8.00.42 AM.png
+Screenshot 2025-11-29 at 8.01.21 AM.png
+Screenshot 2025-11-29 at 8.09.23 AM.png
+Screenshot 2025-11-29 at 8.09.54 AM.png
+Screenshot 2025-11-29 at 8.12.13 AM.png
+Screenshot 2025-12-06 at 2.14.58 PM.png
+Screenshot 2025-12-06 at 2.15.02 PM-2.png
+Screenshot-1125-105419.png
+SECURITY.md
+shortened Copy of Bus_Buddy_WVU Presentation 6-26-25.pptx.pdf
+Spark Paper- BusBuddy..docx
+Sparks  Bus_Buddy  Presentation 11-29-25.pptx.pdf
+SparkWV Submission – Big Ideas Track (1).pdf
+SparkWV Submission – Big Ideas Track.pdf
+Statements_October_2025.pdf
+Synergy-Points-Between-AllAI-and-Grainger.pptx
+twilio_2FA_recovery_code.txt
+UHS Bus_Buddy  Presentation 11-29-25.pptx.pdf
+Zoom (1).pkg
+Zoom.pkg
+ghassanghorayeb@Ghassans-Air Downloads % cd BusBuddy-v3-user-interface
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npm install
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+
+added 768 packages, and audited 769 packages in 4s
+
+91 packages are looking for funding
+  run `npm fund` for details
+
+12 vulnerabilities (3 low, 7 moderate, 2 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm notice
+npm notice New minor version of npm available! 11.6.2 -> 11.7.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+npm notice To update run: npm install -g npm@11.7.0
+npm notice
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync android
+✔ Copying web assets from public to android/app/src/main/assets/public in 12.92ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 1.43ms
+✔ copy android in 33.89ms
+✔ Updating Android plugins in 5.52ms
+[info] Found 2 Capacitor plugins for android:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update android in 31.32ms
+[info] Sync finished in 0.1s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync ios
+✔ Copying web assets from public to ios/App/App/public in 15.28ms
+✔ Creating capacitor.config.json in ios/App/App in 1.45ms
+✔ copy ios in 44.17ms
+✔ Updating iOS plugins in 5.32ms
+✔ Updating iOS native dependencies with pod install in 2.75s
+[info] Found 2 Capacitor plugins for ios:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update ios in 2.80s
+[info] Sync finished in 4.647s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap open ios
+✔ Opening the Xcode workspace... in 3.01s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync ios && npx cap sync android
+✔ Copying web assets from public to ios/App/App/public in 13.02ms
+✔ Creating capacitor.config.json in ios/App/App in 1.67ms
+✔ copy ios in 41.21ms
+✔ Updating iOS plugins in 7.15ms
+✔ Updating iOS native dependencies with pod install in 2.91s
+[info] Found 2 Capacitor plugins for ios:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update ios in 2.97s
+[info] Sync finished in 3.272s
+✔ Copying web assets from public to android/app/src/main/assets/public in 9.73ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 3.12ms
+✔ copy android in 32.96ms
+✔ Updating Android plugins in 5.51ms
+[info] Found 2 Capacitor plugins for android:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update android in 100.51ms
+[info] Sync finished in 0.156s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap open android
+[info] Opening Android project at: android.
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap open ios
+✔ Opening the Xcode workspace... in 3.01s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync ios
+✔ Copying web assets from public to ios/App/App/public in 12.56ms
+✔ Creating capacitor.config.json in ios/App/App in 1.39ms
+✔ copy ios in 40.54ms
+✔ Updating iOS plugins in 4.91ms
+✔ Updating iOS native dependencies with pod install in 2.77s
+[info] Found 2 Capacitor plugins for ios:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update ios in 2.81s
+[info] Sync finished in 3.113s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap open ios
+✔ Opening the Xcode workspace... in 3.00s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap open android
+[info] Opening Android project at: android.
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync ios
+✔ Copying web assets from public to ios/App/App/public in 11.58ms
+✔ Creating capacitor.config.json in ios/App/App in 3.42ms
+✔ copy ios in 41.47ms
+✔ Updating iOS plugins in 5.45ms
+✔ Updating iOS native dependencies with pod install in 3.12s
+[info] Found 2 Capacitor plugins for ios:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update ios in 3.17s
+[info] Sync finished in 3.475s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync ios
+✔ Copying web assets from public to ios/App/App/public in 11.45ms
+✔ Creating capacitor.config.json in ios/App/App in 1.34ms
+✔ copy ios in 39.36ms
+✔ Updating iOS plugins in 5.31ms
+✔ Updating iOS native dependencies with pod install in 2.96s
+[info] Found 2 Capacitor plugins for ios:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update ios in 3.01s
+[info] Sync finished in 3.303s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync android
+✔ Copying web assets from public to android/app/src/main/assets/public in 11.32ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 3.08ms
+✔ copy android in 37.83ms
+✔ Updating Android plugins in 5.35ms
+[info] Found 2 Capacitor plugins for android:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update android in 50.20ms
+[info] Sync finished in 0.13s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % npx cap sync android
+✔ Copying web assets from public to android/app/src/main/assets/public in 11.76ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 254.46μs
+✔ copy android in 30.93ms
+✔ Updating Android plugins in 5.10ms
+[info] Found 2 Capacitor plugins for android:
+       @capacitor/geolocation@7.1.6
+       @capacitor/preferences@7.0.2
+✔ update android in 35.06ms
+[info] Sync finished in 0.14s
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % cat ~/Downloads/BusBuddy-v3-user-interface/client/src/lib/pushNotifications.ts | head -100
+import { PushNotifications, Token, ActionPerformed } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
+import { getStoredSessionToken } from './queryClient';
+
+export interface DeviceToken {
+  token: string;
+  platform: 'ios' | 'android' | 'web';
+  userId: string;
+}
+
+class PushNotificationService {
+  private isInitialized = false;
+
+  async initialize(userId: string): Promise<void> {
+    if (this.isInitialized) return;
+    
+    // Only run on native platforms (iOS/Android)
+    if (!Capacitor.isNativePlatform()) {
+      console.log('Push notifications only available on native platforms');
+      return;
+    }
+
+    try {
+      // Request permission
+      const permissionResult = await PushNotifications.requestPermissions();
+      
+      if (permissionResult.receive === 'granted') {
+        // Register with OS for push notifications
+        await PushNotifications.register();
+        
+        // Listen for registration success
+        await PushNotifications.addListener('registration', async (token: Token) => {
+          console.log('Push registration success, token:', token.value);
+          
+          // Send token to backend
+          await this.registerDeviceToken(token.value, userId);
+        });
+
+        // Listen for registration errors
+        await PushNotifications.addListener('registrationError', (error: any) => {
+          console.error('Push registration error:', error);
+        });
+
+        // Listen for push notifications
+        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('Push notification received:', notification);
+          // Notification is automatically shown by OS
+        });
+
+        // Listen for notification taps
+        await PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+          console.log('Push notification action performed:', action);
+          
+          // Handle notification tap - could navigate to specific page
+          const data = action.notification.data;
+          if (data?.route) {
+            window.location.href = data.route;
+          }
+        });
+
+        this.isInitialized = true;
+      } else {
+        console.log('Push notification permission denied');
+      }
+    } catch (error) {
+      console.error('Error initializing push notifications:', error);
+    }
+  }
+
+  private async registerDeviceToken(token: string, userId: string): Promise<void> {
+    try {
+      const platform = Capacitor.getPlatform() as 'ios' | 'android';
+      
+      // Build headers with auth token for native platforms
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Include Bearer token for native app authentication
+      const sessionToken = getStoredSessionToken();
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+        console.log('[PUSH] Including auth token in push registration request');
+      } else {
+        console.warn('[PUSH] No session token available for push registration');
+      }
+      
+      const response = await fetch('/api/push-tokens', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          token,
+          platform,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[PUSH] Registration failed:', response.status, errorText);
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % cat ~/Downloads/BusBuddy-v3-user-interface/ios/App/App/AppDelegate.swift
+import UIKit
+import Capacitor
+
+@UIApplicationMain
+class AppDelegate: UIResponder, UIApplicationDelegate {
+
+    var window: UIWindow?
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Override point for customization after application launch.
+        return true
+    }
+
+    func applicationWillResignActive(_ application: UIApplication) {
+        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
+        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
+        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
+    }
+
+    func applicationWillEnterForeground(_ application: UIApplication) {
+        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+    }
+
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // Called when the app was launched with a url. Feel free to add additional processing here,
+        // but if you want the App API to support tracking app url opens, make sure to keep this call
+        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+    }
+
+    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        // Called when the app was launched with an activity, including Universal Links.
+        // Feel free to add additional processing here, but if you want the App API to support
+        // tracking app url opens, make sure to keep this call
+        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+    }
+
+}
+ghassanghorayeb@Ghassans-Air BusBuddy-v3-user-interface % 
