@@ -52,7 +52,7 @@ class PushNotificationService {
           console.log('[PUSH] Notification action performed:', event);
           
           // Handle notification tap - could navigate to specific page
-          const data = event.notification?.data;
+          const data = event.notification?.data as Record<string, unknown> | undefined;
           if (data?.route) {
             window.location.href = data.route as string;
           }
