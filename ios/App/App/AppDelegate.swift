@@ -1,16 +1,60 @@
 import UIKit
 import Capacitor
 import FirebaseCore
+import FirebaseMessaging
+import UserNotifications
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Initialize Firebase - required for push notifications
         FirebaseApp.configure()
+        
+        // Set up notification center delegate
+        UNUserNotificationCenter.current().delegate = self
+        
+        // Set up Firebase Messaging delegate
+        Messaging.messaging().delegate = self
+        
+        // Register for remote notifications
+        application.registerForRemoteNotifications()
+        
         return true
+    }
+    
+    // MARK: - Push Notification Registration
+    
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Pass device token to Firebase
+        Messaging.messaging().apnsToken = deviceToken
+        print("[AppDelegate] APNS Token registered with Firebase")
+    }
+    
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[AppDelegate] Failed to register for remote notifications: \(error.localizedDescription)")
+    }
+    
+    // MARK: - Firebase Messaging Delegate
+    
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("[AppDelegate] FCM Token received: \(fcmToken ?? "nil")")
+        // The Capacitor Firebase Messaging plugin will handle sending this to the server
+    }
+    
+    // MARK: - UNUserNotificationCenterDelegate
+    
+    // Handle notifications when app is in foreground
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Show notification even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+    
+    // Handle notification tap
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        completionHandler()
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
