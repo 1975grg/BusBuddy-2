@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeFirebase } from "./firebase-push";
@@ -8,6 +9,15 @@ import { initializeFirebase } from "./firebase-push";
 initializeFirebase();
 
 const app = express();
+
+// Enable CORS for native app requests (iOS/Android with embedded JavaScript)
+app.use(cors({
+  origin: true, // Allow all origins for native app support
+  credentials: true, // Allow cookies for session auth
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
