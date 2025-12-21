@@ -12,23 +12,39 @@ const PRODUCTION_API_URL = "https://bus-buddy-v-3-user-interface-1975grg.replit.
 // On native platforms with embedded JS, we need to call the production server
 // On web, relative URLs work fine
 export function getApiBaseUrl(): string {
-  if (Capacitor.isNativePlatform()) {
-    console.log("[API] Using production URL for native platform");
-    return PRODUCTION_API_URL;
+  try {
+    const platform = Capacitor.getPlatform();
+    const isNative = Capacitor.isNativePlatform();
+    console.log("[API-BASE] Platform check:", { platform, isNative });
+    
+    if (isNative) {
+      console.log("[API-BASE] Using production URL:", PRODUCTION_API_URL);
+      return PRODUCTION_API_URL;
+    }
+    console.log("[API-BASE] Using relative URLs (web)");
+    return "";
+  } catch (e) {
+    console.error("[API-BASE] Error checking platform:", e);
+    return "";
   }
-  return "";
 }
 
 // Build full API URL
 export function buildApiUrl(path: string): string {
+  console.log("[API-URL] Building URL for path:", path);
   const baseUrl = getApiBaseUrl();
+  console.log("[API-URL] Base URL:", baseUrl || "(empty - relative)");
+  
   // If path already starts with http, return as-is
   if (path.startsWith("http")) {
+    console.log("[API-URL] Path is already absolute, returning as-is");
     return path;
   }
   // Ensure path starts with /
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${baseUrl}${normalizedPath}`;
+  const fullUrl = `${baseUrl}${normalizedPath}`;
+  console.log("[API-URL] Final URL:", fullUrl);
+  return fullUrl;
 }
 
 // In-memory cache of the token for synchronous access
@@ -216,18 +232,31 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const fullUrl = buildApiUrl(url);
-  console.log("[API] Request:", method, fullUrl);
-  
-  const res = await fetch(fullUrl, {
-    method,
-    headers: getAuthHeaders(!!data),
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const fullUrl = buildApiUrl(url);
+    console.log("[API-REQUEST] Starting request:", { method, url, fullUrl });
+    console.log("[API-REQUEST] Request body:", data ? JSON.stringify(data).substring(0, 100) : "(none)");
+    
+    const headers = getAuthHeaders(!!data);
+    console.log("[API-REQUEST] Headers:", JSON.stringify(headers));
+    
+    const res = await fetch(fullUrl, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    console.log("[API-REQUEST] Response status:", res.status);
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error("[API-REQUEST] Error caught:", error);
+    console.error("[API-REQUEST] Error name:", (error as Error)?.name);
+    console.error("[API-REQUEST] Error message:", (error as Error)?.message);
+    console.error("[API-REQUEST] Error stack:", (error as Error)?.stack);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
