@@ -144,3 +144,11 @@ Preferred communication style: Simple, everyday language.
 - **Movement Re-Activation**: If the bus starts moving again after being stationary for 30 minutes, wake lock automatically re-engages.
 - **Visual Status Indicator**: Driver dashboard shows wake lock status (On/Auto-off/Not Supported/Off) with explanatory text.
 - **Technical Note**: This is a short-term MVP solution. Long-term solution is Cube hardware integration for buses which will provide GPS independently of driver phones.
+
+### iOS Push Notifications Fix (December 22, 2025)
+- **Root Cause**: Dynamic import of `@capacitor-firebase/messaging` was hanging indefinitely because Vite treats Capacitor plugins as external dependencies and doesn't bundle them.
+- **Solution**: Replaced dynamic import with `registerPlugin` from `@capacitor/core` at module scope to ensure the plugin is properly registered.
+- **Foreground Notifications**: AppDelegate.swift already had `userNotificationCenter(_:willPresent:)` configured with `.banner, .sound, .badge` to show notifications when app is open.
+- **Sound**: Push notifications include `sound: 'default'` in the APNs payload for iOS notification sounds.
+- **Status**: Push notifications now work in both foreground and background on iOS with sound.
+- **Rebuild Required**: After downloading the ios folder, run `pod install` in ios/App, then build from Xcode.
