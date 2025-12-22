@@ -29,10 +29,14 @@
   };
 })();
 
+console.log('[MAIN-EARLY] Starting main.tsx imports...');
+
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { initializeSessionToken } from "./lib/queryClient";
+
+console.log('[MAIN] Before push notification import...');
 
 // Force import push notification service to prevent tree-shaking
 // This MUST be at the top level so the module gets bundled
