@@ -2,6 +2,9 @@ import { Capacitor } from '@capacitor/core';
 import { getStoredSessionToken, buildApiUrl } from './queryClient';
 import type { FirebaseMessaging as FirebaseMessagingType } from '@capacitor-firebase/messaging';
 
+// Top-level log to ensure this module is NOT tree-shaken
+console.log('[PUSH-MODULE] PushNotificationService module loaded, platform:', Capacitor.getPlatform());
+
 export interface DeviceToken {
   token: string;
   platform: 'ios' | 'android' | 'web';
@@ -30,7 +33,15 @@ class PushNotificationService {
   }
 
   async initialize(userId: string): Promise<void> {
-    if (this.isInitialized) return;
+    console.log('[PUSH] ========== INITIALIZE CALLED ==========');
+    console.log('[PUSH] userId:', userId);
+    console.log('[PUSH] isInitialized:', this.isInitialized);
+    console.log('[PUSH] isNativePlatform:', Capacitor.isNativePlatform());
+    
+    if (this.isInitialized) {
+      console.log('[PUSH] Already initialized, skipping');
+      return;
+    }
     
     if (!Capacitor.isNativePlatform()) {
       console.log('[PUSH] Push notifications only available on native platforms');
@@ -38,6 +49,7 @@ class PushNotificationService {
     }
 
     try {
+      console.log('[PUSH] Starting Firebase Messaging initialization...');
       const FirebaseMessaging = await this.getFirebaseMessaging();
       if (!FirebaseMessaging) {
         console.error('[PUSH] Firebase Messaging not available');

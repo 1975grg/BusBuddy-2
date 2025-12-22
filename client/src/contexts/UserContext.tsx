@@ -38,10 +38,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   // Initialize push notifications when user is authenticated on native platform
   useEffect(() => {
+    console.log('[USER-CONTEXT] Push notification effect triggered, user?.id:', user?.id);
     if (user?.id) {
+      console.log('[USER-CONTEXT] Calling pushNotificationService.initialize with userId:', user.id);
       // Initialize push notifications for native platforms (iOS/Android)
-      pushNotificationService.initialize(user.id).catch((err) => {
-        console.error('Failed to initialize push notifications:', err);
+      pushNotificationService.initialize(user.id).then(() => {
+        console.log('[USER-CONTEXT] Push notification initialization completed');
+      }).catch((err) => {
+        console.error('[USER-CONTEXT] Failed to initialize push notifications:', err);
       });
     }
   }, [user?.id]);
