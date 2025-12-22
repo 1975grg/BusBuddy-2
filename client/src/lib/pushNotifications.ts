@@ -16,18 +16,30 @@ class PushNotificationService {
   private firebaseMessaging: typeof FirebaseMessagingType | null = null;
 
   private async getFirebaseMessaging(): Promise<typeof FirebaseMessagingType | null> {
-    if (this.firebaseMessaging) return this.firebaseMessaging;
+    console.log('[PUSH] getFirebaseMessaging called');
+    
+    if (this.firebaseMessaging) {
+      console.log('[PUSH] Returning cached FirebaseMessaging');
+      return this.firebaseMessaging;
+    }
     
     if (!Capacitor.isNativePlatform()) {
+      console.log('[PUSH] Not native platform, returning null');
       return null;
     }
 
     try {
+      console.log('[PUSH] About to dynamic import @capacitor-firebase/messaging...');
       const module = await import('@capacitor-firebase/messaging');
+      console.log('[PUSH] Dynamic import successful, module:', Object.keys(module));
       this.firebaseMessaging = module.FirebaseMessaging;
+      console.log('[PUSH] FirebaseMessaging extracted:', !!this.firebaseMessaging);
       return this.firebaseMessaging;
     } catch (error) {
       console.error('[PUSH] Failed to load Firebase Messaging module:', error);
+      console.error('[PUSH] Error name:', (error as Error).name);
+      console.error('[PUSH] Error message:', (error as Error).message);
+      console.error('[PUSH] Error stack:', (error as Error).stack);
       return null;
     }
   }
@@ -50,16 +62,21 @@ class PushNotificationService {
 
     try {
       console.log('[PUSH] Starting Firebase Messaging initialization...');
+      console.log('[PUSH] Calling getFirebaseMessaging()...');
       const FirebaseMessaging = await this.getFirebaseMessaging();
+      console.log('[PUSH] getFirebaseMessaging returned:', !!FirebaseMessaging);
+      
       if (!FirebaseMessaging) {
-        console.error('[PUSH] Firebase Messaging not available');
+        console.error('[PUSH] Firebase Messaging not available - module failed to load');
         return;
       }
 
-      console.log('[PUSH] Initializing Firebase Messaging plugin...');
+      console.log('[PUSH] About to call requestPermissions()...');
       
       const permissionResult = await FirebaseMessaging.requestPermissions();
-      console.log('[PUSH] Permission result:', permissionResult.receive);
+      console.log('[PUSH] requestPermissions() returned');
+      console.log('[PUSH] Permission result:', permissionResult);
+      console.log('[PUSH] Permission receive value:', permissionResult.receive);
       
       if (permissionResult.receive === 'granted') {
         const tokenResult = await FirebaseMessaging.getToken();
