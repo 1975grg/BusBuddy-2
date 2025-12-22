@@ -34,6 +34,14 @@ import App from "./App";
 import "./index.css";
 import { initializeSessionToken } from "./lib/queryClient";
 
+// Force import push notification service to prevent tree-shaking
+// This MUST be at the top level so the module gets bundled
+import { pushNotificationService } from "./lib/pushNotifications";
+
+// Execute immediately to force the module to be retained in the bundle
+console.log('[MAIN] Push notification service imported:', typeof pushNotificationService);
+console.log('[MAIN] Push service initialize method exists:', typeof pushNotificationService?.initialize);
+
 // Initialize session token from persistent storage before rendering
 // This ensures the token is loaded from Capacitor Preferences on native apps
 initializeSessionToken().then(() => {
