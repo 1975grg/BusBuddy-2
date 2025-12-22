@@ -1,9 +1,11 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { getStoredSessionToken, buildApiUrl } from './queryClient';
-import type { FirebaseMessaging as FirebaseMessagingType } from '@capacitor-firebase/messaging';
+import type { FirebaseMessagingPlugin } from '@capacitor-firebase/messaging';
 
-// Top-level log to ensure this module is NOT tree-shaken
 console.log('[PUSH-MODULE] PushNotificationService module loaded, platform:', Capacitor.getPlatform());
+
+const FirebaseMessaging = registerPlugin<FirebaseMessagingPlugin>('FirebaseMessaging');
+console.log('[PUSH-MODULE] FirebaseMessaging plugin registered:', !!FirebaseMessaging);
 
 export interface DeviceToken {
   token: string;
@@ -13,42 +15,13 @@ export interface DeviceToken {
 
 class PushNotificationService {
   private isInitialized = false;
-  private firebaseMessaging: typeof FirebaseMessagingType | null = null;
-
-  private async getFirebaseMessaging(): Promise<typeof FirebaseMessagingType | null> {
-    console.log('[PUSH] getFirebaseMessaging called');
-    
-    if (this.firebaseMessaging) {
-      console.log('[PUSH] Returning cached FirebaseMessaging');
-      return this.firebaseMessaging;
-    }
-    
-    if (!Capacitor.isNativePlatform()) {
-      console.log('[PUSH] Not native platform, returning null');
-      return null;
-    }
-
-    try {
-      console.log('[PUSH] About to dynamic import @capacitor-firebase/messaging...');
-      const module = await import('@capacitor-firebase/messaging');
-      console.log('[PUSH] Dynamic import successful, module:', Object.keys(module));
-      this.firebaseMessaging = module.FirebaseMessaging;
-      console.log('[PUSH] FirebaseMessaging extracted:', !!this.firebaseMessaging);
-      return this.firebaseMessaging;
-    } catch (error) {
-      console.error('[PUSH] Failed to load Firebase Messaging module:', error);
-      console.error('[PUSH] Error name:', (error as Error).name);
-      console.error('[PUSH] Error message:', (error as Error).message);
-      console.error('[PUSH] Error stack:', (error as Error).stack);
-      return null;
-    }
-  }
 
   async initialize(userId: string): Promise<void> {
     console.log('[PUSH] ========== INITIALIZE CALLED ==========');
     console.log('[PUSH] userId:', userId);
     console.log('[PUSH] isInitialized:', this.isInitialized);
     console.log('[PUSH] isNativePlatform:', Capacitor.isNativePlatform());
+    console.log('[PUSH] FirebaseMessaging available:', !!FirebaseMessaging);
     
     if (this.isInitialized) {
       console.log('[PUSH] Already initialized, skipping');
@@ -62,23 +35,15 @@ class PushNotificationService {
 
     try {
       console.log('[PUSH] Starting Firebase Messaging initialization...');
-      console.log('[PUSH] Calling getFirebaseMessaging()...');
-      const FirebaseMessaging = await this.getFirebaseMessaging();
-      console.log('[PUSH] getFirebaseMessaging returned:', !!FirebaseMessaging);
-      
-      if (!FirebaseMessaging) {
-        console.error('[PUSH] Firebase Messaging not available - module failed to load');
-        return;
-      }
-
       console.log('[PUSH] About to call requestPermissions()...');
       
       const permissionResult = await FirebaseMessaging.requestPermissions();
       console.log('[PUSH] requestPermissions() returned');
-      console.log('[PUSH] Permission result:', permissionResult);
+      console.log('[PUSH] Permission result:', JSON.stringify(permissionResult));
       console.log('[PUSH] Permission receive value:', permissionResult.receive);
       
       if (permissionResult.receive === 'granted') {
+        console.log('[PUSH] Permission granted, getting FCM token...');
         const tokenResult = await FirebaseMessaging.getToken();
         console.log('[PUSH] FCM token received:', tokenResult.token.substring(0, 20) + '...');
         
@@ -105,10 +70,11 @@ class PushNotificationService {
         this.isInitialized = true;
         console.log('[PUSH] Firebase messaging initialized successfully');
       } else {
-        console.log('[PUSH] Push notification permission denied');
+        console.log('[PUSH] Push notification permission denied or not granted:', permissionResult.receive);
       }
     } catch (error) {
       console.error('[PUSH] Error initializing push notifications:', error);
+      console.error('[PUSH] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
   }
 
@@ -156,10 +122,7 @@ class PushNotificationService {
   async removeAllListeners(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     
-    const FirebaseMessaging = await this.getFirebaseMessaging();
-    if (FirebaseMessaging) {
-      await FirebaseMessaging.removeAllListeners();
-    }
+    await FirebaseMessaging.removeAllListeners();
     this.isInitialized = false;
   }
 }
