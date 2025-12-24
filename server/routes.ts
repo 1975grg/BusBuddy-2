@@ -3272,6 +3272,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!route) {
         return res.status(404).json({ error: "Route not found" });
       }
+
+      // Check if messaging is enabled for this organization
+      const org = await storage.getOrganization(route.organizationId);
+      if (org && org.messagingEnabled === false) {
+        return res.status(403).json({ error: "Communications are disabled for this organization" });
+      }
       
       // Get user ID from authenticated session if logged in
       const user = (req as any).user as AuthUser | undefined;
@@ -3375,6 +3381,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify organization ownership (system admins can access any org)
       if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
         return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+
+      // Check if messaging is enabled for this organization
+      const org = await storage.getOrganization(targetMessage.organizationId);
+      if (org && org.messagingEnabled === false) {
+        return res.status(403).json({ error: "Communications are disabled for this organization" });
       }
       
       const message = await storage.addAdminResponse(id, adminResponse, respondedByUserId);
@@ -3577,7 +3589,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/driver-messages", async (req, res) => {
     try {
       const validatedData = insertDriverMessageSchema.parse(req.body);
-      const message = await storage.createDriverMessage(validatedData);
+      
+      // Get the driver's actual organization from their user record (trusted source)
+      const driver = await storage.getUser(validatedData.driverUserId);
+      if (!driver || !driver.organizationId) {
+        return res.status(400).json({ error: "Invalid driver" });
+      }
+      
+      // Check if messaging is enabled for the driver's ACTUAL organization (not client-provided)
+      const org = await storage.getOrganization(driver.organizationId);
+      if (org && org.messagingEnabled === false) {
+        return res.status(403).json({ error: "Communications are disabled for this organization" });
+      }
+      
+      // Override organizationId with trusted driver's organization
+      const trustedData = { ...validatedData, organizationId: driver.organizationId };
+      const message = await storage.createDriverMessage(trustedData);
       res.status(201).json(message);
     } catch (error) {
       console.error("Error creating driver message:", error);
@@ -3665,6 +3692,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify organization ownership (system admins can access any org)
       if (user.role !== "system_admin" && targetMessage.organizationId !== user.organizationId) {
         return res.status(403).json({ error: "You don't have permission to modify this message" });
+      }
+
+      // Check if messaging is enabled for this organization
+      const org = await storage.getOrganization(targetMessage.organizationId);
+      if (org && org.messagingEnabled === false) {
+        return res.status(403).json({ error: "Communications are disabled for this organization" });
       }
       
       const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
@@ -3965,6 +3998,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error broadcasting driver message as alert:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Admin compose direct message to driver
+  app.post("/api/admin-driver-messages", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { driverUserId, routeId, message, type = "general" } = req.body;
+      
+      if (!driverUserId || !routeId || !message) {
+        return res.status(400).json({ error: "driverUserId, routeId, and message are required" });
+      }
+      
+      // Verify the driver exists and belongs to the admin's org (or system admin)
+      const driver = await storage.getUser(driverUserId);
+      if (!driver) {
+        return res.status(404).json({ error: "Driver not found" });
+      }
+      
+      if (user.role !== "system_admin" && driver.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "You don't have permission to message this driver" });
+      }
+
+      // Check if messaging is enabled for this organization
+      const org = await storage.getOrganization(driver.organizationId!);
+      if (org && org.messagingEnabled === false) {
+        return res.status(403).json({ error: "Communications are disabled for this organization" });
+      }
+      
+      // Create driver message on behalf of admin (using driver's ID but with admin content)
+      const driverMessageData = {
+        organizationId: driver.organizationId!,
+        routeId,
+        driverUserId,
+        type: type as "route_issue" | "vehicle_problem" | "schedule_change" | "general",
+        message: `[From Admin] ${message}`,
+      };
+      
+      const newMessage = await storage.createDriverMessage(driverMessageData);
+      
+      // Send Firebase push notification to the driver
+      if (isFirebaseReady()) {
+        try {
+          const pushResult = await sendPushToUser(
+            driverUserId,
+            "📬 New Message from Admin",
+            message.length > 100 ? message.substring(0, 100) + "..." : message,
+            { type: "admin_direct_message", messageId: newMessage.id }
+          );
+          console.log(`[PUSH] Admin direct message notification sent to ${driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+        } catch (pushError) {
+          console.error("[PUSH] Error sending admin direct message notification:", pushError);
+        }
+      }
+      
+      res.status(201).json({ 
+        success: true, 
+        message: newMessage,
+        notification: "Message sent and push notification delivered" 
+      });
+    } catch (error) {
+      console.error("Error sending admin message to driver:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get drivers for an organization (for admin compose dropdown)
+  app.get("/api/organization-drivers", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { organization_id } = req.query;
+      
+      const effectiveOrgId = user.role === "system_admin" && organization_id 
+        ? String(organization_id) 
+        : user.organizationId;
+      
+      if (!effectiveOrgId) {
+        return res.status(400).json({ error: "Organization ID required" });
+      }
+      
+      // Get all users for the org and filter to drivers
+      const allUsers = await storage.getUsersByOrganization(effectiveOrgId);
+      const drivers = allUsers.filter(u => u.role === "driver" && u.isActive);
+      
+      res.json(drivers.map(d => ({
+        id: d.id,
+        name: d.name,
+        email: d.email,
+        phoneNumber: d.phoneNumber
+      })));
+    } catch (error) {
+      console.error("Error fetching organization drivers:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get organization settings (including messaging toggle)
+  app.get("/api/organization-settings", authenticateUser, async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { organization_id } = req.query;
+      
+      const effectiveOrgId = user.role === "system_admin" && organization_id 
+        ? String(organization_id) 
+        : user.organizationId;
+      
+      if (!effectiveOrgId) {
+        return res.status(400).json({ error: "Organization ID required" });
+      }
+      
+      const org = await storage.getOrganization(effectiveOrgId);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      res.json({
+        id: org.id,
+        name: org.name,
+        messagingEnabled: org.messagingEnabled ?? true
+      });
+    } catch (error) {
+      console.error("Error fetching organization settings:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Toggle organization messaging (communications compliance)
+  app.patch("/api/organization-settings/messaging", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
+    try {
+      const user = (req as any).user as AuthUser;
+      const { enabled, organization_id } = req.body;
+      
+      // System admin can target any org, org_admin uses their own
+      const effectiveOrgId = user.role === "system_admin" && organization_id 
+        ? String(organization_id) 
+        : user.organizationId;
+      
+      if (!effectiveOrgId) {
+        return res.status(400).json({ error: "Organization ID required" });
+      }
+      
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "enabled must be a boolean" });
+      }
+      
+      // Update the organization's messaging setting
+      await storage.updateOrganization(effectiveOrgId, { messagingEnabled: enabled });
+      
+      res.json({ success: true, messagingEnabled: enabled });
+    } catch (error) {
+      console.error("Error updating messaging settings:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

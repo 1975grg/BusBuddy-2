@@ -7,11 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building, Palette, Shield, Save } from "lucide-react";
+import { Building, Palette, Shield, Save, MessageSquareOff, MessageSquare } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiFetch, apiRequest } from "@/lib/queryClient";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { OrganizationType } from "@shared/schema";
 
 export default function SettingsPage() {
@@ -24,6 +35,8 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState("");
   const [orgType, setOrgType] = useState<OrganizationType>("school");
   const [primaryColor, setPrimaryColor] = useState("#0080FF");
+  const [showMessagingConfirm, setShowMessagingConfirm] = useState(false);
+  const [pendingMessagingState, setPendingMessagingState] = useState<boolean | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -34,6 +47,38 @@ export default function SettingsPage() {
       const response = await apiFetch("/api/organization");
       if (!response.ok) throw new Error("Failed to fetch organization");
       return response.json();
+    }
+  });
+
+  // Fetch organization settings (messaging toggle)
+  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+    queryKey: ["/api/organization-settings"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/organization-settings");
+      if (!response.ok) throw new Error("Failed to fetch settings");
+      return response.json();
+    }
+  });
+
+  // Toggle messaging mutation
+  const toggleMessagingMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return await apiRequest("PATCH", "/api/organization-settings/messaging", { enabled });
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization-settings"] });
+      toast({
+        title: enabled ? "Communications enabled" : "Communications disabled",
+        description: enabled 
+          ? "All messaging and notifications are now active" 
+          : "All messaging and notifications are now disabled for regulatory compliance"
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to update messaging settings",
+        variant: "destructive"
+      });
     }
   });
 
@@ -254,8 +299,83 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {orgSettings?.messagingEnabled !== false ? (
+                  <MessageSquare className="w-5 h-5" />
+                ) : (
+                  <MessageSquareOff className="w-5 h-5 text-destructive" />
+                )}
+                Communications Compliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 pr-4">
+                  <p className="font-medium">Enable All Communications</p>
+                  <p className="text-sm text-muted-foreground">
+                    When disabled, all messaging and notifications between riders, drivers, and administrators will be blocked for regulatory compliance.
+                  </p>
+                </div>
+                <Switch
+                  checked={orgSettings?.messagingEnabled !== false}
+                  onCheckedChange={(checked) => {
+                    setPendingMessagingState(checked);
+                    setShowMessagingConfirm(true);
+                  }}
+                  disabled={toggleMessagingMutation.isPending}
+                  data-testid="switch-messaging-enabled"
+                />
+              </div>
+              
+              {orgSettings?.messagingEnabled === false && (
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive font-medium">
+                    Communications are currently disabled
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No messages, alerts, or push notifications will be sent until enabled.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <AlertDialog open={showMessagingConfirm} onOpenChange={setShowMessagingConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingMessagingState ? "Enable Communications?" : "Disable All Communications?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingMessagingState 
+                ? "This will allow messaging and notifications between all users (riders, drivers, administrators)."
+                : "This will block ALL communications including messages between riders and admins, drivers and admins, push notifications, and service alerts. Use this for regulatory compliance if your organization cannot use messaging features."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingMessagingState(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingMessagingState !== null) {
+                  toggleMessagingMutation.mutate(pendingMessagingState);
+                }
+                setShowMessagingConfirm(false);
+                setPendingMessagingState(null);
+              }}
+              className={!pendingMessagingState ? "bg-destructive hover:bg-destructive/90" : ""}
+            >
+              {pendingMessagingState ? "Enable Communications" : "Disable Communications"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex justify-end">
         <Button 

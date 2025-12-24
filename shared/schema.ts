@@ -11,6 +11,7 @@ export const organizations = pgTable("organizations", {
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#0080FF"),
   isActive: boolean("is_active").notNull().default(true),
+  messagingEnabled: boolean("messaging_enabled").notNull().default(true), // For regulatory compliance - disable all communications
   createdAt: timestamp("created_at").defaultNow(),
 });
 

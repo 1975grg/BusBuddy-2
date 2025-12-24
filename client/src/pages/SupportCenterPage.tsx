@@ -56,6 +56,14 @@ export default function SupportCenterPage() {
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [forwardNote, setForwardNote] = useState("");
   
+  // Compose message to driver dialog state
+  const [composeDriverDialogOpen, setComposeDriverDialogOpen] = useState(false);
+  const [composeDriverForm, setComposeDriverForm] = useState({
+    driverUserId: "",
+    routeId: "",
+    message: "",
+  });
+  
   // Track current tab (for dropdown menu navigation to Notification Logs)
   // Initialize from URL parameter if present
   const getInitialTab = () => {
@@ -218,6 +226,35 @@ export default function SupportCenterPage() {
     },
     enabled: !!effectiveOrgId,
     refetchInterval: 10000,
+  });
+
+  // Fetch organization drivers for compose dialog
+  const { data: orgDrivers = [] } = useQuery<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null }>>({
+    queryKey: ["/api/organization-drivers", effectiveOrgId],
+    queryFn: async () => {
+      if (!effectiveOrgId) return [];
+      const response = await apiFetch(`/api/organization-drivers?organization_id=${effectiveOrgId}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!effectiveOrgId,
+  });
+
+  // Send direct message to driver mutation
+  const sendDriverMessageMutation = useMutation({
+    mutationFn: async (data: { driverUserId: string; routeId: string; message: string }) => {
+      if (isSystemAdminViewing) throw new Error("Read-only mode");
+      return await apiRequest("POST", "/api/admin-driver-messages", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-messages", effectiveOrgId] });
+      setComposeDriverDialogOpen(false);
+      setComposeDriverForm({ driverUserId: "", routeId: "", message: "" });
+      toast({ title: "Message sent to driver", description: "Push notification delivered" });
+    },
+    onError: () => {
+      toast({ title: "Failed to send message", variant: "destructive" });
+    }
   });
   
   // Build query params for notification logs
@@ -783,16 +820,28 @@ export default function SupportCenterPage() {
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">Two-way conversations with students, families & drivers</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="show-archived" 
-                      checked={showArchived}
-                      onCheckedChange={(checked) => setShowArchived(!!checked)}
-                      data-testid="checkbox-show-archived"
-                    />
-                    <label htmlFor="show-archived" className="text-sm cursor-pointer">
-                      Show archived
-                    </label>
+                  <div className="flex items-center gap-3">
+                    {!isSystemAdminViewing && (
+                      <Button
+                        size="sm"
+                        onClick={() => setComposeDriverDialogOpen(true)}
+                        data-testid="button-compose-driver-message"
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Message Driver
+                      </Button>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="show-archived" 
+                        checked={showArchived}
+                        onCheckedChange={(checked) => setShowArchived(!!checked)}
+                        data-testid="checkbox-show-archived"
+                      />
+                      <label htmlFor="show-archived" className="text-sm cursor-pointer">
+                        Show archived
+                      </label>
+                    </div>
                   </div>
                 </div>
                 
@@ -1804,6 +1853,103 @@ export default function SupportCenterPage() {
             >
               <Forward className="w-4 h-4 mr-2" />
               {forwardToDriverMutation.isPending ? "Forwarding..." : "Forward to Driver"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Compose Driver Message Dialog */}
+      <Dialog open={composeDriverDialogOpen} onOpenChange={setComposeDriverDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]" data-testid="dialog-compose-driver-message">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              Message Driver
+            </DialogTitle>
+            <DialogDescription>
+              Send a direct message to a driver. They will receive a push notification on their phone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="compose-driver">Select Driver</Label>
+              <Select
+                value={composeDriverForm.driverUserId}
+                onValueChange={(value) => setComposeDriverForm(prev => ({ ...prev, driverUserId: value }))}
+              >
+                <SelectTrigger id="compose-driver" data-testid="select-compose-driver">
+                  <SelectValue placeholder="Choose a driver..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgDrivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      {driver.name || driver.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="compose-route">Related Route (optional)</Label>
+              <Select
+                value={composeDriverForm.routeId}
+                onValueChange={(value) => setComposeDriverForm(prev => ({ ...prev, routeId: value }))}
+              >
+                <SelectTrigger id="compose-route" data-testid="select-compose-route">
+                  <SelectValue placeholder="Select a route..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No specific route</SelectItem>
+                  {activeRoutes.map((route) => (
+                    <SelectItem key={route.id} value={route.id.toString()}>
+                      {route.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="compose-message">Message</Label>
+              <Textarea
+                id="compose-message"
+                placeholder="Type your message to the driver..."
+                value={composeDriverForm.message}
+                onChange={(e) => setComposeDriverForm(prev => ({ ...prev, message: e.target.value }))}
+                className="min-h-[100px]"
+                data-testid="textarea-compose-driver-message"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setComposeDriverDialogOpen(false);
+                setComposeDriverForm({ driverUserId: "", routeId: "", message: "" });
+              }}
+              data-testid="button-cancel-compose-driver"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (composeDriverForm.driverUserId && composeDriverForm.message.trim()) {
+                  sendDriverMessageMutation.mutate({
+                    driverUserId: composeDriverForm.driverUserId,
+                    routeId: composeDriverForm.routeId === "none" ? "" : composeDriverForm.routeId,
+                    message: composeDriverForm.message.trim(),
+                  });
+                }
+              }}
+              disabled={!composeDriverForm.driverUserId || !composeDriverForm.message.trim() || sendDriverMessageMutation.isPending}
+              data-testid="button-send-driver-message"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {sendDriverMessageMutation.isPending ? "Sending..." : "Send Message"}
             </Button>
           </DialogFooter>
         </DialogContent>
