@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { pushNotificationService } from "@/lib/pushNotifications";
 
 export function UserMenu() {
   const { user } = useUser();
@@ -28,6 +29,10 @@ export function UserMenu() {
       // Clear stored session token (for native apps)
       // MUST await to ensure token is cleared from Capacitor Preferences
       await setStoredSessionToken(null);
+      
+      // Reset push notification service so it can re-initialize on next login
+      // This ensures the iOS permission prompt can appear again
+      await pushNotificationService.removeAllListeners();
       
       // Invalidate all queries to clear the cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });

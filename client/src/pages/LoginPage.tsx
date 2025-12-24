@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
 import { useUser } from "@/contexts/UserContext";
+import { pushNotificationService } from "@/lib/pushNotifications";
 import { HelpCircle, KeyRound, Mail, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
@@ -98,6 +99,19 @@ export default function LoginPage() {
         await setStoredSessionToken(data.sessionToken);
       }
 
+      // Initialize push notifications immediately after login (more reliable than UserContext effect)
+      // This ensures the iOS permission prompt appears right after login
+      // MUST await to ensure permission prompt displays before redirect
+      if (data.user?.id) {
+        console.log('[LOGIN] Initializing push notifications for user:', data.user.id);
+        try {
+          await pushNotificationService.initialize(data.user.id);
+          console.log('[LOGIN] Push notification initialization completed');
+        } catch (err) {
+          console.error('[LOGIN] Push notification initialization failed:', err);
+        }
+      }
+
       // Check if user needs to reset their password (temp password on first login)
       if (data.mustResetPassword) {
         toast({
@@ -175,6 +189,19 @@ export default function LoginPage() {
       // MUST await before redirect to ensure token is saved to Capacitor Preferences
       if (data.sessionToken) {
         await setStoredSessionToken(data.sessionToken);
+      }
+
+      // Initialize push notifications immediately after login (more reliable than UserContext effect)
+      // This ensures the iOS permission prompt appears right after login
+      // MUST await to ensure permission prompt displays before redirect
+      if (data.user?.id) {
+        console.log('[LOGIN] Initializing push notifications for user:', data.user.id);
+        try {
+          await pushNotificationService.initialize(data.user.id);
+          console.log('[LOGIN] Push notification initialization completed');
+        } catch (err) {
+          console.error('[LOGIN] Push notification initialization failed:', err);
+        }
       }
       
       toast({
