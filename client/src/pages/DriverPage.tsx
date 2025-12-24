@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Star, StarOff, Heart, MessageSquare } from "lucide-react";
+import { Route, MapPin, Star, StarOff, Heart, MessageSquare, MessageSquareOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiRequest, queryClient, apiFetch } from "@/lib/queryClient";
@@ -78,6 +78,19 @@ export default function DriverPage() {
     enabled: !!selectedRoute && !authLoading,
     refetchInterval: 5000, // Refetch every 5 seconds for live GPS updates
   });
+
+  // Query for organization messaging settings
+  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+    queryKey: ["/api/organization-settings"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/organization-settings");
+      if (!response.ok) return { messagingEnabled: true };
+      return response.json();
+    },
+    enabled: !authLoading,
+  });
+
+  const messagingEnabled = orgSettings?.messagingEnabled ?? true;
 
   // Find user's favorite route if they have one
   const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
@@ -309,36 +322,50 @@ export default function DriverPage() {
       {/* Contact Admin Section */}
       {currentRoute && currentUser && (
         <>
-          <Card>
+          <Card className={!messagingEnabled ? "opacity-60" : ""}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
+                {messagingEnabled ? (
+                  <MessageSquare className="w-5 h-5" />
+                ) : (
+                  <MessageSquareOff className="w-5 h-5 text-muted-foreground" />
+                )}
                 Need Help?
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Report issues with the route, vehicle, or schedule to the admin team.
-              </p>
-              <Button 
-                onClick={() => setMessageDialogOpen(true)}
-                className="w-full"
-                data-testid="button-contact-admin"
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Contact Admin
-              </Button>
+              {messagingEnabled ? (
+                <>
+                  <p className="text-muted-foreground mb-4">
+                    Report issues with the route, vehicle, or schedule to the admin team.
+                  </p>
+                  <Button 
+                    onClick={() => setMessageDialogOpen(true)}
+                    className="w-full"
+                    data-testid="button-contact-admin"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Contact Admin
+                  </Button>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-center py-2">
+                  Messaging is currently disabled for this organization.
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          <SendDriverMessageDialog
-            route={currentRoute}
-            driverUserId={currentUser.id}
-            open={messageDialogOpen}
-            onOpenChange={setMessageDialogOpen}
-          />
+          {messagingEnabled && (
+            <SendDriverMessageDialog
+              route={currentRoute}
+              driverUserId={currentUser.id}
+              open={messageDialogOpen}
+              onOpenChange={setMessageDialogOpen}
+            />
+          )}
 
-          <MessageHistory userType="driver" routeId={selectedRoute} userId={currentUser.id} />
+          <MessageHistory userType="driver" routeId={selectedRoute} userId={currentUser.id} messagingEnabled={messagingEnabled} />
         </>
       )}
     </div>

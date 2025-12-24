@@ -36,9 +36,10 @@ interface MessageHistoryProps {
   userType: "rider" | "driver";
   routeId: string;
   userId?: string;
+  messagingEnabled?: boolean;
 }
 
-export function MessageHistory({ userType, routeId, userId }: MessageHistoryProps) {
+export function MessageHistory({ userType, routeId, userId, messagingEnabled = true }: MessageHistoryProps) {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
 
   if (userMessages.length === 0) {
     return (
-      <Card>
+      <Card className={!messagingEnabled ? "opacity-60" : ""}>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
@@ -157,7 +158,11 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No messages yet. Use the "Contact {userType === "rider" ? "Support" : "Admin"}" button to send a message.</p>
+          {messagingEnabled ? (
+            <p className="text-sm text-muted-foreground">No messages yet. Use the "Contact {userType === "rider" ? "Support" : "Admin"}" button to send a message.</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Messaging is currently disabled for this organization.</p>
+          )}
         </CardContent>
       </Card>
     );
@@ -201,7 +206,7 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
                     {format(new Date(message.createdAt), "MMM d, yyyy 'at' h:mm a")}
                   </p>
                 </div>
-                {isOwnMessage(message) && (
+                {isOwnMessage(message) && messagingEnabled && (
                   <div className="flex items-center gap-1">
                     <Button
                       size="icon"

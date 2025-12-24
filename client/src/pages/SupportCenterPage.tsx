@@ -240,6 +240,20 @@ export default function SupportCenterPage() {
     enabled: !!effectiveOrgId,
   });
 
+  // Fetch organization settings (messaging toggle)
+  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+    queryKey: ["/api/organization-settings", effectiveOrgId],
+    queryFn: async () => {
+      const url = effectiveOrgId ? `/api/organization-settings?organization_id=${effectiveOrgId}` : "/api/organization-settings";
+      const response = await apiFetch(url);
+      if (!response.ok) return { messagingEnabled: true };
+      return response.json();
+    },
+    enabled: !!effectiveOrgId,
+  });
+
+  const messagingEnabled = orgSettings?.messagingEnabled ?? true;
+
   // Send direct message to driver mutation
   const sendDriverMessageMutation = useMutation({
     mutationFn: async (data: { driverUserId: string; routeId: string; message: string }) => {
@@ -753,8 +767,8 @@ export default function SupportCenterPage() {
     return <Badge variant={variants[status] || "default"}>{status}</Badge>;
   };
 
-  // Fetch organization settings for the banner
-  const { data: orgSettings } = useQuery({
+  // Fetch organization info for system admin viewing banner
+  const { data: viewingOrgInfo } = useQuery({
     queryKey: ["/api/org-settings", effectiveOrgId],
     queryFn: async () => {
       const url = effectiveOrgId 
@@ -774,7 +788,7 @@ export default function SupportCenterPage() {
           <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="flex items-center justify-between">
             <span className="text-blue-800 dark:text-blue-200">
-              Viewing <strong>{orgSettings?.name || 'Organization'}</strong> support as System Administrator (read-only)
+              Viewing <strong>{viewingOrgInfo?.name || 'Organization'}</strong> support as System Administrator (read-only)
             </span>
             <button 
               onClick={handleBackToSystem}
@@ -783,6 +797,15 @@ export default function SupportCenterPage() {
             >
               Back to System Dashboard
             </button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!messagingEnabled && (
+        <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <strong>Communications Disabled:</strong> All messaging between riders, drivers, and admins is currently turned off for regulatory compliance. Enable messaging in Settings to resume communications.
           </AlertDescription>
         </Alert>
       )}
@@ -825,7 +848,9 @@ export default function SupportCenterPage() {
                       <Button
                         size="sm"
                         onClick={() => setComposeDriverDialogOpen(true)}
+                        disabled={!messagingEnabled}
                         data-testid="button-compose-driver-message"
+                        title={!messagingEnabled ? "Communications disabled for this organization" : undefined}
                       >
                         <Send className="w-4 h-4 mr-2" />
                         Message Driver
@@ -1031,7 +1056,7 @@ export default function SupportCenterPage() {
                               {getMessageTypeIcon(selectedMessage.messageType)}
                               Message Details
                             </CardTitle>
-                            {selectedMessage.status !== "resolved" && !selectedMessage.archivedAt && !isSystemAdminViewing && (
+                            {selectedMessage.status !== "resolved" && !selectedMessage.archivedAt && !isSystemAdminViewing && messagingEnabled && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1042,7 +1067,7 @@ export default function SupportCenterPage() {
                               </Button>
                             )}
                           </div>
-                          {!isSystemAdminViewing && (
+                          {!isSystemAdminViewing && messagingEnabled && (
                           <div className="flex items-center gap-2">
                             {selectedMessage.archivedAt ? (
                               <>
@@ -1149,30 +1174,38 @@ export default function SupportCenterPage() {
                         
                         {/* Reply to Parent/Student Section */}
                         {!isSystemAdminViewing && (
-                        <div className="border-t pt-4 mt-4">
+                        <div className={`border-t pt-4 mt-4 ${!messagingEnabled ? 'opacity-60' : ''}`}>
                           <div className="flex items-center gap-2 mb-3">
                             <User className="w-4 h-4 text-muted-foreground" />
                             <p className="text-sm font-semibold">Reply to {selectedMessage.messageType === 'rider' ? 'Parent/Student' : 'Driver'}</p>
                           </div>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            This will send a response directly to the {selectedMessage.messageType === 'rider' ? 'parent or student' : 'driver'} who sent this message.
-                          </p>
-                          <Textarea
-                            placeholder="Type your response..."
-                            value={responseText}
-                            onChange={(e) => setResponseText(e.target.value)}
-                            className="mb-2"
-                            data-testid="textarea-response"
-                          />
-                          <Button
-                            onClick={handleRespond}
-                            disabled={!responseText.trim() || respondMutation.isPending}
-                            className="w-full"
-                            data-testid="button-send-response"
-                          >
-                            <Send className="w-4 h-4 mr-2" />
-                            {respondMutation.isPending ? "Sending..." : "Send Response"}
-                          </Button>
+                          {messagingEnabled ? (
+                            <>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                This will send a response directly to the {selectedMessage.messageType === 'rider' ? 'parent or student' : 'driver'} who sent this message.
+                              </p>
+                              <Textarea
+                                placeholder="Type your response..."
+                                value={responseText}
+                                onChange={(e) => setResponseText(e.target.value)}
+                                className="mb-2"
+                                data-testid="textarea-response"
+                              />
+                              <Button
+                                onClick={handleRespond}
+                                disabled={!responseText.trim() || respondMutation.isPending}
+                                className="w-full"
+                                data-testid="button-send-response"
+                              >
+                                <Send className="w-4 h-4 mr-2" />
+                                {respondMutation.isPending ? "Sending..." : "Send Response"}
+                              </Button>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              Messaging is disabled for this organization. Enable communications in Settings to respond to messages.
+                            </p>
+                          )}
                         </div>
                         )}
                       </CardContent>

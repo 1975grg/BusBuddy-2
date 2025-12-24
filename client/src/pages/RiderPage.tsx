@@ -5,7 +5,7 @@ import { SendRiderMessageDialog } from "@/components/SendRiderMessageDialog";
 import { MessageHistory } from "@/components/MessageHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, MessageSquareOff } from "lucide-react";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiFetch } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
@@ -52,6 +52,19 @@ export default function RiderPage() {
     refetchInterval: 30000, // Refresh every 30 seconds
     enabled: !!selectedRoute && !authLoading, // Only fetch if we have a route ID
   });
+
+  // Query for organization messaging settings
+  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+    queryKey: ["/api/organization-settings"],
+    queryFn: async () => {
+      const response = await apiFetch("/api/organization-settings");
+      if (!response.ok) return { messagingEnabled: true };
+      return response.json();
+    },
+    enabled: !authLoading,
+  });
+
+  const messagingEnabled = orgSettings?.messagingEnabled ?? true;
 
   // Early return AFTER all hooks
   if (authLoading) {
@@ -132,48 +145,62 @@ export default function RiderPage() {
       />
 
       {/* Contact Support Section - Above Messages */}
-      <Card>
+      <Card className={!messagingEnabled ? "opacity-60" : ""}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
+            {messagingEnabled ? (
+              <MessageSquare className="w-5 h-5" />
+            ) : (
+              <MessageSquareOff className="w-5 h-5 text-muted-foreground" />
+            )}
             Need Help?
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground mb-4">
-            Have a question about your route or transportation services? Contact our support team.
-          </p>
-          <Button 
-            onClick={() => setMessageDialogOpen(true)}
-            className="w-full"
-            data-testid="button-contact-support"
-          >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Contact Support
-          </Button>
+          {messagingEnabled ? (
+            <>
+              <p className="text-muted-foreground mb-4">
+                Have a question about your route or transportation services? Contact our support team.
+              </p>
+              <Button 
+                onClick={() => setMessageDialogOpen(true)}
+                className="w-full"
+                data-testid="button-contact-support"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Contact Support
+              </Button>
+            </>
+          ) : (
+            <p className="text-muted-foreground text-center py-2">
+              Messaging is currently disabled for this organization.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       {/* Message History - Below Need Help */}
-      <MessageHistory userType="rider" routeId={currentRoute.id} userId={user?.id} />
+      <MessageHistory userType="rider" routeId={currentRoute.id} userId={user?.id} messagingEnabled={messagingEnabled} />
 
       {/* Contact Support Dialog */}
-      <SendRiderMessageDialog
-        route={{
-          id: currentRoute.id,
-          name: currentRoute.name,
-          organizationId: currentRoute.organizationId || user?.organizationId || "",
-          vehicleNumber: currentRoute.busName,
-          type: "shuttle",
-          status: "active",
-          isActive: true,
-          createdAt: new Date(),
-          archivedAt: null,
-          archivedByUserId: null
-        }}
-        open={messageDialogOpen}
-        onOpenChange={setMessageDialogOpen}
-      />
+      {messagingEnabled && (
+        <SendRiderMessageDialog
+          route={{
+            id: currentRoute.id,
+            name: currentRoute.name,
+            organizationId: currentRoute.organizationId || user?.organizationId || "",
+            vehicleNumber: currentRoute.busName,
+            type: "shuttle",
+            status: "active",
+            isActive: true,
+            createdAt: new Date(),
+            archivedAt: null,
+            archivedByUserId: null
+          }}
+          open={messageDialogOpen}
+          onOpenChange={setMessageDialogOpen}
+        />
+      )}
     </div>
   );
 }
