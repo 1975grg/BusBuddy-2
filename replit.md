@@ -164,3 +164,13 @@ Preferred communication style: Simple, everyday language.
   - Components: App.tsx, app-sidebar.tsx, RiderTracker.tsx, MessageHistory.tsx, DriverServiceAlerts.tsx, EditRouteDialog.tsx, ArchiveRouteDialog.tsx
 - **Mutations**: All mutations using POST/PUT/DELETE already used `apiRequest()` which handles native platform auth correctly
 - **Excluded Files**: Object storage uploads (LogoUpload, ObjectUploader) and public geocoding (AddressAutocomplete) use signed URLs or public endpoints that don't require auth headers
+
+### Admin Direct Messaging & Communications Compliance (December 24, 2025)
+- **Admin Direct Messaging to Drivers**: Admins can now compose and send direct messages to drivers from the Support Center using the "Message Driver" button. Opens a dialog to select driver, related route, and message content. Driver receives push notification.
+- **Communications Compliance Toggle**: Organization Settings now includes a "Communications Compliance" toggle that can disable ALL messaging between all parties (riders, drivers, admins) for regulatory compliance.
+  - Toggle is in Organization Settings page under "Communications Compliance" card
+  - Confirmation dialog warns about implications before toggling
+  - When disabled: All messaging endpoints return 403 errors
+  - Enforced server-side on: POST rider-messages, POST driver-messages, POST admin-driver-messages, PATCH respond endpoints
+  - Warning banner displays when communications are disabled
+  - Uses trusted organization ID from driver/route records (not client-provided) for security
