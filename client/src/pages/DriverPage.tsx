@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DriverControls } from "@/components/DriverControls";
 import { LiveMap } from "@/components/LiveMap";
@@ -79,17 +79,20 @@ export default function DriverPage() {
     refetchInterval: 5000, // Refetch every 5 seconds for live GPS updates
   });
 
-  // Early returns AFTER all hooks
-  if (authLoading || routesLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
   // Find user's favorite route if they have one
   const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
   
-  // Set initial selected route to favorite if available
-  if (!selectedRoute && favoriteRoute) {
-    setSelectedRoute(favoriteRoute.id);
+  // Set initial selected route to favorite if available - MUST be in useEffect, not during render
+  // Setting state during render causes a loop that blocks UserContext from initializing push notifications
+  useEffect(() => {
+    if (!selectedRoute && favoriteRoute) {
+      setSelectedRoute(favoriteRoute.id);
+    }
+  }, [favoriteRoute, selectedRoute]);
+
+  // Early returns AFTER all hooks
+  if (authLoading || routesLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
   const handleFavoriteToggle = (routeId: string) => {
