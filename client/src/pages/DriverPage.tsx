@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Route, MapPin, Star, StarOff, Heart, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { apiRequest, queryClient, getStoredSessionToken } from "@/lib/queryClient";
+import { apiRequest, queryClient, apiFetch } from "@/lib/queryClient";
 import type { Route as RouteType, User, RouteSession } from "@shared/schema";
 import driverAvatarUrl from "@assets/generated_images/Bus_driver_avatar_a7c98208.png";
 
@@ -61,17 +61,7 @@ export default function DriverPage() {
       if (!selectedRoute) return null;
       
       try {
-        // Build headers with Bearer token for native app contexts (where cookies don't persist)
-        const headers: HeadersInit = {};
-        const token = getStoredSessionToken();
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`/api/route-sessions/active/${selectedRoute}`, {
-          credentials: "include",
-          headers,
-        });
+        const response = await apiFetch(`/api/route-sessions/active/${selectedRoute}`);
         if (response.status === 404) {
           // No active session found - this is normal
           return null;

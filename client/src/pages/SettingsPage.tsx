@@ -11,6 +11,7 @@ import { Building, Palette, Shield, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
+import { apiFetch, apiRequest } from "@/lib/queryClient";
 import type { OrganizationType } from "@shared/schema";
 
 export default function SettingsPage() {
@@ -30,7 +31,7 @@ export default function SettingsPage() {
   const { data: organization, isLoading } = useQuery({
     queryKey: ["/api/organization"],
     queryFn: async () => {
-      const response = await fetch("/api/organization");
+      const response = await apiFetch("/api/organization");
       if (!response.ok) throw new Error("Failed to fetch organization");
       return response.json();
     }
@@ -51,11 +52,7 @@ export default function SettingsPage() {
     mutationFn: async (data: { name: string; type: OrganizationType; logoUrl: string; primaryColor: string }) => {
       if (!organization?.id) throw new Error("Organization ID not found");
       
-      const response = await fetch(`/api/organization/${organization.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const response = await apiRequest("PUT", `/api/organization/${organization.id}`, data);
       if (!response.ok) throw new Error("Failed to save settings");
       return response.json();
     },

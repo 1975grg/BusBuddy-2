@@ -282,6 +282,22 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Helper function for GET requests that works on both web and native
+// Use this instead of direct fetch() in queryFn implementations
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const fullUrl = buildApiUrl(url);
+  const headers = {
+    ...getAuthHeaders(false),
+    ...options.headers,
+  };
+  
+  return fetch(fullUrl, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

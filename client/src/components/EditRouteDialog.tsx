@@ -14,7 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFetch } from "@/lib/queryClient";
 import { Trash2, Users } from "lucide-react";
 import type { Route, RouteStop, RiderProfile } from "@shared/schema";
 
@@ -53,7 +53,7 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
   const { data: stops = [] } = useQuery<RouteStop[]>({
     queryKey: ["/api/routes", route.id, "stops"],
     queryFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}/stops`);
+      const response = await apiFetch(`/api/routes/${route.id}/stops`);
       if (!response.ok) throw new Error("Failed to fetch stops");
       return response.json();
     },
@@ -64,7 +64,7 @@ export function EditRouteDialog({ route, open, onOpenChange, onSuccess }: EditRo
   const { data: riders = [] } = useQuery<Array<RiderProfile & { subscriptionId: string; notificationMode: string }>>({
     queryKey: ["/api/routes", route.id, "riders"],
     queryFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}/riders`);
+      const response = await apiFetch(`/api/routes/${route.id}/riders`);
       if (!response.ok) throw new Error("Failed to fetch riders");
       return response.json();
     },

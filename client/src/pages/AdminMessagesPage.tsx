@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, User, Truck, Clock, CheckCircle2, Send } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, apiFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { RiderMessage, DriverMessage } from "@shared/schema";
 
@@ -23,7 +23,7 @@ export default function AdminMessagesPage() {
   const { data: currentAdmin } = useQuery({
     queryKey: ["/api/users", "org_admin"],
     queryFn: async () => {
-      const response = await fetch("/api/users?role=org_admin");
+      const response = await apiFetch("/api/users?role=org_admin");
       const users = await response.json();
       return users[0]; // Get first org admin for now - TODO: Get from auth context
     },
@@ -34,7 +34,7 @@ export default function AdminMessagesPage() {
     queryKey: ["/api/rider-messages", currentAdmin?.organizationId],
     queryFn: async () => {
       if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${currentAdmin.organizationId}`);
+      const response = await apiFetch(`/api/rider-messages?organization_id=${currentAdmin.organizationId}`);
       return response.json();
     },
     enabled: !!currentAdmin?.organizationId,
@@ -46,7 +46,7 @@ export default function AdminMessagesPage() {
     queryKey: ["/api/driver-messages", currentAdmin?.organizationId],
     queryFn: async () => {
       if (!currentAdmin?.organizationId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`);
+      const response = await apiFetch(`/api/driver-messages?organization_id=${currentAdmin.organizationId}`);
       return response.json();
     },
     enabled: !!currentAdmin?.organizationId,

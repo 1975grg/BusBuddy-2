@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, apiFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -50,7 +50,7 @@ export function MessageHistory({ userType, routeId, userId }: MessageHistoryProp
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: [endpoint],
     queryFn: async () => {
-      const response = await fetch(endpoint);
+      const response = await apiFetch(endpoint);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch messages");

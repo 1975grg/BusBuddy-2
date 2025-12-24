@@ -152,3 +152,15 @@ Preferred communication style: Simple, everyday language.
 - **Sound**: Push notifications include `sound: 'default'` in the APNs payload for iOS notification sounds.
 - **Status**: Push notifications now work in both foreground and background on iOS with sound.
 - **Rebuild Required**: After downloading the ios folder, run `pod install` in ios/App, then build from Xcode.
+
+### Native App API Fixes (December 24, 2025)
+- **Root Cause**: API calls failing on iOS/Android native apps because direct `fetch()` calls used relative URLs without the production server base URL, and didn't include Bearer token authentication headers.
+- **Solution**: Created `apiFetch()` helper function in `queryClient.ts` that:
+  - Automatically builds full URLs using `buildApiUrl()` on native platforms
+  - Includes Bearer token from Capacitor Preferences for authentication
+  - Falls back to relative URLs with credentials on web platform
+- **Files Updated**: All pages and components using `fetch()` for authenticated API calls now use `apiFetch()`:
+  - Pages: RoutesPage, AdminDashboardPage, AccessManagementPage, RiderPage, DriverPage, SupportCenterPage, SettingsPage, NotificationLogsPage, AdminMessagesPage, SystemAdminDashboard, RiderOnboardingPage
+  - Components: App.tsx, app-sidebar.tsx, RiderTracker.tsx, MessageHistory.tsx, DriverServiceAlerts.tsx, EditRouteDialog.tsx, ArchiveRouteDialog.tsx
+- **Mutations**: All mutations using POST/PUT/DELETE already used `apiRequest()` which handles native platform auth correctly
+- **Excluded Files**: Object storage uploads (LogoUpload, ObjectUploader) and public geocoding (AddressAutocomplete) use signed URLs or public endpoints that don't require auth headers

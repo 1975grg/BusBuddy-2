@@ -16,7 +16,7 @@ import { Users, Shield, Trash2, RotateCcw, Bus, UserX, Car, Search, Filter, Cale
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFetch } from "@/lib/queryClient";
 import type { Route, RiderProfile, User, UserRouteAssignment } from "@shared/schema";
 
 interface RiderWithSubscription extends RiderProfile {
@@ -62,7 +62,7 @@ export default function AccessManagementPage() {
     queryKey: ["/api/routes", effectiveOrgId],
     queryFn: async () => {
       const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch routes");
       return response.json();
     },
@@ -127,7 +127,7 @@ export default function AccessManagementPage() {
       const url = effectiveOrgId 
         ? `/api/org-settings?organizationId=${effectiveOrgId}`
         : "/api/org-settings";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
     }
@@ -137,7 +137,7 @@ export default function AccessManagementPage() {
     queryKey: ["/api/routes", selectedRoute, "riders", effectiveOrgId],
     queryFn: async () => {
       const url = `/api/routes/${selectedRoute}/riders${effectiveOrgId ? `?organizationId=${effectiveOrgId}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch riders");
       return response.json();
     },
@@ -150,7 +150,7 @@ export default function AccessManagementPage() {
       const url = effectiveOrgId 
         ? `/api/staff?organizationId=${effectiveOrgId}`
         : "/api/staff";
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch staff");
       return response.json();
     },

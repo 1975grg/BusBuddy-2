@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
+import { apiFetch, apiRequest } from "@/lib/queryClient";
 import { Building, Plus, Users, Activity, Settings, UserPlus, Copy, Check, Eye, EyeOff, Mail, Send, LogIn, Pencil, KeyRound, UserX, UserCheck, X, Archive, ArchiveRestore, Inbox, Clock } from "lucide-react";
 import type { Organization, OrganizationType, User } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,7 +56,7 @@ export default function SystemAdminDashboard() {
   const { data: organizations, isLoading } = useQuery({
     queryKey: ["/api/system/organizations"],
     queryFn: async () => {
-      const response = await fetch("/api/system/organizations?includeAdmins=true");
+      const response = await apiFetch("/api/system/organizations?includeAdmins=true");
       if (!response.ok) throw new Error("Failed to fetch organizations");
       return response.json() as Promise<OrgWithAdmin[]>;
     },
@@ -66,7 +67,7 @@ export default function SystemAdminDashboard() {
   const { data: inquiries } = useQuery({
     queryKey: ["/api/system/inquiries"],
     queryFn: async () => {
-      const response = await fetch("/api/system/inquiries", { credentials: "include" });
+      const response = await apiFetch("/api/system/inquiries");
       if (!response.ok) throw new Error("Failed to fetch inquiries");
       return response.json() as Promise<Array<{ id: string; organizationName: string; organizationType: string; contactName: string; contactEmail: string; status: string; createdAt: string }>>;
     },
@@ -77,7 +78,7 @@ export default function SystemAdminDashboard() {
   const { data: contactMessages } = useQuery({
     queryKey: ["/api/system/contact-messages"],
     queryFn: async () => {
-      const response = await fetch("/api/system/contact-messages", { credentials: "include" });
+      const response = await apiFetch("/api/system/contact-messages");
       if (!response.ok) throw new Error("Failed to fetch contact messages");
       return response.json() as Promise<Array<{ id: string; name: string; email: string; subject: string; message: string; status: string; createdAt: string; readAt: string | null }>>;
     },
@@ -87,11 +88,7 @@ export default function SystemAdminDashboard() {
   // Create organization mutation
   const createOrgMutation = useMutation({
     mutationFn: async (data: { name: string; type: OrganizationType }) => {
-      const response = await fetch("/api/system/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const response = await apiRequest("POST", "/api/system/organizations", data);
       if (!response.ok) throw new Error("Failed to create organization");
       return response.json();
     },
@@ -116,11 +113,7 @@ export default function SystemAdminDashboard() {
 
   const createAdminMutation = useMutation({
     mutationFn: async (data: { organizationId: string; name: string; email: string; password: string }) => {
-      const response = await fetch("/api/system/organizations/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const response = await apiRequest("POST", "/api/system/organizations/admin", data);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to create admin");
@@ -153,7 +146,7 @@ export default function SystemAdminDashboard() {
     queryKey: ["/api/system/organizations", viewOrgDialog.org?.id, "admins"],
     queryFn: async () => {
       if (!viewOrgDialog.org?.id) return [];
-      const response = await fetch(`/api/system/organizations/${viewOrgDialog.org.id}/admins`);
+      const response = await apiFetch(`/api/system/organizations/${viewOrgDialog.org.id}/admins`);
       if (!response.ok) throw new Error("Failed to fetch admins");
       return response.json() as Promise<User[]>;
     },
@@ -163,11 +156,7 @@ export default function SystemAdminDashboard() {
   // Update admin mutation
   const updateAdminMutation = useMutation({
     mutationFn: async (data: { orgId: string; adminId: string; name?: string; email?: string }) => {
-      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: data.name, email: data.email })
-      });
+      const response = await apiRequest("PUT", `/api/system/organizations/${data.orgId}/admins/${data.adminId}`, { name: data.name, email: data.email });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update admin");
@@ -188,11 +177,7 @@ export default function SystemAdminDashboard() {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: { orgId: string; adminId: string; password: string }) => {
-      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: data.password })
-      });
+      const response = await apiRequest("POST", `/api/system/organizations/${data.orgId}/admins/${data.adminId}/reset-password`, { password: data.password });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to reset password");
@@ -217,10 +202,7 @@ export default function SystemAdminDashboard() {
   // Toggle admin status mutation
   const toggleAdminStatusMutation = useMutation({
     mutationFn: async (data: { orgId: string; adminId: string }) => {
-      const response = await fetch(`/api/system/organizations/${data.orgId}/admins/${data.adminId}/toggle-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
+      const response = await apiRequest("POST", `/api/system/organizations/${data.orgId}/admins/${data.adminId}/toggle-status`, {});
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to toggle status");
@@ -243,10 +225,7 @@ export default function SystemAdminDashboard() {
   // Toggle organization status mutation (archive/restore)
   const toggleOrgStatusMutation = useMutation({
     mutationFn: async (orgId: string) => {
-      const response = await fetch(`/api/system/organizations/${orgId}/toggle-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
+      const response = await apiRequest("POST", `/api/system/organizations/${orgId}/toggle-status`, {});
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to toggle organization status");

@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Info, Bus, Clock, Bell } from "lucide-react";
 import { format } from "date-fns";
+import { apiFetch } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
 
 interface DriverServiceAlertsProps {
@@ -14,7 +15,7 @@ export function DriverServiceAlerts({ routeId }: DriverServiceAlertsProps) {
   const { data: alerts = [], isLoading } = useQuery<ServiceAlert[]>({
     queryKey: ["/api/service-alerts", routeId],
     queryFn: async () => {
-      const response = await fetch(`/api/service-alerts?route_id=${routeId}`);
+      const response = await apiFetch(`/api/service-alerts?route_id=${routeId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch service alerts");

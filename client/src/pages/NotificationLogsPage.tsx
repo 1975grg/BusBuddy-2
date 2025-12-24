@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Search, Filter, Bell, Phone, MessageSquare, Bus, AlertCircle } from "lucide-react";
 import { useRequireRole } from "@/contexts/UserContext";
+import { apiFetch } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { Route, NotificationLog } from "@shared/schema";
 
@@ -61,7 +62,7 @@ export default function NotificationLogsPage() {
   const { data: logs = [], isLoading } = useQuery<NotificationLog[]>({
     queryKey: ["/api/notification-logs", queryParams.toString()],
     queryFn: async () => {
-      const response = await fetch(`/api/notification-logs?${queryParams}`);
+      const response = await apiFetch(`/api/notification-logs?${queryParams}`);
       return response.json();
     },
     staleTime: 0,
@@ -71,7 +72,7 @@ export default function NotificationLogsPage() {
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["/api/notification-logs/count", user.organizationId],
     queryFn: async () => {
-      const response = await fetch(`/api/notification-logs/count?organization_id=${user.organizationId}`);
+      const response = await apiFetch(`/api/notification-logs/count?organization_id=${user.organizationId}`);
       return response.json();
     },
   });

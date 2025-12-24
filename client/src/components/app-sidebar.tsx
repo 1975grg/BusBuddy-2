@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/contexts/UserContext";
-import { apiRequest, queryClient, setStoredSessionToken } from "@/lib/queryClient";
+import { apiRequest, queryClient, setStoredSessionToken, apiFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Route } from "@shared/schema";
 import busIconUrl from "@assets/bus-buddy-logo.png";
@@ -135,7 +135,7 @@ export function AppSidebar() {
   const { data: orgSettings } = useQuery({
     queryKey: ["/api/organization"],
     queryFn: async () => {
-      const response = await fetch("/api/organization");
+      const response = await apiFetch("/api/organization");
       if (!response.ok) throw new Error("Failed to fetch organization");
       return response.json();
     }
@@ -156,7 +156,7 @@ export function AppSidebar() {
     queryKey: ["/api/rider-messages", "org_admin", userOrgId],
     queryFn: async () => {
       if (!userOrgId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${userOrgId}`);
+      const response = await apiFetch(`/api/rider-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch rider messages");
@@ -171,7 +171,7 @@ export function AppSidebar() {
     queryKey: ["/api/driver-messages", "org_admin", userOrgId],
     queryFn: async () => {
       if (!userOrgId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${userOrgId}`);
+      const response = await apiFetch(`/api/driver-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch driver messages");
@@ -187,7 +187,7 @@ export function AppSidebar() {
     queryKey: ["/api/driver-messages", "driver", authenticatedUser?.id],
     queryFn: async () => {
       if (!authenticatedUser?.id || !userOrgId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${userOrgId}`);
+      const response = await apiFetch(`/api/driver-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch driver messages");
@@ -205,7 +205,7 @@ export function AppSidebar() {
     queryKey: ["/api/rider-messages", "rider", authenticatedUser?.id],
     queryFn: async () => {
       if (!authenticatedUser?.id || !userOrgId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${userOrgId}`);
+      const response = await apiFetch(`/api/rider-messages?organization_id=${userOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch rider messages");

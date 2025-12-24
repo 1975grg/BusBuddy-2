@@ -7,19 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import { useRequireRole } from "@/contexts/UserContext";
-import { getStoredSessionToken } from "@/lib/queryClient";
+import { apiFetch } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
-
-// Helper to get auth headers for native app support
-function getAuthHeaders(): HeadersInit {
-  const headers: HeadersInit = {};
-  const token = getStoredSessionToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
@@ -45,10 +35,7 @@ export default function RiderPage() {
   const { data: realRoute, isLoading: routeLoading } = useQuery({
     queryKey: ["/api/routes", selectedRoute],
     queryFn: async () => {
-      const response = await fetch(`/api/routes/${selectedRoute}`, {
-        credentials: "include",
-        headers: getAuthHeaders(),
-      });
+      const response = await apiFetch(`/api/routes/${selectedRoute}`);
       if (!response.ok) return null;
       return response.json();
     },
@@ -59,10 +46,7 @@ export default function RiderPage() {
   const { data: serviceAlerts = [], isLoading: alertsLoading } = useQuery<ServiceAlert[]>({
     queryKey: ["/api/service-alerts", selectedRoute],
     queryFn: async () => {
-      const response = await fetch(`/api/service-alerts?route_id=${selectedRoute}`, {
-        credentials: "include",
-        headers: getAuthHeaders(),
-      });
+      const response = await apiFetch(`/api/service-alerts?route_id=${selectedRoute}`);
       return response.json();
     },
     refetchInterval: 30000, // Refresh every 30 seconds

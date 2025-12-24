@@ -10,7 +10,7 @@ import { MapPin, Clock, Smartphone, MessageSquare, QrCode, CheckCircle, Eye, Eye
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFetch } from "@/lib/queryClient";
 import type { Route, RouteStop, Organization, User } from "@shared/schema";
 import { SmartAppBanner } from "@/components/SmartAppBanner";
 
@@ -42,7 +42,7 @@ export default function RiderOnboardingPage() {
     staleTime: 0,
     queryFn: async () => {
       try {
-        const response = await fetch("/api/me", { credentials: "include" });
+        const response = await apiFetch("/api/me");
         if (!response.ok) return null;
         return response.json();
       } catch {

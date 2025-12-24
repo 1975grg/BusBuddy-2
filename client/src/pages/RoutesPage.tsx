@@ -17,7 +17,7 @@ import { ArchiveRouteDialog } from "@/components/ArchiveRouteDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFetch } from "@/lib/queryClient";
 import type { Route, RouteStop, Organization } from "@shared/schema";
 
 interface RouteWithStops extends Route {
@@ -56,7 +56,7 @@ export default function RoutesPage() {
       const url = effectiveOrgId 
         ? `/api/org-settings?organizationId=${effectiveOrgId}`
         : "/api/org-settings";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
     },
@@ -68,7 +68,7 @@ export default function RoutesPage() {
     queryKey: ["/api/routes", effectiveOrgId],
     queryFn: async () => {
       const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch routes");
       return response.json();
     },

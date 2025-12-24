@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFetch } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Trash2, Users, Loader2 } from "lucide-react";
 import type { Route } from "@shared/schema";
@@ -54,10 +54,7 @@ export function ArchiveRouteDialog({ route, open, onOpenChange, onSuccess }: Arc
 
   const archiveMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/routes/${route.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const response = await apiRequest("DELETE", `/api/routes/${route.id}`);
       
       if (!response.ok) {
         const error = await response.json();

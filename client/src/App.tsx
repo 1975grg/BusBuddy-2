@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiFetch } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -104,7 +104,7 @@ function AppContent() {
   const { data: orgSettings } = useQuery({
     queryKey: ["/api/organization"],
     queryFn: async () => {
-      const response = await fetch("/api/organization");
+      const response = await apiFetch("/api/organization");
       if (!response.ok) return null;
       return response.json();
     },

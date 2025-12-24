@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bell, BellOff, Clock, MapPin, AlertTriangle, Info, Bus, Calendar } from "lucide-react";
 import { LiveMap } from "./LiveMap";
-import { apiRequest, getStoredSessionToken } from "@/lib/queryClient";
+import { apiRequest, getStoredSessionToken, apiFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ServiceAlert, ProximityAlert } from "@shared/schema";
 
@@ -58,15 +58,7 @@ export function RiderTracker({
         console.log("[RiderTracker] No riderProfileId, returning empty array");
         return [];
       }
-      const headers: HeadersInit = {};
-      const token = getStoredSessionToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const response = await fetch(`/api/proximity-alerts/${riderProfileId}`, {
-        credentials: "include",
-        headers,
-      });
+      const response = await apiFetch(`/api/proximity-alerts/${riderProfileId}`);
       if (!response.ok) {
         console.log("[RiderTracker] Alert fetch failed:", response.status);
         return [];
@@ -148,16 +140,7 @@ export function RiderTracker({
       // Mark alert as read after showing
       (async () => {
         try {
-          const headers: HeadersInit = { "Content-Type": "application/json" };
-          const token = getStoredSessionToken();
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-          }
-          await fetch(`/api/proximity-alerts/${alert.id}/read`, {
-            method: "PATCH",
-            credentials: "include",
-            headers,
-          });
+          await apiRequest("PATCH", `/api/proximity-alerts/${alert.id}/read`);
         } catch (err) {
           console.error("Failed to mark alert as read:", err);
         }
@@ -207,17 +190,7 @@ export function RiderTracker({
   const { data: activeSession } = useQuery({
     queryKey: ["/api/route-sessions/active", routeId],
     queryFn: async () => {
-      // Build headers with Bearer token for native app contexts (where cookies don't persist)
-      const headers: HeadersInit = {};
-      const token = getStoredSessionToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(`/api/route-sessions/active/${routeId}`, {
-        credentials: "include",
-        headers,
-      });
+      const response = await apiFetch(`/api/route-sessions/active/${routeId}`);
       if (!response.ok) {
         if (response.status === 404) {
           console.log("RiderTracker: No active session found for route", routeId);

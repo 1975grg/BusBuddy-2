@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { useRequireRole } from "@/contexts/UserContext";
+import { apiFetch } from "@/lib/queryClient";
 import type { Route } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye } from "lucide-react";
@@ -20,7 +21,7 @@ export default function AdminDashboardPage() {
     queryKey: ["/api/routes", effectiveOrgId],
     queryFn: async () => {
       const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch routes");
       return response.json();
     },
@@ -34,7 +35,7 @@ export default function AdminDashboardPage() {
       const url = effectiveOrgId 
         ? `/api/users?role=org_admin&organizationId=${effectiveOrgId}`
         : "/api/users?role=org_admin";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       const users = await response.json();
       return users[0];
     },
@@ -48,7 +49,7 @@ export default function AdminDashboardPage() {
       const url = effectiveOrgId 
         ? `/api/org-settings?organizationId=${effectiveOrgId}`
         : "/api/org-settings";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
     },
@@ -63,7 +64,7 @@ export default function AdminDashboardPage() {
     queryKey: ["/api/rider-messages", messageOrgId],
     queryFn: async () => {
       if (!messageOrgId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${messageOrgId}`);
+      const response = await apiFetch(`/api/rider-messages?organization_id=${messageOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch rider messages");
@@ -77,7 +78,7 @@ export default function AdminDashboardPage() {
     queryKey: ["/api/driver-messages", messageOrgId],
     queryFn: async () => {
       if (!messageOrgId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${messageOrgId}`);
+      const response = await apiFetch(`/api/driver-messages?organization_id=${messageOrgId}`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch driver messages");

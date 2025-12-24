@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, User, Truck, Clock, Send, Megaphone, Archive, ArchiveRestore, Trash2, AlertCircle, Bell, XCircle, Bus, Forward, Radio, Calendar, Search, Filter, Phone, ArrowLeft, Eye } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, apiFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { SendAlertDialog } from "@/components/SendAlertDialog";
@@ -172,7 +172,7 @@ export default function SupportCenterPage() {
     queryKey: ["/api/routes", effectiveOrgId],
     queryFn: async () => {
       const url = effectiveOrgId ? `/api/routes?organizationId=${effectiveOrgId}` : "/api/routes";
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch routes");
       return response.json();
     },
@@ -185,10 +185,7 @@ export default function SupportCenterPage() {
     queryKey: ["/api/rider-messages", effectiveOrgId],
     queryFn: async () => {
       if (!effectiveOrgId) return [];
-      const response = await fetch(`/api/rider-messages?organization_id=${effectiveOrgId}`, {
-        credentials: 'include',
-        cache: 'no-cache' // Force fresh data, bypass HTTP cache
-      });
+      const response = await apiFetch(`/api/rider-messages?organization_id=${effectiveOrgId}`);
       return response.json();
     },
     enabled: !!effectiveOrgId,
@@ -202,10 +199,7 @@ export default function SupportCenterPage() {
     queryKey: ["/api/driver-messages", effectiveOrgId],
     queryFn: async () => {
       if (!effectiveOrgId) return [];
-      const response = await fetch(`/api/driver-messages?organization_id=${effectiveOrgId}`, {
-        credentials: 'include',
-        cache: 'no-cache' // Force fresh data, bypass HTTP cache
-      });
+      const response = await apiFetch(`/api/driver-messages?organization_id=${effectiveOrgId}`);
       return response.json();
     },
     enabled: !!effectiveOrgId,
@@ -219,9 +213,7 @@ export default function SupportCenterPage() {
     queryKey: ["/api/service-alerts", effectiveOrgId],
     queryFn: async () => {
       if (!effectiveOrgId) return [];
-      const response = await fetch(`/api/service-alerts?organization_id=${effectiveOrgId}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`/api/service-alerts?organization_id=${effectiveOrgId}`);
       return response.json();
     },
     enabled: !!effectiveOrgId,
@@ -261,7 +253,7 @@ export default function SupportCenterPage() {
   const { data: notificationLogs = [], isLoading: logsLoading } = useQuery<NotificationLog[]>({
     queryKey: ["/api/notification-logs", logsQueryParams.toString()],
     queryFn: async () => {
-      const response = await fetch(`/api/notification-logs?${logsQueryParams}`);
+      const response = await apiFetch(`/api/notification-logs?${logsQueryParams}`);
       if (!response.ok) {
         console.error('Failed to fetch notification logs:', response.status, response.statusText);
         return [];
@@ -277,9 +269,7 @@ export default function SupportCenterPage() {
     queryKey: ["/api/notification-logs/count", effectiveOrgId],
     queryFn: async () => {
       if (!effectiveOrgId) return { count: 0 };
-      const response = await fetch(`/api/notification-logs/count?organization_id=${effectiveOrgId}`, {
-        credentials: 'include'
-      });
+      const response = await apiFetch(`/api/notification-logs/count?organization_id=${effectiveOrgId}`);
       return response.json();
     },
     enabled: !!effectiveOrgId,
@@ -733,7 +723,7 @@ export default function SupportCenterPage() {
       const url = effectiveOrgId 
         ? `/api/org-settings?organizationId=${effectiveOrgId}`
         : "/api/org-settings";
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) throw new Error("Failed to fetch settings");
       return response.json();
     },
