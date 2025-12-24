@@ -228,8 +228,8 @@ export default function SupportCenterPage() {
     refetchInterval: 10000,
   });
 
-  // Fetch organization drivers for compose dialog
-  const { data: orgDrivers = [] } = useQuery<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null }>>({
+  // Fetch organization drivers for compose dialog (includes default route assignment)
+  const { data: orgDrivers = [] } = useQuery<Array<{ id: string; name: string | null; email: string; phoneNumber: string | null; defaultRouteId: string | null }>>({
     queryKey: ["/api/organization-drivers", effectiveOrgId],
     queryFn: async () => {
       if (!effectiveOrgId) return [];
@@ -1909,23 +1909,43 @@ export default function SupportCenterPage() {
               <Label htmlFor="compose-driver">Select Driver</Label>
               <Select
                 value={composeDriverForm.driverUserId}
-                onValueChange={(value) => setComposeDriverForm(prev => ({ ...prev, driverUserId: value }))}
+                onValueChange={(value) => {
+                  // Auto-populate route with driver's default assigned route
+                  const selectedDriver = orgDrivers.find(d => d.id === value);
+                  const autoRouteId = selectedDriver?.defaultRouteId || "";
+                  setComposeDriverForm(prev => ({ 
+                    ...prev, 
+                    driverUserId: value,
+                    routeId: autoRouteId 
+                  }));
+                }}
               >
                 <SelectTrigger id="compose-driver" data-testid="select-compose-driver">
                   <SelectValue placeholder="Choose a driver..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {orgDrivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      {driver.name || driver.email}
-                    </SelectItem>
-                  ))}
+                  {orgDrivers.map((driver) => {
+                    const routeName = driver.defaultRouteId 
+                      ? activeRoutes.find(r => r.id === driver.defaultRouteId)?.name 
+                      : null;
+                    return (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.name || driver.email}
+                        {routeName && <span className="text-muted-foreground ml-1">({routeName})</span>}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="compose-route">Related Route (optional)</Label>
+              <Label htmlFor="compose-route">
+                Route
+                {composeDriverForm.driverUserId && orgDrivers.find(d => d.id === composeDriverForm.driverUserId)?.defaultRouteId && (
+                  <span className="text-muted-foreground ml-1 font-normal">(auto-filled)</span>
+                )}
+              </Label>
               <Select
                 value={composeDriverForm.routeId}
                 onValueChange={(value) => setComposeDriverForm(prev => ({ ...prev, routeId: value }))}
@@ -1934,7 +1954,6 @@ export default function SupportCenterPage() {
                   <SelectValue placeholder="Select a route..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No specific route</SelectItem>
                   {activeRoutes.map((route) => (
                     <SelectItem key={route.id} value={route.id.toString()}>
                       {route.name}
@@ -1942,6 +1961,9 @@ export default function SupportCenterPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {!composeDriverForm.routeId && composeDriverForm.driverUserId && (
+                <p className="text-xs text-muted-foreground">Please select a route to send this message</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1970,15 +1992,15 @@ export default function SupportCenterPage() {
             </Button>
             <Button
               onClick={() => {
-                if (composeDriverForm.driverUserId && composeDriverForm.message.trim()) {
+                if (composeDriverForm.driverUserId && composeDriverForm.routeId && composeDriverForm.message.trim()) {
                   sendDriverMessageMutation.mutate({
                     driverUserId: composeDriverForm.driverUserId,
-                    routeId: composeDriverForm.routeId === "none" ? "" : composeDriverForm.routeId,
+                    routeId: composeDriverForm.routeId,
                     message: composeDriverForm.message.trim(),
                   });
                 }
               }}
-              disabled={!composeDriverForm.driverUserId || !composeDriverForm.message.trim() || sendDriverMessageMutation.isPending}
+              disabled={!composeDriverForm.driverUserId || !composeDriverForm.routeId || !composeDriverForm.message.trim() || sendDriverMessageMutation.isPending}
               data-testid="button-send-driver-message"
             >
               <Send className="w-4 h-4 mr-2" />

@@ -4032,8 +4032,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = (req as any).user as AuthUser;
       const { driverUserId, routeId, message, type = "general" } = req.body;
       
-      if (!driverUserId || !routeId || !message) {
-        return res.status(400).json({ error: "driverUserId, routeId, and message are required" });
+      if (!driverUserId || !message) {
+        return res.status(400).json({ error: "driverUserId and message are required" });
       }
       
       // Verify the driver exists and belongs to the admin's org (or system admin)
@@ -4052,10 +4052,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Communications are disabled for this organization" });
       }
       
+      // If no routeId provided, try to get driver's default route assignment
+      let effectiveRouteId = routeId;
+      if (!effectiveRouteId) {
+        const assignments = await storage.getUserRouteAssignments(driverUserId);
+        const defaultAssignment = assignments.find(a => a.isDefault) || assignments[0];
+        effectiveRouteId = defaultAssignment?.routeId || null;
+      }
+      
+      // Route is required - reject if we couldn't determine one
+      if (!effectiveRouteId) {
+        return res.status(400).json({ error: "A route is required. Please select a route or assign one to the driver first." });
+      }
+      
       // Create driver message on behalf of admin (using driver's ID but with admin content)
       const driverMessageData = {
         organizationId: driver.organizationId!,
-        routeId,
+        routeId: effectiveRouteId,
         driverUserId,
         type: type as "route_issue" | "vehicle_problem" | "schedule_change" | "general",
         message: `[From Admin] ${message}`,
@@ -4107,12 +4120,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getUsersByOrganization(effectiveOrgId);
       const drivers = allUsers.filter(u => u.role === "driver" && u.isActive);
       
-      res.json(drivers.map(d => ({
-        id: d.id,
-        name: d.name,
-        email: d.email,
-        phoneNumber: d.phoneNumber
-      })));
+      // Get route assignments for each driver
+      const driversWithRoutes = await Promise.all(drivers.map(async (d) => {
+        const assignments = await storage.getUserRouteAssignments(d.id);
+        const defaultAssignment = assignments.find(a => a.isDefault) || assignments[0];
+        return {
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          phoneNumber: d.phoneNumber,
+          defaultRouteId: defaultAssignment?.routeId || null
+        };
+      }));
+      
+      res.json(driversWithRoutes);
     } catch (error) {
       console.error("Error fetching organization drivers:", error);
       res.status(500).json({ error: "Internal server error" });
