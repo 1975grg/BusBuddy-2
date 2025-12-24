@@ -75,12 +75,15 @@ class PushNotificationService {
       const response = await fetch(url, {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           token,
           platform,
           userId,
         }),
       });
+      
+      console.log('[PUSH] Registration response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
