@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { sendMagicLinkEmail, sendPasswordResetEmail, sendWelcomeEmail } from "./email";
-import { sendProximityAlertPush, sendServiceAlertPush, isFirebaseReady } from "./firebase-push";
+import { sendProximityAlertPush, sendServiceAlertPush, sendPushToUser, isFirebaseReady } from "./firebase-push";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -3668,6 +3668,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
+      
+      // Send Firebase push notification to the driver
+      if (isFirebaseReady() && targetMessage.driverUserId) {
+        try {
+          const pushResult = await sendPushToUser(
+            targetMessage.driverUserId,
+            "📬 New Message from Admin",
+            adminResponse.length > 100 ? adminResponse.substring(0, 100) + "..." : adminResponse,
+            { type: "admin_response", messageId: id }
+          );
+          console.log(`[PUSH] Driver message response notification sent to ${targetMessage.driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+        } catch (pushError) {
+          console.error("[PUSH] Error sending driver message notification:", pushError);
+        }
+      }
+      
       res.json(message);
     } catch (error) {
       console.error("Error adding admin response to driver message:", error);
