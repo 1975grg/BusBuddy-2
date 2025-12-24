@@ -54,6 +54,30 @@ export default function DriverPage() {
     },
   });
 
+  // Mutation to update driver's assigned route - syncs with admin dashboard
+  const updateAssignedRouteMutation = useMutation({
+    mutationFn: async ({ routeId }: { routeId: string }) => {
+      if (!currentUser) throw new Error("User not found");
+      return apiRequest("PUT", `/api/route-assignments/${currentUser.id}/default`, { routeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      console.log("Driver route assignment updated successfully");
+    },
+    onError: (error: any) => {
+      console.error("Failed to update route assignment:", error);
+    },
+  });
+
+  // Handler for route selection that persists to database
+  const handleRouteChange = (routeId: string) => {
+    setSelectedRoute(routeId);
+    // Persist the route assignment to database so admin dashboard stays in sync
+    if (currentUser) {
+      updateAssignedRouteMutation.mutate({ routeId });
+    }
+  };
+
   // Query for active session when route is selected - MUST be before early returns
   const { data: activeSession, isLoading: sessionLoading } = useQuery({
     queryKey: ["/api/route-sessions/active", selectedRoute],
@@ -180,7 +204,7 @@ export default function DriverPage() {
             {selectedRoute !== favoriteRoute.id && (
               <Button 
                 className="mt-3 w-full" 
-                onClick={() => setSelectedRoute(favoriteRoute.id)}
+                onClick={() => handleRouteChange(favoriteRoute.id)}
                 data-testid="button-select-favorite"
               >
                 Select This Route
@@ -247,7 +271,7 @@ export default function DriverPage() {
             <div className="space-y-4">
               <Select
                 value={selectedRoute}
-                onValueChange={setSelectedRoute}
+                onValueChange={handleRouteChange}
                 data-testid="select-route-dropdown"
               >
                 <SelectTrigger className="w-full">

@@ -28,7 +28,8 @@ import {
   notificationMethodEnum,
   notificationModeEnum,
   stopPreferences,
-  routeStops
+  routeStops,
+  userRouteAssignments
 } from "@shared/schema";
 import { qrService } from "./qr";
 import { smsService } from "./sms";
@@ -1000,7 +1001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Set default route for user
+  // Set default route for user (creates assignment if needed)
   app.put("/api/route-assignments/:userId/default", authenticateUser, async (req, res) => {
     try {
       const requestingUser = (req as any).user as AuthUser;
@@ -1012,7 +1013,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const assignment = await storage.setDefaultRoute(userId, routeId);
+      // Check if user already has an assignment for this route
+      const existingAssignments = await storage.getUserRouteAssignments(userId);
+      const existingForRoute = existingAssignments.find(a => a.routeId === routeId);
+      
+      let assignment: any;
+      
+      if (existingForRoute) {
+        // Use setDefaultRoute which clears all defaults then sets this one
+        assignment = await storage.setDefaultRoute(userId, routeId);
+      } else {
+        // First, clear all default flags for this user using direct DB update
+        await db.update(userRouteAssignments)
+          .set({ isDefault: false })
+          .where(eq(userRouteAssignments.userId, userId));
+        
+        // Create new assignment with this route as default
+        assignment = await storage.createUserRouteAssignment({
+          userId,
+          routeId,
+          assignedByUserId: requestingUser.id,
+          isDefault: true,
+        });
+      }
+      
       res.json(assignment);
     } catch (error) {
       console.error("Error setting default route:", error);
