@@ -133,13 +133,35 @@ export default function DriverPage() {
   // Find user's favorite route if they have one
   const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
   
-  // Set initial selected route to favorite if available - MUST be in useEffect, not during render
-  // Setting state during render causes a loop that blocks UserContext from initializing push notifications
+  // Get the user's default route assignment (from admin dashboard)
+  const userRouteAssignments = (currentUser as any)?.routeAssignments || [];
+  const defaultAssignment = userRouteAssignments.find((a: any) => a.isDefault) || userRouteAssignments[0];
+  const defaultAssignedRouteId = defaultAssignment?.routeId;
+  
+  // Set initial selected route: prefer default assignment from admin, then favorite
+  // This effect runs on mount and when assignments change from the backend
   useEffect(() => {
-    if (!selectedRoute && favoriteRoute) {
-      setSelectedRoute(favoriteRoute.id);
+    if (!selectedRoute) {
+      // Initial load: use default assignment if available, otherwise favorite
+      if (defaultAssignedRouteId) {
+        setSelectedRoute(defaultAssignedRouteId);
+      } else if (favoriteRoute) {
+        setSelectedRoute(favoriteRoute.id);
+      }
     }
-  }, [favoriteRoute, selectedRoute]);
+  }, [defaultAssignedRouteId, favoriteRoute, selectedRoute]);
+  
+  // Sync with admin changes: update selected route when admin changes the default assignment
+  // This runs when the polled /api/me returns new route assignments
+  useEffect(() => {
+    if (defaultAssignedRouteId && selectedRoute && defaultAssignedRouteId !== selectedRoute) {
+      console.log("[ADMIN-SYNC] Route assignment changed by admin:", { 
+        old: selectedRoute, 
+        new: defaultAssignedRouteId 
+      });
+      setSelectedRoute(defaultAssignedRouteId);
+    }
+  }, [defaultAssignedRouteId]);
 
   // Early returns AFTER all hooks
   if (authLoading || routesLoading) {
