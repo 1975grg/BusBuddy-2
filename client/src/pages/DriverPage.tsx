@@ -58,14 +58,26 @@ export default function DriverPage() {
   const updateAssignedRouteMutation = useMutation({
     mutationFn: async ({ routeId }: { routeId: string }) => {
       if (!currentUser) throw new Error("User not found");
-      return apiRequest("PUT", `/api/route-assignments/${currentUser.id}/default`, { routeId });
+      console.log("[DRIVER-SYNC] Sending route assignment update:", { userId: currentUser.id, routeId });
+      const response = await apiRequest("PUT", `/api/route-assignments/${currentUser.id}/default`, { routeId });
+      console.log("[DRIVER-SYNC] Route assignment response received");
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
-      console.log("Driver route assignment updated successfully");
+      // Also invalidate staff query for same-session admin views
+      if (currentUser?.organizationId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/staff", currentUser.organizationId] });
+      }
+      console.log("[DRIVER-SYNC] Route assignment updated successfully");
+      toast({ description: "Route assignment saved" });
     },
     onError: (error: any) => {
-      console.error("Failed to update route assignment:", error);
+      console.error("[DRIVER-SYNC] Failed to update route assignment:", error);
+      toast({
+        variant: "destructive",
+        description: error?.message || "Failed to save route assignment. Please try again.",
+      });
     },
   });
 

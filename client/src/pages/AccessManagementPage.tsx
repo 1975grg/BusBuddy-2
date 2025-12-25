@@ -155,6 +155,7 @@ export default function AccessManagementPage() {
       return response.json();
     },
     enabled: !!effectiveOrgId,
+    refetchInterval: 15000, // Refresh every 15 seconds to pick up driver route changes
   });
 
   const drivers = staff.filter(s => s.role === "driver" && s.isActive);

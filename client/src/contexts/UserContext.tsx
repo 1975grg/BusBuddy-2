@@ -34,6 +34,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/me"],
     retry: false, // Don't retry on 401
     refetchOnWindowFocus: false,
+    refetchInterval: 30000, // Refresh every 30 seconds to pick up assignment changes from admin
   });
 
   // Initialize push notifications when user is authenticated on native platform
