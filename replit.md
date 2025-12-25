@@ -6,6 +6,11 @@ Bus Buddy is a real-time bus and shuttle tracking platform for institutions like
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Development Notes
+- **iOS Project Location**: `~/Downloads/BusBuddy-v3-user-interface/ios/App` (on user's local Mac)
+- **Production API**: https://bus-buddy-v-3-user-interface-1975grg.replit.app
+- **Test Account (Driver)**: testdriver@universityhs.edu at University HS organization
+
 ## System Architecture
 
 ### UI/UX Decisions

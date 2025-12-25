@@ -54,17 +54,19 @@ export default function RiderPage() {
   });
 
   // Query for organization messaging settings
-  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+  // Default to false (disabled) if the API call fails - safer default
+  const { data: orgSettings, isLoading: orgSettingsLoading } = useQuery<{ messagingEnabled: boolean }>({
     queryKey: ["/api/organization-settings"],
     queryFn: async () => {
       const response = await apiFetch("/api/organization-settings");
-      if (!response.ok) return { messagingEnabled: true };
+      if (!response.ok) return { messagingEnabled: false };
       return response.json();
     },
     enabled: !authLoading,
   });
 
-  const messagingEnabled = orgSettings?.messagingEnabled ?? true;
+  // Only show messaging as enabled once we've confirmed from the server
+  const messagingEnabled = !orgSettingsLoading && (orgSettings?.messagingEnabled ?? false);
 
   // Early return AFTER all hooks
   if (authLoading) {
@@ -145,7 +147,7 @@ export default function RiderPage() {
       />
 
       {/* Contact Support Section - Above Messages */}
-      <Card className={!messagingEnabled ? "opacity-60" : ""}>
+      <Card className={!messagingEnabled && !orgSettingsLoading ? "opacity-60" : ""}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {messagingEnabled ? (
@@ -157,7 +159,12 @@ export default function RiderPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {messagingEnabled ? (
+          {orgSettingsLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+              <span className="text-muted-foreground">Loading...</span>
+            </div>
+          ) : messagingEnabled ? (
             <>
               <p className="text-muted-foreground mb-4">
                 Have a question about your route or transportation services? Contact our support team.
@@ -183,7 +190,7 @@ export default function RiderPage() {
       <MessageHistory userType="rider" routeId={currentRoute.id} userId={user?.id} messagingEnabled={messagingEnabled} />
 
       {/* Contact Support Dialog */}
-      {messagingEnabled && (
+      {messagingEnabled && !orgSettingsLoading && (
         <SendRiderMessageDialog
           route={{
             id: currentRoute.id,

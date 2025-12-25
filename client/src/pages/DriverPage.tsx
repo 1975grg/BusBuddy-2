@@ -104,17 +104,19 @@ export default function DriverPage() {
   });
 
   // Query for organization messaging settings
-  const { data: orgSettings } = useQuery<{ messagingEnabled: boolean }>({
+  // Default to false (disabled) if the API call fails - safer default
+  const { data: orgSettings, isLoading: orgSettingsLoading } = useQuery<{ messagingEnabled: boolean }>({
     queryKey: ["/api/organization-settings"],
     queryFn: async () => {
       const response = await apiFetch("/api/organization-settings");
-      if (!response.ok) return { messagingEnabled: true };
+      if (!response.ok) return { messagingEnabled: false };
       return response.json();
     },
     enabled: !authLoading,
   });
 
-  const messagingEnabled = orgSettings?.messagingEnabled ?? true;
+  // Only show messaging as enabled once we've confirmed from the server
+  const messagingEnabled = !orgSettingsLoading && (orgSettings?.messagingEnabled ?? false);
 
   // Find user's favorite route if they have one
   const favoriteRoute = routes.find(route => route.id === currentUser?.favoriteRouteId);
@@ -346,7 +348,7 @@ export default function DriverPage() {
       {/* Contact Admin Section */}
       {currentRoute && currentUser && (
         <>
-          <Card className={!messagingEnabled ? "opacity-60" : ""}>
+          <Card className={!messagingEnabled && !orgSettingsLoading ? "opacity-60" : ""}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {messagingEnabled ? (
@@ -358,7 +360,12 @@ export default function DriverPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {messagingEnabled ? (
+              {orgSettingsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                  <span className="text-muted-foreground">Loading...</span>
+                </div>
+              ) : messagingEnabled ? (
                 <>
                   <p className="text-muted-foreground mb-4">
                     Report issues with the route, vehicle, or schedule to the admin team.
@@ -380,7 +387,7 @@ export default function DriverPage() {
             </CardContent>
           </Card>
 
-          {messagingEnabled && (
+          {messagingEnabled && !orgSettingsLoading && (
             <SendDriverMessageDialog
               route={currentRoute}
               driverUserId={currentUser.id}

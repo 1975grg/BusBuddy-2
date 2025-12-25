@@ -774,7 +774,9 @@ export default function AccessManagementPage() {
                           <p className="text-sm font-medium">Assigned Route</p>
                           <p className="text-sm text-muted-foreground">
                             {driver.routeAssignments.length > 0 
-                              ? getRouteName(driver.routeAssignments[0].routeId)
+                              ? getRouteName(
+                                  (driver.routeAssignments.find(a => a.isDefault) || driver.routeAssignments[0]).routeId
+                                )
                               : "Unassigned"}
                           </p>
                         </div>

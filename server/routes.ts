@@ -1008,8 +1008,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { routeId } = req.body;
 
+      console.log("[ROUTE-SYNC] Setting default route:", { 
+        userId, 
+        routeId, 
+        requestingUserId: requestingUser.id,
+        requestingUserRole: requestingUser.role 
+      });
+
       // Users can set their own default, org admins can set for their org
       if (requestingUser.id !== userId && requestingUser.role !== "org_admin" && requestingUser.role !== "system_admin") {
+        console.log("[ROUTE-SYNC] Forbidden - user mismatch");
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -1017,11 +1025,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingAssignments = await storage.getUserRouteAssignments(userId);
       const existingForRoute = existingAssignments.find(a => a.routeId === routeId);
       
+      console.log("[ROUTE-SYNC] Existing assignments:", existingAssignments.length, "Has route:", !!existingForRoute);
+      
       let assignment: any;
       
       if (existingForRoute) {
         // Use setDefaultRoute which clears all defaults then sets this one
         assignment = await storage.setDefaultRoute(userId, routeId);
+        console.log("[ROUTE-SYNC] Updated existing assignment to default");
       } else {
         // First, clear all default flags for this user using direct DB update
         await db.update(userRouteAssignments)
@@ -1035,11 +1046,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignedByUserId: requestingUser.id,
           isDefault: true,
         });
+        console.log("[ROUTE-SYNC] Created new assignment:", assignment?.id);
       }
       
       res.json(assignment);
     } catch (error) {
-      console.error("Error setting default route:", error);
+      console.error("[ROUTE-SYNC] Error setting default route:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1623,10 +1635,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/staff", authenticateUser, requireRole("org_admin", "system_admin"), async (req, res) => {
     try {
       const user = (req as any).user as AuthUser;
-      const { role } = req.query;
+      const { role, organizationId } = req.query;
+      
+      // System admins can view any org's staff, org admins only their own
+      const effectiveOrgId = user.role === "system_admin" && organizationId && typeof organizationId === "string"
+        ? organizationId
+        : user.organizationId;
       
       // Get all users for the organization
-      const allUsers = await storage.getUsersByOrganization(user.organizationId);
+      const allUsers = await storage.getUsersByOrganization(effectiveOrgId);
       
       // Filter to only drivers and org_admins
       let staffMembers = allUsers.filter(u => 

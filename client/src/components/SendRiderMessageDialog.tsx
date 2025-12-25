@@ -65,11 +65,13 @@ export function SendRiderMessageDialog({ open, onOpenChange, route }: SendRiderM
       });
       handleClose();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error sending message:", error);
+      // Show the specific error message from the server (e.g., "Communications are disabled")
+      const errorMessage = error?.message || "Failed to send message. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
