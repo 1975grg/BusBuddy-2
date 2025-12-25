@@ -399,24 +399,38 @@ export default function DriverPage() {
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
                   <span className="text-muted-foreground">Loading...</span>
                 </div>
-              ) : messagingEnabled ? (
+              ) : (
                 <>
                   <p className="text-muted-foreground mb-4">
-                    Report issues with the route, vehicle, or schedule to the admin team.
+                    {messagingEnabled 
+                      ? "Report issues with the route, vehicle, or schedule to the admin team."
+                      : "Communications are currently disabled for this organization."}
                   </p>
                   <Button 
-                    onClick={() => setMessageDialogOpen(true)}
-                    className="w-full"
+                    onClick={() => {
+                      if (!messagingEnabled) {
+                        toast({
+                          variant: "destructive",
+                          title: "Communications Disabled",
+                          description: "Messaging has been turned off by the administrator for regulatory compliance.",
+                        });
+                        return;
+                      }
+                      setMessageDialogOpen(true);
+                    }}
+                    className={`w-full ${!messagingEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                    variant={messagingEnabled ? "default" : "secondary"}
+                    aria-disabled={!messagingEnabled}
                     data-testid="button-contact-admin"
                   >
-                    <MessageSquare className="w-4 h-4 mr-2" />
+                    {messagingEnabled ? (
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                    ) : (
+                      <MessageSquareOff className="w-4 h-4 mr-2" />
+                    )}
                     Contact Admin
                   </Button>
                 </>
-              ) : (
-                <p className="text-muted-foreground text-center py-2">
-                  Messaging is currently disabled for this organization.
-                </p>
               )}
             </CardContent>
           </Card>

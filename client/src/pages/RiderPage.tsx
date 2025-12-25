@@ -6,6 +6,7 @@ import { MessageHistory } from "@/components/MessageHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, MessageSquareOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useRequireRole } from "@/contexts/UserContext";
 import { apiFetch } from "@/lib/queryClient";
 import type { ServiceAlert } from "@shared/schema";
@@ -14,6 +15,7 @@ import { SmartAppBanner } from "@/components/SmartAppBanner";
 export default function RiderPage() {
   const { user, isLoading: authLoading } = useRequireRole("rider");
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   // Debug logging
   console.log("RiderPage Debug:", {
@@ -164,24 +166,38 @@ export default function RiderPage() {
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
               <span className="text-muted-foreground">Loading...</span>
             </div>
-          ) : messagingEnabled ? (
+          ) : (
             <>
               <p className="text-muted-foreground mb-4">
-                Have a question about your route or transportation services? Contact our support team.
+                {messagingEnabled 
+                  ? "Have a question about your route or transportation services? Contact our support team."
+                  : "Communications are currently disabled for this organization."}
               </p>
               <Button 
-                onClick={() => setMessageDialogOpen(true)}
-                className="w-full"
+                onClick={() => {
+                  if (!messagingEnabled) {
+                    toast({
+                      variant: "destructive",
+                      title: "Communications Disabled",
+                      description: "Messaging has been turned off by the administrator for regulatory compliance.",
+                    });
+                    return;
+                  }
+                  setMessageDialogOpen(true);
+                }}
+                className={`w-full ${!messagingEnabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                variant={messagingEnabled ? "default" : "secondary"}
+                aria-disabled={!messagingEnabled}
                 data-testid="button-contact-support"
               >
-                <MessageSquare className="w-4 h-4 mr-2" />
+                {messagingEnabled ? (
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                ) : (
+                  <MessageSquareOff className="w-4 h-4 mr-2" />
+                )}
                 Contact Support
               </Button>
             </>
-          ) : (
-            <p className="text-muted-foreground text-center py-2">
-              Messaging is currently disabled for this organization.
-            </p>
           )}
         </CardContent>
       </Card>
