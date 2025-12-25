@@ -345,10 +345,12 @@ export default function AccessManagementPage() {
   };
 
   const openEditDialog = (staffMember: StaffMember) => {
+    // Find the default route assignment, or fall back to first assignment
+    const defaultAssignment = staffMember.routeAssignments.find(a => a.isDefault) || staffMember.routeAssignments[0];
     setEditForm({
       name: staffMember.name || "",
       phoneNumber: staffMember.phoneNumber || "",
-      routeId: staffMember.routeAssignments.length > 0 ? staffMember.routeAssignments[0].routeId : "",
+      routeId: defaultAssignment?.routeId || "",
     });
     setEditDialog({ open: true, staffMember });
   };
