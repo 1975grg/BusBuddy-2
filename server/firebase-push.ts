@@ -11,6 +11,76 @@ import { eq, and } from 'drizzle-orm';
 let isInitialized = false;
 
 /**
+ * Notification Rate Limiting System
+ * Prevents duplicate/spam notifications while ensuring important ones get through
+ */
+
+// In-memory cache for tracking recent notifications
+// Key format: "userId:notificationType:uniqueKey"
+const recentNotifications = new Map<string, number>();
+
+// Cooldown periods in milliseconds
+const COOLDOWN_PERIODS = {
+  proximity_alert: 60 * 1000,      // 60 seconds for same stop alert
+  admin_direct_message: 30 * 1000, // 30 seconds for same message thread
+  admin_response: 30 * 1000,       // 30 seconds for admin responses
+  service_alert: 5 * 60 * 1000,    // 5 minutes for same service alert type
+  default: 10 * 1000,              // 10 seconds default
+};
+
+// Clean up old entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  recentNotifications.forEach((timestamp, key) => {
+    // Remove entries older than 10 minutes
+    if (now - timestamp > 10 * 60 * 1000) {
+      keysToDelete.push(key);
+    }
+  });
+  keysToDelete.forEach(key => recentNotifications.delete(key));
+}, 5 * 60 * 1000);
+
+/**
+ * Check if a notification should be rate-limited
+ * Returns true if the notification should be sent, false if it should be skipped
+ */
+export function shouldSendNotification(
+  userId: string,
+  notificationType: string,
+  uniqueKey: string
+): boolean {
+  const cacheKey = `${userId}:${notificationType}:${uniqueKey}`;
+  const lastSent = recentNotifications.get(cacheKey);
+  const now = Date.now();
+  
+  // Get cooldown period for this notification type
+  const cooldownMs = COOLDOWN_PERIODS[notificationType as keyof typeof COOLDOWN_PERIODS] 
+    || COOLDOWN_PERIODS.default;
+  
+  if (lastSent && (now - lastSent) < cooldownMs) {
+    console.log(`[Rate Limit] Skipping duplicate notification for ${userId} (${notificationType}:${uniqueKey}) - last sent ${Math.round((now - lastSent) / 1000)}s ago`);
+    return false;
+  }
+  
+  // Record this notification
+  recentNotifications.set(cacheKey, now);
+  return true;
+}
+
+/**
+ * Clear rate limit for a specific notification (useful for testing or manual override)
+ */
+export function clearNotificationRateLimit(
+  userId: string,
+  notificationType: string,
+  uniqueKey: string
+): void {
+  const cacheKey = `${userId}:${notificationType}:${uniqueKey}`;
+  recentNotifications.delete(cacheKey);
+}
+
+/**
  * Initialize Firebase Admin SDK
  * Requires FIREBASE_SERVICE_ACCOUNT_KEY environment variable with the JSON key
  */
@@ -196,14 +266,25 @@ async function deactivateInvalidToken(token: string): Promise<void> {
 }
 
 /**
- * Send proximity alert push notification
+ * Send proximity alert push notification with rate limiting
+ * @param routeId - Required to distinguish notifications for same stop on different routes
+ * @param sessionId - Required to distinguish notifications within same route across different trip sessions
  */
 export async function sendProximityAlertPush(
   userId: string,
   alertType: 'approaching' | 'arrived',
   stopName: string,
-  routeName: string
-): Promise<{ sent: number; failed: number }> {
+  routeName: string,
+  routeId?: string,
+  sessionId?: string
+): Promise<{ sent: number; failed: number; rateLimited?: boolean }> {
+  // Rate limit by user + route + session + stop name + alert type to prevent spam
+  // This ensures different routes with same stop names still get notifications
+  const uniqueKey = `${routeId || 'no-route'}:${sessionId || 'no-session'}:${stopName}:${alertType}`;
+  if (!shouldSendNotification(userId, 'proximity_alert', uniqueKey)) {
+    return { sent: 0, failed: 0, rateLimited: true };
+  }
+  
   const title = alertType === 'approaching' 
     ? '🚌 Bus Approaching!' 
     : '🚌 Bus Arrived!';
@@ -221,21 +302,73 @@ export async function sendProximityAlertPush(
 }
 
 /**
- * Send service alert push notification to all users on a route
+ * Send service alert push notification to all users on a route with rate limiting
+ * @param alertId - Optional alert ID to distinguish different alert instances (e.g., updated details)
  */
 export async function sendServiceAlertPush(
   userIds: string[],
   alertType: string,
   title: string,
   message: string,
-  routeName: string
-): Promise<{ totalSent: number; totalFailed: number }> {
+  routeName: string,
+  alertId?: string | number
+): Promise<{ totalSent: number; totalFailed: number; rateLimited: number }> {
   const emoji = alertType === 'cancelled' ? '❌' : alertType === 'delayed' ? '⏰' : '📢';
   const pushTitle = `${emoji} ${title}`;
   
-  return sendPushToUsers(userIds, pushTitle, message, {
-    type: 'service_alert',
-    alertType,
-    routeName,
+  let totalSent = 0;
+  let totalFailed = 0;
+  let rateLimited = 0;
+  
+  // Rate limit by user + route + alert type + alert ID
+  // Include alert ID so updated messages with same type can still be sent
+  const uniqueKey = alertId ? `${routeName}:${alertType}:${alertId}` : `${routeName}:${alertType}`;
+  
+  for (const userId of userIds) {
+    if (!shouldSendNotification(userId, 'service_alert', uniqueKey)) {
+      rateLimited++;
+      continue;
+    }
+    
+    const result = await sendPushToUser(userId, pushTitle, message, {
+      type: 'service_alert',
+      alertType,
+      routeName,
+    });
+    totalSent += result.sent;
+    totalFailed += result.failed;
+  }
+  
+  if (rateLimited > 0) {
+    console.log(`[Rate Limit] Service alert: ${rateLimited} users rate-limited`);
+  }
+  
+  return { totalSent, totalFailed, rateLimited };
+}
+
+/**
+ * Send admin message push notification to a driver with rate limiting
+ */
+export async function sendAdminMessagePush(
+  userId: string,
+  messageId: number | string,
+  messageContent: string,
+  isResponse: boolean = false
+): Promise<{ sent: number; failed: number; rateLimited?: boolean }> {
+  const notificationType = isResponse ? 'admin_response' : 'admin_direct_message';
+  
+  // Rate limit by user + message type (allows one notification per 30 seconds per thread)
+  if (!shouldSendNotification(userId, notificationType, String(messageId))) {
+    return { sent: 0, failed: 0, rateLimited: true };
+  }
+  
+  const title = "New Message from Admin";
+  const body = messageContent.length > 100 
+    ? messageContent.substring(0, 100) + "..." 
+    : messageContent;
+  
+  return sendPushToUser(userId, title, body, {
+    type: notificationType,
+    messageId: String(messageId),
   });
 }

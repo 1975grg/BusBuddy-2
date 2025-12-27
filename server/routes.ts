@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { sendMagicLinkEmail, sendPasswordResetEmail, sendWelcomeEmail } from "./email";
-import { sendProximityAlertPush, sendServiceAlertPush, sendPushToUser, isFirebaseReady } from "./firebase-push";
+import { sendProximityAlertPush, sendServiceAlertPush, sendPushToUser, sendAdminMessagePush, isFirebaseReady } from "./firebase-push";
 import { 
   insertOrgSettingsSchema, 
   insertOrganizationSchema, 
@@ -2538,7 +2538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`Failed to create in-app alert for ${rider.name}:`, alertError);
           }
 
-          // Send Firebase push notification to authenticated riders on this route
+          // Send Firebase push notification to authenticated riders on this route (with rate limiting)
           if (isFirebaseReady()) {
             try {
               // Get authenticated riders assigned to this route
@@ -2551,9 +2551,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   userId,
                   notificationType as 'approaching' | 'arrived',
                   stop.name,
-                  route.name
+                  route.name,
+                  session.routeId,  // Include route ID for unique key
+                  session.id        // Include session ID for unique key
                 );
-                console.log(`[Notification] Firebase push to user ${userId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+                if (pushResult.rateLimited) {
+                  console.log(`[Notification] Firebase push to user ${userId} rate-limited (recent notification sent)`);
+                } else {
+                  console.log(`[Notification] Firebase push to user ${userId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+                }
               }
             } catch (pushError) {
               console.error(`[Notification] Firebase push error:`, pushError);
@@ -3743,16 +3749,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const message = await storage.respondToDriverMessage(id, adminResponse, respondedByUserId);
       
-      // Send Firebase push notification to the driver
+      // Send Firebase push notification to the driver (with rate limiting)
       if (isFirebaseReady() && targetMessage.driverUserId) {
         try {
-          const pushResult = await sendPushToUser(
+          const pushResult = await sendAdminMessagePush(
             targetMessage.driverUserId,
-            "📬 New Message from Admin",
-            adminResponse.length > 100 ? adminResponse.substring(0, 100) + "..." : adminResponse,
-            { type: "admin_response", messageId: id }
+            id,
+            adminResponse,
+            true // this is a response to a driver message
           );
-          console.log(`[PUSH] Driver message response notification sent to ${targetMessage.driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+          if (pushResult.rateLimited) {
+            console.log(`[PUSH] Driver message response to ${targetMessage.driverUserId} rate-limited (recent notification already sent)`);
+          } else {
+            console.log(`[PUSH] Driver message response notification sent to ${targetMessage.driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+          }
         } catch (pushError) {
           console.error("[PUSH] Error sending driver message notification:", pushError);
         }
@@ -4093,16 +4103,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const newMessage = await storage.createDriverMessage(driverMessageData);
       
-      // Send Firebase push notification to the driver
+      // Send Firebase push notification to the driver (with rate limiting)
       if (isFirebaseReady()) {
         try {
-          const pushResult = await sendPushToUser(
+          const pushResult = await sendAdminMessagePush(
             driverUserId,
-            "📬 New Message from Admin",
-            message.length > 100 ? message.substring(0, 100) + "..." : message,
-            { type: "admin_direct_message", messageId: newMessage.id }
+            newMessage.id,
+            message,
+            false // not a response, it's a direct message
           );
-          console.log(`[PUSH] Admin direct message notification sent to ${driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+          if (pushResult.rateLimited) {
+            console.log(`[PUSH] Admin direct message to ${driverUserId} rate-limited (recent notification already sent)`);
+          } else {
+            console.log(`[PUSH] Admin direct message notification sent to ${driverUserId}: ${pushResult.sent} success, ${pushResult.failed} failed`);
+          }
         } catch (pushError) {
           console.error("[PUSH] Error sending admin direct message notification:", pushError);
         }

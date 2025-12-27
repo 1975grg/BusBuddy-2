@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 - **Real-time Capabilities**: Planned WebSocket integration for live GPS tracking.
 - **Authentication**: Dual strategy using HttpOnly cookie sessions for web and Bearer tokens (Capacitor Preferences) for native apps, with role-based access control (Admin, Driver, Rider). Includes password expiration policies (e.g., annual for riders) and magic link support.
 - **Data Storage Strategy**: Multi-tenant architecture using Neon PostgreSQL, with Drizzle for schema management.
-- **Notification System**: SMS notifications with TCPA compliance (opt-in/out, keyword support), in-app proximity alerts, and service alerts via toast notifications.
+- **Notification System**: SMS notifications with TCPA compliance (opt-in/out, keyword support), in-app proximity alerts, service alerts via toast notifications, and Firebase push notifications with server-side rate limiting to prevent spam (60s cooldown for proximity alerts, 30s for messages, 5min for service alerts).
 - **Messaging System**: Bidirectional messaging (Riders ↔ Admin, Drivers ↔ Admin) with real-time updates, message attribution, and a unified Support Center. Includes admin direct messaging to drivers.
 - **Location Services**: Geofencing for automatic stop advancement and screen wake lock for drivers during trips to ensure continuous GPS tracking.
 - **System Administration**: Dedicated dashboard for system administrators to manage organizations, including a read-only viewing mode for organizational data.
