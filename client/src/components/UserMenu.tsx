@@ -31,8 +31,12 @@ export function UserMenu() {
       await setStoredSessionToken(null);
       
       // Reset push notification service so it can re-initialize on next login
-      // This ensures the iOS permission prompt can appear again
-      await pushNotificationService.removeAllListeners();
+      // Wrap in try-catch to ensure logout continues even if Firebase cleanup fails
+      try {
+        await pushNotificationService.removeAllListeners();
+      } catch (error) {
+        console.warn("[Logout] Failed to reset push notifications, continuing logout:", error);
+      }
       
       // Invalidate all queries to clear the cache
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
