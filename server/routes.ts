@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { sendMagicLinkEmail, sendPasswordResetEmail, sendWelcomeEmail } from "./email";
 import { sendProximityAlertPush, sendServiceAlertPush, sendPushToUser, sendAdminMessagePush, isFirebaseReady } from "./firebase-push";
 import { 
@@ -2330,11 +2330,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stops = await storage.getRouteStopsByRoute(id);
       
       // Check if any riders depend on these stops
-      const stopIds = stops.map(s => s.id).filter(Boolean);
+      const stopIds = stops.map(s => s.id).filter((id): id is string => Boolean(id));
       if (stopIds.length > 0) {
         const dependentPreferences = await db.select()
           .from(stopPreferences)
-          .where(sql`${stopPreferences.stopId} IN (${sql.join(stopIds.map(id => sql`${id}`), sql`, `)})`);
+          .where(inArray(stopPreferences.stopId, stopIds));
         
         if (dependentPreferences.length > 0) {
           return res.status(409).json({
