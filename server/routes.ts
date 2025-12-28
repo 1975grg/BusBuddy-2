@@ -29,6 +29,7 @@ import {
   notificationModeEnum,
   stopPreferences,
   routeStops,
+  routeSessions,
   userRouteAssignments
 } from "@shared/schema";
 import { qrService } from "./qr";
@@ -2346,8 +2347,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Delete all stops for this route in a transaction (all-or-nothing)
-      // Use hard delete since we've already verified no dependent riders exist
+      // First clear any route_sessions that reference these stops via currentStopId
+      // Then delete the stops themselves
       await db.transaction(async (tx) => {
+        // Clear currentStopId references in route_sessions to avoid FK constraint violations
+        if (stopIds.length > 0) {
+          await tx.update(routeSessions)
+            .set({ currentStopId: null })
+            .where(inArray(routeSessions.currentStopId, stopIds));
+        }
+        
+        // Now delete the stops
         for (const stop of stops) {
           if (stop.id) {
             await tx.delete(routeStops)
