@@ -110,6 +110,7 @@ export interface IStorage {
   createUserRouteAssignment(assignment: InsertUserRouteAssignment): Promise<UserRouteAssignment>;
   getUserRouteAssignments(userId: string): Promise<UserRouteAssignment[]>;
   getRouteAssignmentsByRoute(routeId: string): Promise<UserRouteAssignment[]>;
+  getRiderUserIdsForRoute(routeId: string): Promise<string[]>;  // Optimized query for rider-only notifications
   setDefaultRoute(userId: string, routeId: string): Promise<UserRouteAssignment | undefined>;
   revokeRouteAssignment(assignmentId: string, revokedByUserId: string): Promise<UserRouteAssignment | undefined>;
   deleteRouteAssignment(assignmentId: string): Promise<boolean>;
@@ -529,6 +530,20 @@ export class DatabaseStorage implements IStorage {
         eq(userRouteAssignments.isActive, true),
         isNull(userRouteAssignments.revokedAt)
       ));
+  }
+
+  // Get only rider user IDs for a route (excludes drivers/admins) - optimized single query
+  async getRiderUserIdsForRoute(routeId: string): Promise<string[]> {
+    const results = await db.select({ userId: userRouteAssignments.userId })
+      .from(userRouteAssignments)
+      .innerJoin(users, eq(userRouteAssignments.userId, users.id))
+      .where(and(
+        eq(userRouteAssignments.routeId, routeId),
+        eq(userRouteAssignments.isActive, true),
+        isNull(userRouteAssignments.revokedAt),
+        eq(users.role, 'rider')
+      ));
+    return results.map(r => r.userId);
   }
 
   async setDefaultRoute(userId: string, routeId: string): Promise<UserRouteAssignment | undefined> {

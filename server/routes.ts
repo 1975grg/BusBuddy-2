@@ -2538,15 +2538,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`Failed to create in-app alert for ${rider.name}:`, alertError);
           }
 
-          // Send Firebase push notification to authenticated riders on this route (with rate limiting)
+          // Send Firebase push notification to authenticated RIDERS on this route (with rate limiting)
+          // IMPORTANT: Only send to riders, NOT drivers - drivers don't need proximity alerts
           if (isFirebaseReady()) {
             try {
-              // Get authenticated riders assigned to this route
-              const routeAssignments = await storage.getRouteAssignmentsByRoute(session.routeId);
-              const authenticatedRiderUserIds = routeAssignments.map(a => a.userId);
+              // Get rider user IDs in a single optimized query (excludes drivers/admins)
+              const riderUserIds = await storage.getRiderUserIdsForRoute(session.routeId);
               
-              // Send push notification to each authenticated rider
-              for (const userId of authenticatedRiderUserIds) {
+              // Send push notification to each authenticated rider only
+              for (const userId of riderUserIds) {
                 const pushResult = await sendProximityAlertPush(
                   userId,
                   notificationType as 'approaching' | 'arrived',
