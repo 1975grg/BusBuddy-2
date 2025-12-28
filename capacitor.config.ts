@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   },
   server: {
     // Cache-busting: increment version after each publish to force fresh load
-    url: 'https://bus-buddy-v-3-user-interface-1975grg.replit.app?v=20251225b',
+    url: 'https://bus-buddy-v-3-user-interface-1975grg.replit.app?v=20251228a',
     cleartext: true
   }
 };
