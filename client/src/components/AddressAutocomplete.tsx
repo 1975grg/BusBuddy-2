@@ -6,6 +6,7 @@ import { MapPin, Loader2, Navigation } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { buildApiUrl, getStoredSessionToken } from "@/lib/queryClient";
 
 interface AddressSuggestion {
   id: string;
@@ -76,9 +77,18 @@ export function AddressAutocomplete({
     
     const searchAddresses = async () => {
       try {
-        const response = await fetch(
-          `/api/geocode/search?q=${encodeURIComponent(debouncedQuery)}&limit=5`
-        );
+        const apiUrl = buildApiUrl(`/api/geocode/search?q=${encodeURIComponent(debouncedQuery)}&limit=5`);
+        
+        const headers: HeadersInit = {};
+        const token = getStoredSessionToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(apiUrl, {
+          headers,
+          credentials: "include",
+        });
         
         if (!response.ok) {
           throw new Error("Search failed");
