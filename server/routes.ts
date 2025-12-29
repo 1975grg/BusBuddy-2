@@ -30,7 +30,9 @@ import {
   stopPreferences,
   routeStops,
   routeSessions,
-  userRouteAssignments
+  userRouteAssignments,
+  stopNotificationTracking,
+  proximityAlerts
 } from "@shared/schema";
 import { qrService } from "./qr";
 import { smsService } from "./sms";
@@ -2340,6 +2342,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Clear stopPreferences that reference these stops (riders will need to re-select)
           await tx.delete(stopPreferences)
             .where(inArray(stopPreferences.stopId, stopIds));
+          
+          // Clear stop_notification_tracking records for these stops (session-based spam prevention flags)
+          await tx.delete(stopNotificationTracking)
+            .where(inArray(stopNotificationTracking.stopId, stopIds));
+          
+          // Clear proximity_alerts for these stops (one-off rider alerts)
+          await tx.delete(proximityAlerts)
+            .where(inArray(proximityAlerts.stopId, stopIds));
           
           // Clear currentStopId references in route_sessions to avoid FK constraint violations
           await tx.update(routeSessions)
