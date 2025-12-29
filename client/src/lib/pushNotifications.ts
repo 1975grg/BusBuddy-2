@@ -1,13 +1,43 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { getStoredSessionToken, buildApiUrl } from './queryClient';
-import type { FirebaseMessagingPlugin } from '@capacitor-firebase/messaging';
-
-const FirebaseMessaging = registerPlugin<FirebaseMessagingPlugin>('FirebaseMessaging');
 
 export interface DeviceToken {
   token: string;
   platform: 'ios' | 'android' | 'web';
   userId: string;
+}
+
+// Lazy-loaded Firebase Messaging plugin to prevent crashes on devices where it's not properly configured
+let FirebaseMessaging: any = null;
+let firebaseLoadError: Error | null = null;
+
+async function getFirebaseMessaging(): Promise<any> {
+  if (firebaseLoadError) {
+    throw firebaseLoadError;
+  }
+  
+  if (FirebaseMessaging) {
+    return FirebaseMessaging;
+  }
+  
+  try {
+    // Only attempt to load on native platforms
+    if (!Capacitor.isNativePlatform()) {
+      throw new Error('Firebase Messaging is only available on native platforms');
+    }
+    
+    // Dynamically import and register the plugin
+    const { registerPlugin } = await import('@capacitor/core');
+    const { FirebaseMessagingPlugin } = await import('@capacitor-firebase/messaging') as any;
+    
+    FirebaseMessaging = registerPlugin<typeof FirebaseMessagingPlugin>('FirebaseMessaging');
+    console.log('[PUSH] Firebase Messaging plugin loaded successfully');
+    return FirebaseMessaging;
+  } catch (error) {
+    console.error('[PUSH] Failed to load Firebase Messaging plugin:', error);
+    firebaseLoadError = error as Error;
+    throw error;
+  }
 }
 
 class PushNotificationService {
@@ -19,26 +49,38 @@ class PushNotificationService {
     }
     
     if (!Capacitor.isNativePlatform()) {
+      console.log('[PUSH] Not a native platform, skipping push notification setup');
       return;
     }
 
     try {
-      const permissionResult = await FirebaseMessaging.requestPermissions();
+      console.log('[PUSH] Starting push notification initialization...');
+      
+      const messaging = await getFirebaseMessaging();
+      if (!messaging) {
+        console.warn('[PUSH] Firebase Messaging not available');
+        return;
+      }
+      
+      const permissionResult = await messaging.requestPermissions();
+      console.log('[PUSH] Permission result:', permissionResult);
       
       if (permissionResult.receive === 'granted') {
-        const tokenResult = await FirebaseMessaging.getToken();
+        const tokenResult = await messaging.getToken();
+        console.log('[PUSH] Got FCM token');
         
         await this.registerDeviceToken(tokenResult.token, userId);
 
-        await FirebaseMessaging.addListener('tokenReceived', async (event) => {
+        await messaging.addListener('tokenReceived', async (event: any) => {
+          console.log('[PUSH] Token refreshed');
           await this.registerDeviceToken(event.token, userId);
         });
 
-        await FirebaseMessaging.addListener('notificationReceived', (event) => {
+        await messaging.addListener('notificationReceived', (event: any) => {
           console.log('[PUSH] Notification received:', event.notification?.title);
         });
 
-        await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+        await messaging.addListener('notificationActionPerformed', (event: any) => {
           const data = event.notification?.data as Record<string, unknown> | undefined;
           if (data?.route) {
             window.location.href = data.route as string;
@@ -52,6 +94,7 @@ class PushNotificationService {
       }
     } catch (error) {
       console.error('[PUSH] Error initializing push notifications:', error);
+      // Don't throw - let the app continue without push notifications
     }
   }
 
@@ -98,7 +141,14 @@ class PushNotificationService {
   async removeAllListeners(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     
-    await FirebaseMessaging.removeAllListeners();
+    try {
+      const messaging = await getFirebaseMessaging();
+      if (messaging) {
+        await messaging.removeAllListeners();
+      }
+    } catch (error) {
+      console.error('[PUSH] Error removing listeners:', error);
+    }
     this.isInitialized = false;
   }
 }
