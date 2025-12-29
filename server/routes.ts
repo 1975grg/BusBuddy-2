@@ -2330,28 +2330,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all stops for this route
       const stops = await storage.getRouteStopsByRoute(id);
       
-      // Check if any riders depend on these stops
+      // Get stop IDs for cleanup
       const stopIds = stops.map(s => s.id).filter((id): id is string => Boolean(id));
-      if (stopIds.length > 0) {
-        const dependentPreferences = await db.select()
-          .from(stopPreferences)
-          .where(inArray(stopPreferences.stopId, stopIds));
-        
-        if (dependentPreferences.length > 0) {
-          return res.status(409).json({
-            error: "Cannot delete all stops. Some riders have selected these as their home stops.",
-            code: "STOPS_IN_USE",
-            affectedRiders: dependentPreferences.length
-          });
-        }
-      }
       
       // Delete all stops for this route in a transaction (all-or-nothing)
-      // First clear any route_sessions that reference these stops via currentStopId
-      // Then delete the stops themselves
+      // Clear all references first, then delete the stops
       await db.transaction(async (tx) => {
-        // Clear currentStopId references in route_sessions to avoid FK constraint violations
         if (stopIds.length > 0) {
+          // Clear stopPreferences that reference these stops (riders will need to re-select)
+          await tx.delete(stopPreferences)
+            .where(inArray(stopPreferences.stopId, stopIds));
+          
+          // Clear currentStopId references in route_sessions to avoid FK constraint violations
           await tx.update(routeSessions)
             .set({ currentStopId: null })
             .where(inArray(routeSessions.currentStopId, stopIds));
