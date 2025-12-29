@@ -1,43 +1,13 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { getStoredSessionToken, buildApiUrl } from './queryClient';
+import type { FirebaseMessagingPlugin } from '@capacitor-firebase/messaging';
+
+const FirebaseMessaging = registerPlugin<FirebaseMessagingPlugin>('FirebaseMessaging');
 
 export interface DeviceToken {
   token: string;
   platform: 'ios' | 'android' | 'web';
   userId: string;
-}
-
-// Lazy-loaded Firebase Messaging plugin to prevent crashes on devices where it's not properly configured
-let FirebaseMessaging: any = null;
-let firebaseLoadError: Error | null = null;
-
-async function getFirebaseMessaging(): Promise<any> {
-  if (firebaseLoadError) {
-    throw firebaseLoadError;
-  }
-  
-  if (FirebaseMessaging) {
-    return FirebaseMessaging;
-  }
-  
-  try {
-    // Only attempt to load on native platforms
-    if (!Capacitor.isNativePlatform()) {
-      throw new Error('Firebase Messaging is only available on native platforms');
-    }
-    
-    // Dynamically import and register the plugin
-    const { registerPlugin } = await import('@capacitor/core');
-    const { FirebaseMessagingPlugin } = await import('@capacitor-firebase/messaging') as any;
-    
-    FirebaseMessaging = registerPlugin<typeof FirebaseMessagingPlugin>('FirebaseMessaging');
-    console.log('[PUSH] Firebase Messaging plugin loaded successfully');
-    return FirebaseMessaging;
-  } catch (error) {
-    console.error('[PUSH] Failed to load Firebase Messaging plugin:', error);
-    firebaseLoadError = error as Error;
-    throw error;
-  }
 }
 
 class PushNotificationService {
@@ -49,38 +19,26 @@ class PushNotificationService {
     }
     
     if (!Capacitor.isNativePlatform()) {
-      console.log('[PUSH] Not a native platform, skipping push notification setup');
       return;
     }
 
     try {
-      console.log('[PUSH] Starting push notification initialization...');
-      
-      const messaging = await getFirebaseMessaging();
-      if (!messaging) {
-        console.warn('[PUSH] Firebase Messaging not available');
-        return;
-      }
-      
-      const permissionResult = await messaging.requestPermissions();
-      console.log('[PUSH] Permission result:', permissionResult);
+      const permissionResult = await FirebaseMessaging.requestPermissions();
       
       if (permissionResult.receive === 'granted') {
-        const tokenResult = await messaging.getToken();
-        console.log('[PUSH] Got FCM token');
+        const tokenResult = await FirebaseMessaging.getToken();
         
         await this.registerDeviceToken(tokenResult.token, userId);
 
-        await messaging.addListener('tokenReceived', async (event: any) => {
-          console.log('[PUSH] Token refreshed');
+        await FirebaseMessaging.addListener('tokenReceived', async (event) => {
           await this.registerDeviceToken(event.token, userId);
         });
 
-        await messaging.addListener('notificationReceived', (event: any) => {
+        await FirebaseMessaging.addListener('notificationReceived', (event) => {
           console.log('[PUSH] Notification received:', event.notification?.title);
         });
 
-        await messaging.addListener('notificationActionPerformed', (event: any) => {
+        await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
           const data = event.notification?.data as Record<string, unknown> | undefined;
           if (data?.route) {
             window.location.href = data.route as string;
@@ -94,7 +52,6 @@ class PushNotificationService {
       }
     } catch (error) {
       console.error('[PUSH] Error initializing push notifications:', error);
-      // Don't throw - let the app continue without push notifications
     }
   }
 
@@ -142,10 +99,7 @@ class PushNotificationService {
     if (!Capacitor.isNativePlatform()) return;
     
     try {
-      const messaging = await getFirebaseMessaging();
-      if (messaging) {
-        await messaging.removeAllListeners();
-      }
+      await FirebaseMessaging.removeAllListeners();
     } catch (error) {
       console.error('[PUSH] Error removing listeners:', error);
     }
